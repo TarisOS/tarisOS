@@ -1,0 +1,46 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Wi-Fi's regulatory domain (the channels and transmit power allowed) set to the country of the
+# timezone, in /etc/conf.d/wireless-regdom, which the kernel's Wi-Fi stack is given whenever it
+# loads. Run at boot (taris-regdom.service) and by the setup screen once it has set the timezone;
+# applied at once too. A timezone with no country (UTC…) leaves it as it is.
+set -euo pipefail
+
+conf=/etc/conf.d/wireless-regdom
+tab=/usr/share/zoneinfo/zone.tab
+[[ -f $conf && -f $tab && -e /etc/localtime ]] || exit 0
+
+# The zone's name as zone.tab lists it: the link's own target first (zone.tab lists current names
+# only, and old names are links to them), then the fully resolved one
+country=""
+for zone in "$(readlink /etc/localtime)" "$(readlink -f /etc/localtime)"; do
+	zone=${zone#*/zoneinfo/}
+	zone=${zone#posix/}
+	zone=${zone#right/}
+	country=$(awk -v z="$zone" '$1 !~ /^#/ && $3 == z { print $1; exit }' "$tab")
+	[[ -n $country ]] && break
+done
+# Old names that are hard links to the current zone's file (Europe/Kiev…): the zone with that file
+if [[ -z $country ]]; then
+	while read -r code _ zone _; do
+		[[ $code == \#* ]] && continue
+		if [[ /usr/share/zoneinfo/$zone -ef /etc/localtime ]]; then
+			country=$code
+			break
+		fi
+	done <"$tab"
+fi
+[[ $country =~ ^[A-Z]{2}$ ]] || exit 0
+
+line="WIRELESS_REGDOM=\"$country\""
+if ! grep -qxF "$line" "$conf" || [[ $(grep -c '^WIRELESS_REGDOM=' "$conf") -ne 1 ]]; then
+	sed -i '/^WIRELESS_REGDOM=/d' "$conf"
+	echo "$line" >>"$conf"
+fi
+
+# Applied now when Wi-Fi is already up (otherwise when it loads)
+if [[ -d /sys/module/cfg80211 ]] && command -v iw >/dev/null; then
+	iw reg set "$country" || true
+fi

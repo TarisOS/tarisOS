@@ -1,0 +1,10 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The greeter's folders: the look the last session left (written by administrators' sessions) and
+# the account that last logged in (written by the greeter)
+d /var/lib/taris 0755 root root -
+d /var/lib/taris/greeter 2775 root wheel -
+d /var/lib/taris/greeter/faces 2775 root wheel -
+d /var/lib/taris/greeter/state 2775 root wheel -
+d /var/lib/taris/greeter-user 0755 greeter greeter -

@@ -1,0 +1,5 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Asahi Linux's packages for Arch Linux ARM
+Server = https://github.com/asahi-alarm/asahi-alarm/releases/download/$arch

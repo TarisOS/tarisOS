@@ -1,0 +1,13 @@
+// Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// The Tor switch (/usr/lib/taris/tor, the taskbar's Tor icon): switching it on and a new identity
+// need no password; switching it off and every other setting ask for one as pkexec always does, so
+// nothing running as the user can take everything off Tor, or change how it connects, unseen
+polkit.addRule(function (action, subject) {
+    const line = action.lookup("command_line");
+    if (action.id === "org.freedesktop.policykit.exec" && action.lookup("program") === "/usr/lib/taris/tor" &&
+        (line === "/usr/lib/taris/tor on" || line === "/usr/lib/taris/tor newnym") && subject.active && subject.local)
+        return polkit.Result.YES;
+    return polkit.Result.NOT_HANDLED;
+});

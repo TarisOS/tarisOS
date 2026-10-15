@@ -1,0 +1,44 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# QMLTermWidget (the terminal in the dashboard's Agent tab) with TarisOS's patches
+# (taris.patch): at most ~30 screen updates a second, since every update redraws the shell's
+# full-screen surface, and a full repaint when it's put in a window or shown again (a partial one
+# left the new texture magenta), and colour schemes also found in each account's
+# $XDG_STATE_HOME/taris/terminal (the shell writes Taris.colorscheme there from the colour scheme),
+# and wheel scrolling by the distance moved, in the scrollback and in programs that read the mouse
+# (a trackpad's many small events each scrolled a line, or sent a whole wheel click).
+# Based on Arch's qmltermwidget PKGBUILD, same upstream commit.
+
+pkgname=qmltermwidget-taris
+_pkgname=qmltermwidget
+_commit=ce8e09ad4daeb9fe59b60d6b228b0f7cf4055e16
+pkgver=2.0.0.git1
+pkgrel=5
+pkgdesc='QML port of qtermwidget, patched for the TarisOS shell'
+arch=('x86_64' 'aarch64')
+url='https://github.com/Swordfish90/qmltermwidget'
+license=('GPL-2.0-only')
+depends=('qt6-declarative')
+provides=("$_pkgname=$pkgver")
+conflicts=("$_pkgname")
+source=("$_pkgname-$_commit.tar.gz::https://github.com/Swordfish90/qmltermwidget/archive/$_commit.tar.gz"
+        'taris.patch')
+sha256sums=('928b7791269f275d953ef0a38d14d1b7196654812243e9cf7b03975b12022c76'
+            '74e9cdab99e1e0ab9ab41be259d070a78570987358a788c3d5950f9edd8068a7')
+
+prepare() {
+  cd "$_pkgname-$_commit"
+  patch -Np1 -i ../taris.patch
+}
+
+build() {
+  cd "$_pkgname-$_commit"
+  qmake6
+  make
+}
+
+package() {
+  cd "$_pkgname-$_commit"
+  make INSTALL_ROOT="$pkgdir" install -j1
+}

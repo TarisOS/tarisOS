@@ -1,0 +1,231 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's desktop: Hyprland's settings and the shell's integration (/usr/share/taris/hypr, so
+# updates reach them; each account's own changes go on top), the default apps, the desktop portal's
+# file picker, a new account's defaults (colours, wallpapers, web apps, agent skills), the window
+# title bar plugin and the system's name. Built from this repository's packaging folder.
+
+pkgname=taris-desktop
+pkgver=1.0.0
+pkgrel=17
+pkgdesc='TarisOS: the Hyprland desktop, its defaults and the system name'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=(
+    'taris-shell'
+    'hyprland'
+    'xdg-desktop-portal-hyprland'
+    'xdg-desktop-portal-gtk'
+    'gnome-keyring'
+    'polkit'
+    'glib2'
+    'dconf'
+    'xdg-utils'
+    'xdg-user-dirs'
+    'desktop-file-utils'
+    'wl-clipboard'
+    'cliphist'
+    'adw-gtk-theme'
+    'papirus-icon-theme'
+    'fluent-icon-theme-git'
+    'noto-fonts'
+    'noto-fonts-emoji'
+    'python'
+    'file'
+    'curl'
+    'bash'
+
+    # The title bar plugin, built for each Hyprland installed
+    'jq'
+    'make'
+    'gcc'
+    'pkgconf'
+    'binutils'
+)
+optdepends=(
+    'taris-wallpapers: the wallpaper collection'
+    'chromium: the browser, and the web apps'
+)
+install=taris-desktop.install
+backup=('etc/xdg/kitty/kitty.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/xdg-desktop-portal/hyprland-portals.conf' 'etc/default/grub.d/taris-name.cfg' 'etc/mpv/mpv.conf')
+source=(
+    'user-defaults'
+    'name-system'
+    'os-release'
+    'taris-os-release.hook'
+    'taris-hyprbars.hook'
+    'taris-hyprbars-remove.hook'
+    'taris-name.cfg'
+    'hyprland-portals.conf'
+    'skel-hyprland.lua'
+    'bashrc'
+    'mimeapps.list'
+    'update'
+    'install-on-demand'
+    'taris-install-code.desktop'
+    'taris-install-steam.desktop'
+    'taris-install-obs.desktop'
+    'taris-install-writer.desktop'
+    'taris-install-calc.desktop'
+    'taris-install-impress.desktop'
+    'taris-install-firefox.desktop'
+    'taris-install-nordvpn.desktop'
+    'taris-install-nordvpn.svg'
+    'nordvpn-setup'
+    'taris-nordvpn.hook'
+    'taris-nordvpn-remove.hook'
+    'mirrors'
+    'taris-mirrors.service'
+    'taris-mirrors.timer'
+    'first-apps'
+    'first-apps.list'
+    'taris-first-apps.service'
+    'taris-first-apps.timer'
+    '50-taris-mirrors.rules'
+    '50-taris-nordvpn.rules'
+    'input-method'
+    'taris-hyprbars.service'
+    'kitty.conf'
+    'mpv.conf'
+    'taris-logind.conf'
+    'taris-logind.hook'
+    'fuse-sleep'
+    'taris-fuse-resume.service'
+)
+sha256sums=('fc6a262fc78bb184a12a713142f0816e9bbe61e1e3829670a705df3c8968b6ed'
+            '0c6982fcab9703ec3cc44de107f16c9ee37714c98099eb692760162317771196'
+            'a4e539f03826bb696f5f91c468fc194bc5ff13943deb5f28d429dc5ed8dd0eb5'
+            '6c921e5153cd6471d96e7214ef5cd56b2c555113ad786352feefe43080c818dd'
+            '15c5a5f71c658769c4d462e35ee4204526a2b395c20865c711d8410611fd4d94'
+            'd195f9f269f035d005f3fb59e2eb3a66854e8ec3faa60cfa81c11d604152c79f'
+            '673e49fc16c9d5de7c2c74ef6f95ee661d4a7c25828aebdc0c056ab8500a349b'
+            '75c2b68f29d001d142062a744996dcf5f1bdaedafd98361236607415aaaf3427'
+            '1a7f147c8ac153ec944b5cbb47ef3eebdbb7150d3aaec192568ec5cf9d8c62f6'
+            '5e544b3017a0141369f0ebe8f524a58909482c16d5c47045b1c10660811c9fda'
+            'b838524eb391a1e2d39d2f65292f4afc301c24dcbde3ef69ee0e2473eea815c2'
+            'e2091234f748fae23b2667396ef52257fb6ac52af2e39dead8f1dede05f0862d'
+            '2336dff308e2ed89556d95289e263039600d4676fdc0141e4d34d67c5c91f852'
+            'bf5f4b47666951f19259d91d703538ab0c35e31fbfd9acacb8ad0cade8deb6af'
+            '6bfc2b0a390b48b7ece5044e1caabe4476af02b99f3e9ec7bec0c81d4a3d7756'
+            '39549485a47a48f7fb9e1af0e8bc5720781da1ec40555853a244e565a03b7076'
+            '3895c999812d0c3a2e8b4d97b46f0286dbac44bf30e717ec453118955b202956'
+            '18fa4dd265f7b20667e09c5936b4f17fb81b733fa0188e5ef94362024e200d26'
+            'ef7b14571a63474d1e8e53620473ba4aad2eee878e324338dfc7061dd1a966ba'
+            '7ca694ded73fda370d73dede872b3e1711253037b7ba621a19be0ff429b1fdfc'
+            '4cf9e7d58fd5f2a221dea6d62511f52327f17729afa188847d9e7874c4af8e9b'
+            '7d62fb53a3664a8cd5eae82d24a9b194568f322446f03208e80c11fad3c8cfe8'
+            'd1853757daa28b814c7198822e446b19229739118f35797e55d7d6b30c2009b7'
+            'ec8d98c4a0ede2381fb34e64adc4af9adb720ca9991cb1d925820bb601e524ef'
+            '972f9898a76b16b7cb070bfc46e91fcf5220dd63eccf1e18b36ee455dab9ace3'
+            'eabfeb432b6f88f1bc57ece1f9d872e0a14f31845e830c5f95174a1c41105cf8'
+            '5a26a6fe3cb65288f757d3ab70650d4db199ffa387b182329eda4ab49c3347a5'
+            '7c03a5004a45e2dcbf6553979c76e376c197249aa5263652ab9b8786d99c8aeb'
+            '6c5571f9471c76eba1bd0091166e2f2bbe8e4c635d0ef6687664010601f31a81'
+            '39249f1cad1b434b9422e6b60e60a1752e0659d76db462a03ef3e0ded4b39e99'
+            '48191b8622f9b58d6ad852b732c4df727f72d80729e56754c873e6ac4d07b15e'
+            '9d22cfb1060ce303bf69011b34d9f684f481270a79fb5371f9b04031b437feaf'
+            'b2ebeacaefb5445b650d0551d1681d39df6309d6bc05798e14f25e696697a57d'
+            'a295b5068c3ee1fcbbe1418db7bcc7af9f4073a60a253a0b933986e826808e74'
+            '021e577c36c78438fc822618fc263a063a6ef0bfe7047cae45fe068b67ed13c2'
+            '673fe188e0ae343fe66893459b9ead70fe107731676c0f0f57ab008a8568f2b9'
+            '4826f5eddf299b6e91037b0ea5d595cd9e4157150ee254745060925a2b8caa60'
+            '61fd421f2de0f3f0bf9204832f003f38a0d6d4dd98309187ed5c3fa81689b300'
+            '5f8eae0f5e43d87e5c169afea72e159134126fa044be486542e2e402428d4c13'
+            'a819e7b7e13d02682dca89cb1754cf7098ab0be2dfd5360cad9d90b33b125977'
+            '888719e5366b8938c937268c40185977b1b0dcc2f4ca1cf7b066641b67089995'
+            '558851ddd3b3597a3027bff48818bc46888fd021dbd77ec83a1b59b87e467593')
+
+# This repository's packaging folder (the Hyprland config, defaults, agent skills, title bars)
+_packaging="${TARIS_PACKAGING:-$startdir/../..}"
+
+package() {
+    local share="$pkgdir/usr/share/taris"
+
+    install -Dm644 "$_packaging/hypr/hyprland.lua" "$_packaging/hypr/taris.lua" -t "$share/hypr"
+    install -Dm644 skel-hyprland.lua "$pkgdir/etc/skel/.config/hypr/hyprland.lua"
+    # A new account's picture until its owner picks one
+    install -Dm644 "$_packaging/defaults/logo/face.png" "$pkgdir/etc/skel/.face"
+
+    install -Dm755 user-defaults name-system update install-on-demand input-method mirrors nordvpn-setup -t "$pkgdir/usr/lib/taris"
+    # Apps installed the first time they're opened: VSCodium, Steam, OBS Studio, LibreOffice,
+    # Firefox and NordVPN (whose service and group are set up when it's installed)
+    install -Dm644 taris-install-*.desktop -t "$pkgdir/usr/share/applications"
+    # NordVPN's own icon (from its GPL-3.0 nordvpn-linux), under another name than the one its
+    # package installs: no other icon theme has it, and the stand-in shows before it's installed
+    install -Dm644 taris-install-nordvpn.svg -t "$pkgdir/usr/share/icons/hicolor/scalable/apps"
+    # Each icon pack Settings offers as a theme of its own, Taris-<pack>, that falls back to the
+    # others: an app the pack has no icon for, and that has none of its own (one installed on first
+    # use, Tor Browser), shows the icon of the first other pack that has one, Papirus (the most
+    # complete) first. GTK and Qt both look in the pack, then in what it inherits (hicolor, apps'
+    # own icons, among them), then in the others; a pack that isn't installed is skipped. Hidden
+    # from icon theme pickers; GTK skips a theme without Directories, so it has one (empty).
+    local packs=(Papirus-Dark Tela-dark WhiteSur-dark Fluent-dark breeze-dark Adwaita) pack other inherits
+    for pack in "${packs[@]}"; do
+        inherits=$pack
+        for other in "${packs[@]}"; do
+            [[ $other == "$pack" ]] || inherits+=",$other"
+        done
+        install -d "$pkgdir/usr/share/icons/Taris-$pack"
+        printf '%s\n' '[Icon Theme]' "Name=$pack (Taris)" "Comment=$pack, then the other icon packs" \
+            "Inherits=$inherits" 'Hidden=true' 'Directories=apps' '' \
+            '[apps]' 'Size=48' 'Type=Scalable' 'MinSize=8' 'MaxSize=512' 'Context=Applications' \
+            > "$pkgdir/usr/share/icons/Taris-$pack/index.theme"
+    done
+    install -Dm755 "$_packaging/titlebars/build-hyprbars" "$pkgdir/usr/lib/taris/build-hyprbars"
+    install -Dm644 taris-os-release.hook taris-hyprbars.hook taris-hyprbars-remove.hook taris-nordvpn.hook taris-nordvpn-remove.hook -t "$pkgdir/usr/share/libalpm/hooks"
+    install -Dm644 taris-hyprbars.service -t "$pkgdir/usr/lib/systemd/system"
+    # The freshest mirrors first, a few minutes after starting up and daily
+    install -Dm644 taris-mirrors.service taris-mirrors.timer -t "$pkgdir/usr/lib/systemd/system"
+    install -d "$pkgdir/usr/lib/systemd/system/timers.target.wants"
+    ln -s ../taris-mirrors.timer "$pkgdir/usr/lib/systemd/system/timers.target.wants/taris-mirrors.timer"
+    # The apps that aren't in the image, installed in the background as the first account logs in
+    # (the setup screen starts it; the timer tries again until it has worked)
+    install -Dm755 first-apps -t "$pkgdir/usr/lib/taris"
+    install -Dm644 first-apps.list "$pkgdir/usr/share/taris/first-apps"
+    install -Dm644 taris-first-apps.service taris-first-apps.timer -t "$pkgdir/usr/lib/systemd/system"
+    ln -s ../taris-first-apps.timer "$pkgdir/usr/lib/systemd/system/timers.target.wants/taris-first-apps.timer"
+    install -Dm644 50-taris-mirrors.rules -t "$pkgdir/usr/share/polkit-1/rules.d"
+    # NordVPN's daemon stopped while it's disconnected, without a password (the shell's VPN service)
+    install -Dm644 50-taris-nordvpn.rules -t "$pkgdir/usr/share/polkit-1/rules.d"
+    # Sleep waits up to 15 s for the shell to lock the session, and GNOME's FUSE mounts can't
+    # keep it from sleeping (detached before, mounted again after waking)
+    install -Dm644 taris-logind.conf "$pkgdir/usr/lib/systemd/logind.conf.d/taris.conf"
+    install -Dm644 taris-logind.hook -t "$pkgdir/usr/share/libalpm/hooks"
+    install -Dm755 fuse-sleep -t "$pkgdir/usr/lib/taris"
+    install -d "$pkgdir/usr/lib/systemd/system-sleep"
+    ln -s ../../../lib/taris/fuse-sleep "$pkgdir/usr/lib/systemd/system-sleep/taris-fuse"
+    install -Dm644 taris-fuse-resume.service -t "$pkgdir/usr/lib/systemd/system"
+    install -d "$pkgdir/usr/lib/systemd/system/suspend.target.wants"
+    ln -s ../taris-fuse-resume.service "$pkgdir/usr/lib/systemd/system/suspend.target.wants/taris-fuse-resume.service"
+    install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
+    ln -s ../taris-hyprbars.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/taris-hyprbars.service"
+    install -Dm644 os-release bashrc -t "$share"
+    install -Dm644 taris-name.cfg "$pkgdir/etc/default/grub.d/taris-name.cfg"
+
+    install -Dm644 hyprland-portals.conf "$pkgdir/etc/xdg/xdg-desktop-portal/hyprland-portals.conf"
+    install -Dm644 mimeapps.list "$pkgdir/etc/xdg/mimeapps.list"
+    install -Dm644 kitty.conf "$pkgdir/etc/xdg/kitty/kitty.conf"
+    install -Dm644 mpv.conf "$pkgdir/etc/mpv/mpv.conf"
+
+    install -Dm644 "$_packaging/defaults/taris-theme.json" "$share/defaults/taris-theme.json"
+    install -Dm644 "$_packaging/defaults/webapps/list.tsv" "$share/webapps/list.tsv"
+    install -Dm644 "$_packaging"/defaults/webapps/icons/*.png -t "$share/webapps/icons"
+
+    # TarisOS's logo as the system's icon (os-release's LOGO)
+    local size
+    for size in 16 24 32 48 64 128 256 512; do
+        install -Dm644 "$_packaging/defaults/logo/taris-$size.png" \
+            "$pkgdir/usr/share/icons/hicolor/${size}x$size/apps/taris.png"
+    done
+
+    # Instructions for coding agents, written for this system
+    local skill file
+    for skill in "$_packaging"/agents/skills/*/; do
+        skill=$(basename "$skill")
+        for file in "$_packaging/agents/skills/$skill"/*; do
+            install -Dm644 "$file" "$share/agent-skills/$skill/$(basename "$file")"
+        done
+    done
+}

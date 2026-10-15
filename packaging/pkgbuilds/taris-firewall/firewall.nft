@@ -1,0 +1,32 @@
+#!/usr/bin/nft -f
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's firewall: nothing gets in unless it answers something this machine started (or is
+# local); everything may go out. Loaded at boot by taris-firewall.service; nothing keeps running.
+
+destroy table inet taris_firewall
+
+table inet taris_firewall {
+	chain input {
+		type filter hook input priority filter; policy drop;
+
+		ct state established,related accept
+		ct state invalid drop
+		iif lo accept
+
+		# IPv6 can't work without ICMPv6 (neighbour discovery, router adverts); pings are answered
+		meta l4proto ipv6-icmp accept
+		meta l4proto icmp accept
+
+		# DHCPv6 replies to this machine's own requests
+		ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
+
+		# KDE Connect (a default app): phones and computers on the local network find this one (its
+		# own discovery, and mDNS) and connect to it; everything after pairing is encrypted
+		ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 1714-1764 accept
+		ip6 saddr { fe80::/10, fc00::/7 } meta l4proto { tcp, udp } th dport 1714-1764 accept
+		ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } udp dport 5353 accept
+		ip6 saddr { fe80::/10, fc00::/7 } udp dport 5353 accept
+	}
+}

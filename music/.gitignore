@@ -1,0 +1,5 @@
+# Modified for TarisOS (Taris Music) by George Dobreff ("Witcher") and contributors, 2026.
+node_modules
+dist
+src-tauri/target
+src-tauri/gen

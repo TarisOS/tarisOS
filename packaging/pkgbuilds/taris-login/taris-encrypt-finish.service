@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# After the boot that encrypted the disk: the filesystem back to full size
+[Unit]
+Description=Finish setting up the encrypted disk
+ConditionPathExists=/boot/taris-encrypt-done
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/taris/encrypt finish
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The apps installed in the background as the first account logs in (/usr/lib/taris/first-apps),
+# rather than in the image: one package a line
+
+# VLC, with what everyday files need: the common formats and codecs, Wayland output, sound through
+# PipeWire and subtitles (vlc alone plays almost nothing; vlc-plugins-all adds GStreamer, JACK, SMB
+# and more)
+vlc
+vlc-plugins-base
+vlc-plugins-video-output
+vlc-plugin-ffmpeg
+vlc-plugin-pulse
+vlc-plugin-freetype
+vlc-plugin-ass
+
+# Tor Browser (TarisOS's repository: the Tor Project's build)
+tor-browser-bin

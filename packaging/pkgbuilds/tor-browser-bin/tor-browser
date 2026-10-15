@@ -1,0 +1,27 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Tor Browser (tor-browser-bin, opened from its entry in the launcher): the Tor Project's own
+# build, unpacked into the account's ~/.local/share/tor-browser the first time it's opened, where
+# it updates itself as Tor Browser does. While everything goes through Tor (taris-tor), it uses
+# that Tor's SOCKS port instead of starting a Tor of its own, so it never runs Tor inside Tor and
+# still keeps each site on its own circuit. Switching system-wide Tor on or off applies the next
+# time it's opened.
+# Usage: tor-browser [url]
+set -u
+
+dir="${XDG_DATA_HOME:-$HOME/.local/share}/tor-browser"
+
+if [[ ! -x $dir/Browser/start-tor-browser ]]; then
+	mkdir -p "$dir"
+	if ! tar -xJf /usr/share/tor-browser/tor-browser.tar.xz -C "$dir" --strip-components=1; then
+		notify-send -a TarisOS "Tor Browser couldn't be unpacked"
+		exit 1
+	fi
+fi
+
+if [[ $(/usr/lib/taris/tor status) == "on" ]]; then
+	export TOR_PROVIDER=none TOR_SOCKS_HOST=127.0.0.1 TOR_SOCKS_PORT=9052
+fi
+exec "$dir/Browser/start-tor-browser" "$@"

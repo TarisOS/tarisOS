@@ -1,0 +1,15 @@
+// Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// The greeter's user (greetd runs the greeter and the first-boot setup screen as it): the setup
+// screen makes the first account (setup-apply refuses once the system is set up) and joins Wi-Fi
+// without asking for a password, which nobody has yet
+polkit.addRule(function (action, subject) {
+    if (subject.user !== "greeter")
+        return polkit.Result.NOT_HANDLED;
+    if (action.id === "org.freedesktop.policykit.exec" && action.lookup("program") === "/usr/lib/taris/setup-apply")
+        return polkit.Result.YES;
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 && subject.active && subject.local)
+        return polkit.Result.YES;
+    return polkit.Result.NOT_HANDLED;
+});

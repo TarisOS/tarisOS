@@ -1,0 +1,12 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# 1.0.0-4 added CPU and GPU temperature sensors to the device trees in m1n1's boot image; the Macs'
+# SMCs don't have those keys, so it showed nothing. Where its copies of the device trees are still
+# here, they go, and the boot image is built again with the kernel's own (as Asahi has it)
+post_upgrade() {
+    if [[ -d /var/lib/taris/dtbs ]]; then
+        rm -rf /var/lib/taris/dtbs
+        /usr/bin/update-m1n1
+    fi
+}

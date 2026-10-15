@@ -1,0 +1,32 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Tor Browser: the Tor Project's own build, as it's signed (its key in keys/pgp, imported by
+# distro/build-repo.sh). Linux on 64-bit ARM only has builds on its alpha channel, so that's the one
+# shipped; it updates itself from there once unpacked (the tor-browser launcher). The package keeps
+# the download as it is (unpacked per account), and the archive keeps every version.
+
+pkgname=tor-browser-bin
+pkgver=16.0a13
+pkgrel=1
+pkgdesc='Tor Browser, the Tor Project build for 64-bit ARM (alpha channel)'
+arch=('aarch64')
+url='https://www.torproject.org/'
+license=('MPL-2.0' 'GPL-3.0-only')
+depends=('gtk3' 'alsa-lib' 'dbus' 'tar' 'xz' 'libnotify')
+_file="tor-browser-linux-aarch64-$pkgver.tar.xz"
+source=("https://archive.torproject.org/tor-package-archive/torbrowser/$pkgver/$_file"{,.asc}
+        'tor-browser'
+        'tor-browser.desktop')
+noextract=("$_file")
+validpgpkeys=('EF6E286DDA85EA2A4BA7DE684E2C6E8793298290') # Tor Browser Developers (signing key)
+sha256sums=('4dba033e7c5fb00f8d23fb5412a0825cd13aee565d31fc84b329d0927ac6ccf7'
+            'SKIP'
+            '2e948bd3f72f54bb95da9478c7ef65c4feb31af9277e9d3009db75a01372481a'
+            '66fe75b294045d94ab7aed36922f70224156bda08d778056629fcce8871999ca')
+
+package() {
+    install -Dm644 "$_file" "$pkgdir/usr/share/tor-browser/tor-browser.tar.xz"
+    install -Dm755 tor-browser -t "$pkgdir/usr/bin"
+    install -Dm644 tor-browser.desktop -t "$pkgdir/usr/share/applications"
+}

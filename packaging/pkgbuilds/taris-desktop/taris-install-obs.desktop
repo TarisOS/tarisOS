@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# OBS Studio, installed the first time it's opened: the launcher and the dock show it
+# greyed out until then, and its own entry takes over once it's installed
+[Desktop Entry]
+Type=Application
+Name=OBS Studio
+GenericName=Streaming and Recording
+Comment=Record and stream your screen
+Exec=/usr/lib/taris/install-on-demand obs
+Icon=com.obsproject.Studio
+Categories=AudioVideo;Recorder;
+Keywords=obs;record;stream;screen;video;
+Terminal=false

@@ -1,0 +1,115 @@
+#!/usr/bin/ash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Before the encrypt hook. Settings asked for disk encryption (the EFI partition's taris-encrypt
+# holds the root partition's PARTUUID): ask for the new disk password twice, encrypt the root in
+# place (LUKS2; the filesystem left room for the header), showing how far it's got, and unlock it,
+# so the system starts encrypted. An encryption that was interrupted (the Mac lost power) carries
+# on the same way after the disk password. Either way the encrypt hook then finds it unlocked.
+
+_taris_plymouth() {
+    command -v plymouth >/dev/null 2>&1 && plymouth --ping 2>/dev/null
+}
+
+_taris_ask() {
+    local answer
+    if _taris_plymouth; then
+        plymouth ask-for-password --prompt="$1"
+    else
+        printf '%s: ' "$1" >&2
+        stty -echo 2>/dev/null
+        read -r answer
+        stty echo 2>/dev/null
+        echo >&2
+        printf '%s' "$answer"
+    fi
+}
+
+_taris_say() {
+    if _taris_plymouth; then
+        plymouth display-message --text="$1"
+    else
+        echo "$1"
+    fi
+}
+
+# Runs a cryptsetup reencrypt (its arguments: $@; the disk password on stdin), saying how far it
+# has got from its progress lines ({"device_bytes":"…","device_size":"…",…})
+_taris_reencrypt() {
+    local line bytes size
+    cryptsetup reencrypt --progress-json --progress-frequency 2 "$@" 2>&1 | while read -r line; do
+        bytes=$(echo "$line" | sed -n 's/.*"device_bytes":"\([0-9]*\)".*/\1/p')
+        size=$(echo "$line" | sed -n 's/.*"device_size":"\([0-9]*\)".*/\1/p')
+        [ -n "$bytes" ] && [ -n "$size" ] && [ "$size" -gt 0 ] &&
+            _taris_say "Encrypting the disk: $((bytes * 100 / size))%"
+    done
+}
+
+# Still under way (encrypting started but didn't finish)?
+_taris_pending() {
+    cryptsetup luksDump "$1" 2>/dev/null | grep -q reencrypt
+}
+
+run_hook() {
+    local esp=/taris-esp partuuid="" dev pass confirm tries mounted=0
+
+    mkdir -p "$esp"
+    if (. /usr/share/asahi-scripts/functions.sh && mount_sys_esp "$esp") >/dev/null 2>&1; then
+        mounted=1
+        [ -f "$esp/taris-encrypt" ] && read -r partuuid <"$esp/taris-encrypt"
+    fi
+
+    # Asked for, and started already (the Mac lost power while encrypting): carried on below
+    if [ -n "$partuuid" ] && dev=$(resolve_device "PARTUUID=$partuuid") && cryptsetup isLuks "$dev"; then
+        rm -f "$esp/taris-encrypt"
+        touch "$esp/taris-encrypt-done"
+        partuuid=""
+    fi
+
+    # Asked for: encrypt
+    if [ -n "$partuuid" ] && dev=$(resolve_device "PARTUUID=$partuuid"); then
+        modprobe -a -q dm-crypt >/dev/null 2>&1
+        while :; do
+            pass=$(_taris_ask "New disk password")
+            [ -n "$pass" ] || continue
+            confirm=$(_taris_ask "Confirm disk password")
+            [ "$pass" = "$confirm" ] && break
+            _taris_say "The passwords don't match"
+        done
+        _taris_say "Encrypting the disk: 0%"
+        printf '%s' "$pass" | _taris_reencrypt --encrypt --type luks2 --reduce-device-size 32M --key-file=- "$dev" root
+        if [ -b /dev/mapper/root ] && ! _taris_pending "$dev"; then
+            rm -f "$esp/taris-encrypt"
+            touch "$esp/taris-encrypt-done"
+            _taris_say ""
+        elif cryptsetup isLuks "$dev"; then
+            # Started but not finished: the next boot carries on (below)
+            rm -f "$esp/taris-encrypt"
+            touch "$esp/taris-encrypt-done"
+            err "TarisOS: encrypting the disk stopped before it finished; it carries on at the next start"
+        else
+            rm -f "$esp/taris-encrypt"
+            err "TarisOS: the disk couldn't be encrypted; it starts as it was"
+        fi
+        [ "$mounted" -eq 1 ] && umount "$esp" 2>/dev/null
+        return 0
+    fi
+    [ "$mounted" -eq 1 ] && umount "$esp" 2>/dev/null
+
+    # Interrupted: carry on, then unlock with the same password
+    case "$cryptdevice" in PARTUUID=*) ;; *) return 0 ;; esac
+    dev=$(resolve_device "${cryptdevice%%:*}") || return 0
+    cryptsetup isLuks "$dev" && _taris_pending "$dev" || return 0
+    modprobe -a -q dm-crypt >/dev/null 2>&1
+    tries=0
+    while _taris_pending "$dev" && [ "$tries" -lt 10 ]; do
+        pass=$(_taris_ask "Decrypt password")
+        tries=$((tries + 1))
+        printf '%s' "$pass" | cryptsetup open --test-passphrase --key-file=- "$dev" 2>/dev/null || continue
+        _taris_say "Encrypting the disk..."
+        printf '%s' "$pass" | _taris_reencrypt --resume-only --key-file=- "$dev"
+        _taris_pending "$dev" || printf '%s' "$pass" | cryptsetup open --type luks2 --allow-discards --key-file=- "$dev" root
+    done
+    _taris_say ""
+}

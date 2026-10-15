@@ -1,0 +1,16 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# GRUB's menu again when TarisOS's GRUB settings (kernel options, menu name) change
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = etc/default/grub.d/taris*.cfg
+
+[Action]
+Description = Updating GRUB's menu for TarisOS's settings...
+When = PostTransaction
+Depends = grub
+Exec = /usr/bin/sh -c '[ -f /boot/grub/grub.cfg ] || exit 0; exec grub-mkconfig -o /boot/grub/grub.cfg'

@@ -1,0 +1,15 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+build() {
+    add_binary btrfs
+    add_runscript
+}
+
+help() {
+    cat <<HELPEOF
+Factory reset and backups for TarisOS: replaces the root with @factory and the home folders with
+an empty @home, or both with a backup's, when Settings asked for it.
+HELPEOF
+}

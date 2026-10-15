@@ -1,0 +1,12 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Trigger]
+Type = Package
+Operation = Remove
+Target = nordvpn-bin
+
+[Action]
+Description = Switching off NordVPN's service...
+When = PreTransaction
+Exec = /usr/lib/taris/nordvpn-setup remove

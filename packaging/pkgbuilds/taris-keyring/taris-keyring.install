@@ -1,0 +1,13 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+post_install() {
+    # Only once pacman's own keyring exists (it's made at first boot on a fresh image)
+    if [ -f /etc/pacman.d/gnupg/pubring.gpg ] || [ -f /etc/pacman.d/gnupg/pubring.kbx ]; then
+        pacman-key --populate taris
+    fi
+}
+
+post_upgrade() {
+    post_install
+}

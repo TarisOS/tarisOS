@@ -1,0 +1,18 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# On at once, not only from the next start (its first run clears every cached thumbnail, which may
+# already be stale)
+post_install() {
+    systemctl daemon-reload
+    systemctl start taris-thumbnails.service
+}
+
+post_upgrade() {
+    systemctl daemon-reload
+    systemctl try-restart taris-thumbnails.service
+}
+
+pre_remove() {
+    systemctl stop taris-thumbnails.service
+}

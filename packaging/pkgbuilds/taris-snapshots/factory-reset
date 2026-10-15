@@ -1,0 +1,33 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Factory reset (Settings, through pkexec): at the next boot, before the system starts, the root
+# (@) is replaced by a copy of @factory, the system exactly as it was installed, and the home
+# folders (@home) by an empty one, and the backups are deleted; then the setup screen starts as on
+# the first boot. This marks it
+# for the initramfs (the taris-reset hook) and restarts. --check: exit 0 when it's possible here.
+set -euo pipefail
+
+top=/run/taris-btrfs
+dev=$(findmnt -n -o SOURCE / | sed 's/\[.*\]$//')
+[[ $(findmnt -n -o FSTYPE /) == btrfs && -b $dev ]] || {
+	echo "Factory reset needs the root on btrfs." >&2
+	exit 1
+}
+
+mkdir -p "$top"
+mountpoint -q "$top" || mount -o subvolid=5 "$dev" "$top"
+trap 'umount "$top" 2>/dev/null || true' EXIT
+
+[[ -d $top/@factory && -d $top/@ ]] || {
+	echo "There's no factory state (@factory) to go back to." >&2
+	exit 1
+}
+[[ ${1:-} == --check ]] && exit 0
+
+touch "$top/taris-factory-reset"
+sync
+umount "$top"
+trap - EXIT
+systemctl reboot

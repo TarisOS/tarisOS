@@ -1,0 +1,21 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Every fan handed back to the SMC's own control (auto) at boot. The macsmc_hwmon driver takes each
+# fan to be on auto when it loads, without telling the SMC, and only tells it when it set a speed
+# itself: a fan the SMC still had on a set speed (its state outlives a restart) stayed there,
+# stopped included, and choosing Auto in the fan popout changed nothing. A speed of the driver's
+# own, then 0, makes it set the SMC's mode both ways. Run by udev when the SMC's hwmon device is
+# added (90-taris-fans.rules); fanN_target only takes writes with macsmc_hwmon.fan_control=1.
+# Usage: /usr/lib/taris/fans-auto <the device's sysfs path>
+set -u
+
+dir=${1:-}
+[[ -d $dir ]] || exit 0
+for target in "$dir"/fan*_target; do
+	[[ -w $target ]] || continue
+	min=$(<"${target%_target}_min") || continue
+	[[ $min =~ ^[0-9]+$ ]] && ((min > 0)) || continue
+	echo "$min" >"$target" && echo 0 >"$target"
+done

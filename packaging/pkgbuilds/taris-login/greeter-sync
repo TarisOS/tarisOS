@@ -1,0 +1,38 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The greeter's copy of this account's look (taris-greeter-sync.service, at login and whenever the
+# colours, the wallpaper or the account picture change): the greeter runs as its own user and
+# can't read home folders. Administrators' accounts only (the folder is the wheel group's).
+set -u
+# Shared with the other administrators: what's made here stays theirs to replace
+umask 002
+
+g=/var/lib/taris/greeter
+[[ -d $g && -w $g ]] || exit 0
+state="${XDG_STATE_HOME:-$HOME/.local/state}/taris"
+mkdir -p "$g/state/taris/wallpaper" "$g/faces"
+
+copy() {
+	install -m644 "$1" "$2.new" && mv -f "$2.new" "$2"
+}
+
+[[ -f $state/scheme.json ]] && copy "$state/scheme.json" "$g/state/taris/scheme.json"
+
+wall=$(head -n1 "$state/wallpaper/path.txt" 2>/dev/null)
+if [[ -f $wall ]]; then
+	ext=${wall##*.}
+	[[ $ext =~ ^[A-Za-z0-9]{1,5}$ ]] || ext=img
+	copy "$wall" "$g/wallpaper.$ext"
+	for old in "$g"/wallpaper.*; do
+		[[ $old == "$g/wallpaper.$ext" ]] || rm -f "$old"
+	done
+	printf '%s\n' "$g/wallpaper.$ext" >"$g/state/taris/wallpaper/path.txt.new" && mv -f "$g/state/taris/wallpaper/path.txt.new" "$g/state/taris/wallpaper/path.txt"
+fi
+
+if [[ -f $HOME/.face ]]; then
+	copy "$HOME/.face" "$g/faces/$USER"
+else
+	rm -f "$g/faces/$USER"
+fi

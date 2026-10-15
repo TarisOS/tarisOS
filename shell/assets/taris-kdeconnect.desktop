@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=KDE Connect
+GenericName=Phone Link
+Comment=Your phone and this computer together
+Icon=kdeconnect
+Exec=taris-qs -c taris ipc call kdeconnect open
+Categories=Network;Utility;
+Keywords=phone;android;iphone;kdeconnect;share;files;clipboard;
+X-Taris-Package=kdeconnect

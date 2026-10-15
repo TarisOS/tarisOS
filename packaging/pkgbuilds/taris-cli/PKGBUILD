@@ -1,0 +1,63 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# taris-cli
+
+# Maintainer: Soramane <soramane32 at gmail dot com>
+
+pkgname='taris-cli'
+pkgver=1.1.3
+pkgrel=4
+pkgdesc='The main cli for the Taris dotfiles'
+arch=('any')
+url='https://github.com/caelestia-dots/cli'
+license=('GPL-3.0-only')
+depends=('quickshell-taris' 'wf-recorder' 'python' 'python-pillow' 'python-materialyoucolor' 'libnotify' 'swappy' 'grim' 'dart-sass'
+         'wl-clipboard' 'slurp' 'gpu-screen-recorder' 'dconf' 'cliphist' 'fuzzel' 'git')
+optdepends=('taris-shell: shell control and screenshot function')
+makedepends=('python-build' 'python-installer' 'python-hatch' 'python-hatch-vcs')
+provides=('taris-cli')
+conflicts=('taris-cli-git')
+_archive="caelestia-$pkgver"
+source=("$url/releases/download/v$pkgver/$_archive.tar.gz"
+        apple-silicon-recording.patch
+        keep-icon-theme.patch)
+sha256sums=('f31447efdd94a18556e338bcf8a38236f34660a56b241657817e6cbe80b067e3'
+            'aef8279b352b83a060b4ea56f46c7acf11a8fd002c27d4f53a8755414a33c481'
+            'b27bf55186d27cbff0fb1942e44760bba4fa1e4215095b240bc9c1902df2973c')
+
+prepare() {
+    cd "${srcdir}/${_archive}"
+    # TarisOS: the CLI is the taris command. Every caelestia in its files (but the licence) and their
+    # names becomes taris, except the upstream links (caelestia-dots, caelestiashell.com). Left over
+    # from an earlier build: the renamed copies, replaced by the freshly extracted ones.
+    rm -rf src/taris completions/taris.fish
+    find . -depth -name '*caelestia*' -execdir bash -c 'mv "$1" "${1//caelestia/taris}"' _ {} \;
+    grep -rlIi --exclude=LICENSE caelestia . | xargs -r sed -i \
+        -e 's#caelestia-dots/caelestia#@@UPSTREAM_DOTS@@/@@UPSTREAM_REPO@@#g' \
+        -e 's/caelestia-dots/@@UPSTREAM_DOTS@@/g; s/caelestiashell\.com/@@UPSTREAM_SITE@@/g' \
+        -e 's/caelestia/taris/g; s/Caelestia/Taris/g; s/CAELESTIA/TARIS/g' \
+        -e 's/@@UPSTREAM_DOTS@@/caelestia-dots/g; s/@@UPSTREAM_REPO@@/caelestia/g; s/@@UPSTREAM_SITE@@/caelestiashell.com/g'
+    # TarisOS: Taris runs on the side-by-side quickshell from quickshell-taris
+    sed -i 's/"qs"/"taris-qs"/g' src/taris/subcommands/shell.py src/taris/subcommands/screenshot.py src/taris/utils/version.py
+    # TarisOS: record with wf-recorder on Apple Silicon, where gpu-screen-recorder cannot capture
+    patch -p1 -i "$srcdir/apple-silicon-recording.patch"
+    # TarisOS: a new scheme keeps the icon pack picked in Settings instead of setting Papirus
+    patch -p1 -i "$srcdir/keep-icon-theme.patch"
+    # TarisOS: follow linked wallpaper folders when picking a random wallpaper
+    sed -i 's/directory.rglob("\*")/directory.rglob("*", recurse_symlinks=True)/' src/taris/utils/wallpaper.py
+    # TarisOS: what users see says TarisOS (notifications' sender, the --help text)
+    sed -i 's/"-a", "taris-cli"/"-a", "TarisOS"/' src/taris/utils/notify.py
+    sed -i 's/description="Main control script for the Taris dotfiles"/description="TarisOS control script"/' src/taris/parser.py
+}
+
+build() {
+    cd "${srcdir}/${_archive}"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "${srcdir}/${_archive}"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+    install -Dm644 ./completions/taris.fish "$pkgdir"/usr/share/fish/vendor_completions.d/taris.fish
+}

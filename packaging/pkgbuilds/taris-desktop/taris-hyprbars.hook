@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Title bars on floating windows: the hyprbars plugin built for each Hyprland that's installed
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = hyprland
+Target = taris-desktop
+
+[Action]
+Description = Building the window title bar plugin for this Hyprland...
+When = PostTransaction
+Exec = /usr/lib/taris/build-hyprbars

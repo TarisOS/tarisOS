@@ -1,0 +1,33 @@
+#!/usr/bin/python3 -I
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+"""The login keyring without a password of its own (Settings, when it turns on disk encryption):
+an encrypted install logs in with the disk password and nothing else, so nothing would unlock a
+keyring that has one; the disk encryption protects it instead. Run as the account, in its session
+(the keyring unlocked). Reads the keyring's current password (the account's) on stdin. --check:
+only check that password (the keyring keeps it)."""
+
+import sys
+
+from gi.repository import Gio, GLib
+
+old = sys.stdin.buffer.read().rstrip(b"\n")
+new = old if sys.argv[1:] == ["--check"] else b""
+bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+name, path = "org.freedesktop.secrets", "/org/freedesktop/secrets"
+
+try:
+    session = bus.call_sync(name, path, "org.freedesktop.Secret.Service", "OpenSession",
+                            GLib.Variant("(sv)", ("plain", GLib.Variant("s", ""))),
+                            GLib.VariantType("(vo)"), Gio.DBusCallFlags.NONE, -1, None).unpack()[1]
+    secret = lambda value: (session, b"", value, "text/plain")
+    bus.call_sync(name, path, "org.gnome.keyring.InternalUnsupportedGuiltRiddenInterface", "ChangeWithMasterPassword",
+                  GLib.Variant("(o(oayays)(oayays))", ("/org/freedesktop/secrets/collection/login", secret(old), secret(new))),
+                  None, Gio.DBusCallFlags.NONE, -1, None)
+except GLib.Error as e:
+    # No login keyring yet (nothing saved): nothing to do
+    if "NoSuchObject" in e.message or "No such object" in e.message:
+        sys.exit(0)
+    print("Wrong password" if "denied" in e.message.lower() or "invalid" in e.message.lower() else e.message, file=sys.stderr)
+    sys.exit(1)

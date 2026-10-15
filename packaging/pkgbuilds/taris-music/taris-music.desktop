@@ -1,0 +1,16 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Taris Music (its program, window class and icon are taris-music).
+# It opens as the music workspace over everything (taris_music, in TarisOS's Hyprland config).
+[Desktop Entry]
+Type=Application
+Name=Music
+GenericName=Music Player
+Comment=Listen to YouTube Music
+Exec=hyprctl eval "taris_music()"
+Icon=taris-music
+StartupWMClass=taris-music
+Categories=AudioVideo;Audio;Player;Music;
+Keywords=youtube;music;player;
+Terminal=false

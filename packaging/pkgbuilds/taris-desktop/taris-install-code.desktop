@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# VSCodium, installed the first time it's opened (the launcher and the dock show it greyed out until
+# then; its own entry takes over once it's installed)
+[Desktop Entry]
+Type=Application
+Name=VSCodium
+GenericName=Text Editor
+Comment=Code editor
+Exec=/usr/lib/taris/install-on-demand code
+Icon=vscodium
+Categories=Development;IDE;TextEditor;
+Keywords=vscodium;codium;vscode;code;
+Terminal=false

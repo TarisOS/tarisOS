@@ -1,0 +1,11 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Upgraded from a TarisOS whose image had the apps first-apps installs (before 1.0.0-14): nothing
+# to install after setup there, and an app removed since stays removed
+post_upgrade() {
+    if (($(vercmp "$2" 1.0.0-14) < 0)) && [[ ! -e /var/lib/taris/first-apps-done ]]; then
+        mkdir -p /var/lib/taris
+        touch /var/lib/taris/first-apps-done
+    fi
+}

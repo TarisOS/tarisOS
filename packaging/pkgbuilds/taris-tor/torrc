@@ -1,0 +1,24 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's Tor (taris-tor.service): the whole system goes through it, tor.nft sending every app's
+# TCP to TransPort and its DNS to DNSPort. Arch's own tor.service and /etc/tor/torrc are left as
+# they are, and its SOCKS port (9050) isn't used here. These are the defaults: the bridges and the
+# circuit isolation chosen in Settings (/etc/taris/tor/torrc, from /usr/lib/taris/tor) take the
+# place of the options they set.
+
+DataDirectory /var/lib/taris-tor
+# For Tor Browser (its tor-browser launcher), which keeps each site on its own circuit through it
+SocksPort 127.0.0.1:9052
+TransPort 127.0.0.1:9040
+DNSPort 127.0.0.1:9053
+# .onion names resolve to addresses Tor maps back to them
+AutomapHostsOnResolve 1
+AutomapHostsSuffixes .onion
+VirtualAddrNetworkIPv4 10.192.0.0/10
+Log notice stdout
+# New identity (/usr/lib/taris/tor newnym): Tor's controller, on loopback only, which only root (and
+# Tor) can use: its cookie is readable by them alone
+ControlPort 127.0.0.1:9051
+CookieAuthentication 1
+CookieAuthFile /run/taris-tor/control.authcookie

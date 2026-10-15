@@ -1,0 +1,17 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Started with PipeWire's PulseAudio server (it holds the source while it runs) and again with it
+[Unit]
+Description=Built-in microphone on both channels
+After=pipewire-pulse.service wireplumber.service
+PartOf=pipewire-pulse.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/taris/mic
+TimeoutStartSec=60
+
+[Install]
+WantedBy=pipewire-pulse.service

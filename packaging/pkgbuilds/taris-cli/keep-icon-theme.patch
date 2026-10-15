@@ -1,0 +1,26 @@
+--- a/src/taris/utils/theme.py
++++ b/src/taris/utils/theme.py
+@@ -303,6 +303,14 @@
+         return "grey"
+ 
+ 
++def current_icon_theme() -> str | None:
++    # TarisOS: the icon pack picked in Settings (or the session's default), so a new scheme keeps it
++    proc = subprocess.run(
++        ["dconf", "read", "/org/gnome/desktop/interface/icon-theme"], capture_output=True, text=True
++    )
++    return proc.stdout.strip().strip("'") or None
++
++
+ @log_exception
+ def apply_gtk(colours: dict[str, str], mode: str, icon_theme: str | None = None) -> None:
+     gtk_template = gen_replace(colours, templates_dir / "gtk.css", hash=True)
+@@ -440,7 +448,7 @@
+                 apply_nvtop(colours)
+             if check("enableHtop"):
+                 apply_htop(colours)
+-            icon_theme = cfg.get(f"iconTheme{mode.capitalize()}") or cfg.get("iconTheme")
++            icon_theme = cfg.get(f"iconTheme{mode.capitalize()}") or cfg.get("iconTheme") or current_icon_theme()
+             if check("enableGtk"):
+                 apply_gtk(colours, mode, icon_theme)
+             if check("enableQt"):

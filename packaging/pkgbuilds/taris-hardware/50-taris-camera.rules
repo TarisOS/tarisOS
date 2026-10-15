@@ -1,0 +1,12 @@
+// Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// The camera's switch (/usr/lib/taris/camera, the Camera quick toggle): switching it off needs no
+// password; switching it back on asks for one as pkexec always does, so nothing running as the
+// user can turn the camera on unseen
+polkit.addRule(function (action, subject) {
+    if (action.id === "org.freedesktop.policykit.exec" && action.lookup("program") === "/usr/lib/taris/camera" &&
+        action.lookup("command_line") === "/usr/lib/taris/camera off" && subject.active && subject.local)
+        return polkit.Result.YES;
+    return polkit.Result.NOT_HANDLED;
+});

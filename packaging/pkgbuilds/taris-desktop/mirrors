@@ -1,0 +1,58 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Arch Linux ARM's mirrors, freshest first: taris-mirrors.timer runs it a few minutes after starting
+# up and daily; the update helper, the App Store and the apps installed on first use run it right
+# before they install (through pkexec with no password: 50-taris-mirrors.rules). Arch Linux ARM's
+# main address hands each download to some mirror, and some serve a package list days older than
+# the packages they hold: pacman then asks for files they've already deleted (404) and the install
+# fails. The mirrors whose list is newest go first (the quickest first among equals), each one a
+# fallback for the one before, and the main address last.
+# Usage: /usr/lib/taris/mirrors   (as root)
+set -u
+
+list=/etc/pacman.d/mirrorlist
+
+# The mirrors to choose from: those Arch Linux ARM's own list names (pacman-mirrorlist's file, or
+# the newer one an update of it leaves beside this one)
+mapfile -t hosts < <(grep -hoE 'https?://[a-z0-9.-]+\.mirror\.archlinuxarm\.org' "$list" "$list.pacnew" 2>/dev/null | sort -u)
+((${#hosts[@]})) || exit 0
+
+# "<when its package list changed> <seconds it took to answer> <mirror>", if it answers
+probe() {
+	local head modified changed
+	head=$(curl -sfI -m 8 -w 'time %{time_total}\n' "$1/aarch64/extra/extra.db") || return
+	modified=$(awk -F': ' 'tolower($1) == "last-modified" { print $2 }' <<<"$head" | tr -d '\r')
+	[[ -n $modified ]] || return
+	changed=$(date -d "$modified" +%s 2>/dev/null) || return
+	printf '%s %s %s\n' "$changed" "$(awk '$1 == "time" { print $2 }' <<<"$head")" "$1"
+}
+
+# All at once: an install waits for this
+{
+	for host in "${hosts[@]}"; do
+		probe "$host" &
+	done
+	wait
+} | sort -k1,1nr -k2,2n | awk '{ print $3 }' >"$list.ranked"
+
+# Offline, or none answered: the list stays as it is
+if [[ ! -s $list.ranked ]]; then
+	rm -f "$list.ranked"
+	exit 0
+fi
+
+{
+	echo "# Arch Linux ARM's mirrors, freshest first: written by /usr/lib/taris/mirrors"
+	while read -r host; do
+		echo "Server = $host/\$arch/\$repo"
+	done <"$list.ranked"
+	echo "Server = http://mirror.archlinuxarm.org/\$arch/\$repo"
+	echo
+	echo "# The mirrors it chooses from"
+	for host in "${hosts[@]}"; do
+		echo "# Server = $host/\$arch/\$repo"
+	done
+} >"$list.new" && mv -f "$list.new" "$list"
+rm -f "$list.ranked"

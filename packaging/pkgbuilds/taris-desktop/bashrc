@@ -1,0 +1,36 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's extras for interactive bash shells (~/.bashrc loads this)
+
+# The terminal in the colour scheme's colours: the taris CLI writes them as escape sequences, and
+# sends them to the terminals already open whenever the scheme changes
+_taris_colours="${XDG_STATE_HOME:-$HOME/.local/state}/taris/sequences.txt"
+[[ -t 1 && -r $_taris_colours ]] && cat "$_taris_colours"
+unset _taris_colours
+
+# Coding agents installed from Settings > Apps > Agent (through mise)
+_taris_shims="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims"
+[[ :$PATH: == *":$_taris_shims:"* ]] || PATH="$_taris_shims:$PATH"
+unset _taris_shims
+
+# Apps installed on first use: typing their command offers to install them, then runs them
+command_not_found_handle() {
+	local cmd="$1" answer
+	case $cmd in
+	claude)
+		read -rp "Claude Code isn't installed yet. Install it now? [Y/n] " answer
+		[[ -z $answer || $answer == [Yy]* ]] || return 127
+		TARIS_AGENT_INLINE=1 /etc/xdg/quickshell/taris/assets/agent/install.sh claude "Claude Code" && hash -r && "$@"
+		return
+		;;
+	codium)
+		read -rp "VSCodium isn't installed yet. Install it now (with the system's pending updates)? [Y/n] " answer
+		[[ -z $answer || $answer == [Yy]* ]] || return 127
+		sudo pacman -Syu --needed vscodium-bin && hash -r && "$@"
+		return
+		;;
+	esac
+	printf 'bash: %s: command not found\n' "$cmd" >&2
+	return 127
+}

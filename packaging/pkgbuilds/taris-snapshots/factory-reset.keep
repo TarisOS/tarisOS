@@ -1,0 +1,5 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# What a factory reset keeps (taris-reset): this Mac's own mounts
+/etc/fstab

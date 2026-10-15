@@ -1,0 +1,52 @@
+diff -ruN a/src/services/pipewire/node.cpp b/src/services/pipewire/node.cpp
+--- a/src/services/pipewire/node.cpp	2026-10-10 13:15:14.243450615 +0100
++++ b/src/services/pipewire/node.cpp	2026-10-10 13:15:14.260912706 +0100
+@@ -342,11 +342,20 @@
+ }
+ 
+ void PwNodeBoundAudio::updateVolumeProps(const PwVolumeProps& volumeProps) {
+-	if (volumeProps.volumes.size() != volumeProps.channels.size()) {
+-		qCWarning(logNode) << "Cannot update volume props of" << this->node
+-		                   << "- channelVolumes and channelMap are not the same size. Sizes:"
+-		                   << volumeProps.volumes.size() << volumeProps.channels.size();
+-		return;
++	// Taris: some nodes report a volume more per channel than they have channels (a mono filter or
++	// loopback source: channelVolumes [a, b], channelMap [MONO]). One volume per channel is used
++	// then, instead of ignoring the node, which left its volume and mute state unknown and its
++	// volume impossible to change. setVolumes writes as many volumes as the node reports.
++	auto volumes = volumeProps.volumes;
++	if (volumes.size() != volumeProps.channels.size()) {
++		if (volumes.isEmpty() || volumeProps.channels.isEmpty()) {
++			qCWarning(logNode) << "Cannot update volume props of" << this->node
++			                   << "- channelVolumes and channelMap are not the same size. Sizes:"
++			                   << volumeProps.volumes.size() << volumeProps.channels.size();
++			return;
++		}
++
++		volumes.resize(volumeProps.channels.size(), volumes.last());
+ 	}
+ 
+ 	this->volumeStep = volumeProps.volumeStep;
+@@ -366,8 +375,8 @@
+ 		this->mServerVolumes = volumeProps.volumes;
+ 	}
+ 
+-	if (this->mVolumes != volumeProps.volumes) {
+-		this->mVolumes = volumeProps.volumes;
++	if (this->mVolumes != volumes) {
++		this->mVolumes = volumes;
+ 		volumesChanged = true;
+ 		qCInfo(logNode) << "Got updated volumes of" << this->node << '-' << this->mVolumes;
+ 	}
+@@ -526,6 +535,11 @@
+ 			cubedVolumes.push_back(volume * volume * volume);
+ 		}
+ 
++		// Taris: as many volumes as the node reports (see updateVolumeProps)
++		while (!cubedVolumes.isEmpty() && cubedVolumes.length() < this->mServerVolumes.length()) {
++			cubedVolumes.push_back(cubedVolumes.last());
++		}
++
+ 		// clang-format off
+ 		auto* pod = spa_pod_builder_add_object(
+ 				&builder, SPA_TYPE_OBJECT_Props, SPA_PARAM_Props,

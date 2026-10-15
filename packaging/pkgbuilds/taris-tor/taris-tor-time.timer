@@ -1,0 +1,14 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Started and stopped with Tor (taris-tor.service wants it, and it's bound to it): the time through
+# Tor a minute after Tor starts, then hourly
+
+[Unit]
+Description=TarisOS: the time from the internet through Tor, hourly
+BindsTo=taris-tor.service
+After=taris-tor.service
+
+[Timer]
+OnActiveSec=1min
+OnUnitActiveSec=1h

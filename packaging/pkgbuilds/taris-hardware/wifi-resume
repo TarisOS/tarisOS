@@ -1,0 +1,77 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Wi-Fi after waking from sleep (taris-wifi-resume.service, once per resume). The Broadcom BCM4378
+# and BCM4387 firmware of some Apple Silicon Macs can wake up wedged: scans fail and every network
+# rejects the connection (status 16), which NetworkManager reports as a wrong password. Only
+# reloading the driver (brcmfmac) clears it. Nothing is done when Wi-Fi comes back by itself, when
+# it's switched off, or on other Wi-Fi chips.
+
+wait_back=15   # seconds Wi-Fi gets to reconnect on its own
+wait_reload=30 # seconds it gets after a reload
+
+# Only these chips wedge (the BCM4388 of the M2 Max/Ultra doesn't)
+affected=0
+shopt -s nullglob
+for dev in /sys/bus/pci/devices/*; do
+	[[ $(<"$dev/vendor") == 0x14e4 ]] || continue
+	case $(<"$dev/device") in 0x4425 | 0x4433) affected=1 ;; esac
+done
+((affected)) || exit 0
+
+[[ $(nmcli radio wifi 2>/dev/null) == enabled ]] || exit 0
+
+# Journal entries from here on are after the resume, whatever the clock did across the sleep
+cursor=$(journalctl -q -n 0 --show-cursor 2>/dev/null | sed -n 's/^-- cursor: //p')
+
+wifi_state() {
+	nmcli -t -f TYPE,STATE device 2>/dev/null | awk -F: '$1 == "wifi" { print $2; exit }'
+}
+
+# The wedge's signature: networks rejecting the connection with status 16, again and again
+wedged() {
+	[[ -n $cursor ]] || return 1
+	local rejects
+	rejects=$(journalctl -q --after-cursor "$cursor" -t wpa_supplicant -o cat 2>/dev/null |
+		grep -cE 'CTRL-EVENT-ASSOC-REJECT.*status_code=16( |$)')
+	((rejects >= 2))
+}
+
+# Saved Wi-Fi networks: without any there's nothing Wi-Fi could have reconnected to
+saved_wifi() {
+	nmcli -t -f TYPE connection show 2>/dev/null | grep -q '^802-11-wireless$'
+}
+
+for ((i = 0; i < wait_back; i++)); do
+	state=$(wifi_state)
+	[[ $state == connected ]] && exit 0
+	if wedged; then
+		echo "Wi-Fi firmware wedged after resume (networks reject it): reloading brcmfmac"
+		break
+	fi
+	sleep 1
+done
+if ((i == wait_back)); then
+	saved_wifi || exit 0
+	echo "Wi-Fi not back ${wait_back}s after resume (${state:-no device}): reloading brcmfmac"
+fi
+
+modprobe -r brcmfmac_wcc brcmfmac 2>/dev/null || modprobe -r brcmfmac || {
+	echo "brcmfmac could not be unloaded; Wi-Fi needs a reboot" >&2
+	exit 1
+}
+sleep 1
+modprobe brcmfmac || {
+	echo "brcmfmac could not be loaded again; Wi-Fi needs a reboot" >&2
+	exit 1
+}
+
+for ((i = 0; i < wait_reload; i++)); do
+	[[ $(wifi_state) == connected ]] && {
+		echo "Wi-Fi reconnected ${i}s after the reload"
+		exit 0
+	}
+	sleep 1
+done
+echo "Wi-Fi still not connected ${wait_reload}s after the reload"

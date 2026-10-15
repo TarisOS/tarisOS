@@ -1,0 +1,32 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Autologin on encrypted installs (the disk password is the login): `autologin <user>` makes greetd
+# log the account in once per boot, `autologin --off` stops it. Writes /etc/greetd/taris.toml's
+# [initial_session].
+set -euo pipefail
+
+conf=/etc/greetd/taris.toml
+user="${1:-}"
+[[ -f $conf ]] || exit 0
+
+# Everything but the old [initial_session] section
+python3 -I - "$conf" "$user" <<'PY'
+import re, sys
+path, user = sys.argv[1], sys.argv[2]
+lines, out, skip = open(path).read().splitlines(), [], False
+for line in lines:
+    if re.match(r"^\s*\[", line):
+        skip = line.strip() == "[initial_session]"
+    if not skip:
+        out.append(line)
+while out and not out[-1].strip():
+    out.pop()
+if user != "--off":
+    if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user):
+        sys.exit("autologin: not a username: " + user)
+    out += ["", "[initial_session]", 'command = "start-hyprland"', f'user = "{user}"']
+open(path + ".new", "w").write("\n".join(out) + "\n")
+PY
+mv -f "$conf.new" "$conf"

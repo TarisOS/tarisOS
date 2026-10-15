@@ -1,0 +1,56 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's Chromium settings, kept in each account's ~/.config/chromium-flags.conf (Chromium reads
+# no system-wide one), at every login so updates reach every account. Other lines in it are left
+# as they are.
+# - Google account sign-in and sync: Google only allows them for Chrome, so Chromium signs in with
+#   Chrome's own OAuth client, which every copy of Chrome carries (unofficial; Google could block
+#   it).
+# - Saved passwords in the keyring (gnome-keyring): Chromium only uses it by itself on desktops it
+#   knows.
+# - Web app windows without scrollbars: the shell's extension (Chromium takes one
+#   --load-extension line, a list; a second line would replace the first).
+# - No GPU render node (the GPU driver didn't load): software rendering, or Chromium (and VSCodium,
+#   an Electron app: ~/.config/codium-flags.conf) can start with no window.
+set -u
+
+flags="${XDG_CONFIG_HOME:-$HOME/.config}/chromium-flags.conf"
+ext=/etc/xdg/quickshell/taris/assets/webapp-window
+mkdir -p "$(dirname "$flags")"
+touch "$flags"
+
+ensure() {
+	grep -qxF -- "$1" "$flags" || echo "$1" >>"$flags"
+}
+
+ensure --oauth2-client-id=77185425430.apps.googleusercontent.com
+ensure --oauth2-client-secret=OTJgUOQcT7lO7GsGZq2G4IlT
+grep -q '^--password-store=' "$flags" || echo --password-store=gnome-libsecret >>"$flags"
+
+if [[ -d $ext ]]; then
+	if ! grep -q '^--load-extension=' "$flags"; then
+		echo "--load-extension=$ext" >>"$flags"
+	elif ! grep -q "^--load-extension=\(.*,\)\?$ext\(,\|$\)" "$flags"; then
+		sed -i "s|^--load-extension=.*|&,$ext|" "$flags"
+	fi
+fi
+
+# (A --disable-gpu of the account's own stays: only the one added here goes again)
+shopt -s nullglob
+render=(/dev/dri/renderD*)
+for app in chromium codium; do
+	file="${XDG_CONFIG_HOME:-$HOME/.config}/$app-flags.conf"
+	added="${XDG_STATE_HOME:-$HOME/.local/state}/taris/$app-disable-gpu"
+	if ((${#render[@]})); then
+		if [[ -e $added ]]; then
+			sed -i '/^--disable-gpu$/d' "$file" 2>/dev/null
+			rm -f "$added"
+		fi
+	elif ! grep -qsxF -- --disable-gpu "$file"; then
+		echo --disable-gpu >>"$file"
+		mkdir -p "$(dirname "$added")"
+		touch "$added"
+	fi
+done

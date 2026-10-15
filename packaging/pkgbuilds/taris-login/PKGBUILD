@@ -1,0 +1,96 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's login: greetd running the shell's greeter (the lock screen, in a Hyprland of its own,
+# gone once someone has logged in) or, on first boot, the setup screen (which makes the first
+# account through setup-apply); the greeter's copy of the last session's look; failed-login lockout
+# after 10 attempts, said on every password prompt; the keyring unlocked by the login password.
+# And disk encryption, turned on from Settings: in place at the next boot, unlocked on the Plymouth
+# boot screen, then autologin (the disk password is the login).
+
+pkgname=taris-login
+pkgver=1.0.0
+pkgrel=4
+pkgdesc='TarisOS: the login screen (greetd and the shell greeter)'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=('taris-shell' 'greetd' 'hyprland' 'gnome-keyring' 'pam' 'polkit' 'sudo' 'python' 'python-gobject' 'xkeyboard-config'
+         'cryptsetup' 'plymouth' 'btrfs-progs' 'mkinitcpio' 'asahi-scripts' 'bash' 'systemd')
+optdepends=('kitty: a text login if the greeter fails to start')
+makedepends=('python-pillow')
+backup=('etc/greetd/taris.toml')
+install=taris-login.install
+source=(
+    'greeter'
+    'greeter-session'
+    'greeter-hyprland.lua'
+    'greeter-sync'
+    'taris-greeter-sync.service'
+    'taris-greeter-sync.path'
+    'taris-login.tmpfiles'
+    'greetd.toml'
+    'greetd-service.conf'
+    'setup-apply'
+    '50-taris-setup.rules'
+    'sudoers-wheel'
+    'autologin'
+    'encrypt'
+    'encrypt-initcpio-install'
+    'encrypt-initcpio-hook'
+    'taris-encrypt-finish.service'
+    'keyring-unprotect'
+    'taris.plymouth'
+    'taris.script'
+    'field.py'
+)
+sha256sums=('71427847d0d0a1f00c7836c37112fae0d1c5662fd2686f581804b87b9db97a0b'
+            '08cbc376d68b951445698013374fa321f22774817c42d5fed8ea52c2615d75ef'
+            '8fc22a851aee003105def7e3f3e9d973b8ea4fb7a6bd61b79c9c13c8eac7bf2c'
+            'c019e310b51eb6330ba3be5d33b9ca0d5a9398aa0956662cce1162c7741b162d'
+            'a70266177de5c369346c9d80a5097a00129809362eb2f68cc005dcecf860ecee'
+            '579bbdbeb1fa231f0072532dfbc09990e60d717d0102d97dba438bb8339beb8f'
+            '33ca3b9ff9b61b9fd56169b276c8ae7400629403f0714f125909abb5c92e932f'
+            '4509d2eae8ecb633ce08787a3acb3289f76d4baf216513f75f3374bb9a43028f'
+            '4a6dc8cb783da9194dd469bdbbd9c432d3c3b46c6e7488804d41744805ac872c'
+            '9142a860b55650b2d498989d82a1eb16c31b556b9e80ee9ae89fb8bf934ad33c'
+            'cd23f8a9e1fba4348be8fdf09c676042cf336134ef6d0652a3ff856733e7c944'
+            '842964ab961b448133bd557079f8c1fe1bd5e8e9999f1d2d191fa99c479488c9'
+            '885853694a176bdd6e79b62da5224658ba1ac1ff9d43903ee2499e28c0a6d4cd'
+            'ee9c55293f49fab0e53b80b1cfaabd6017c888be2ba2a233072965e6022900c0'
+            '8457e7ddecb5b8d75f61ebda66c63cd1614d76eab89caafdea0f96ab771c0c52'
+            '6a81439e88d8754d88c8cbc1d203f5660ea946ad807cea4ec83a1a529f2bbe0e'
+            '974b5f36e7daa2bdd61675233b2442742bb64c265f6dde4a17a15543c2785e2c'
+            '51a399f6b5d3324adcbb3206d6d10377e4631a057e3f80e24fd51b73ad8359fa'
+            '9eb47cba85e8042969c046da5488257f2fb80c310b98e3a19e9b4e6468af74c1'
+            '2393e92bbb0aa149f540a2271a7f442cdb9d6f5b780c051aabcb4955b0ed7cab'
+            '223a0283ef36205ec627fc91a388d3a4a05539d9ce8f8384efbd4f09139d7a14')
+
+build() {
+    python3 -I field.py field.png
+}
+
+package() {
+    install -Dm755 greeter greeter-session greeter-sync setup-apply autologin encrypt keyring-unprotect -t "$pkgdir/usr/lib/taris"
+    install -Dm644 50-taris-setup.rules -t "$pkgdir/usr/share/polkit-1/rules.d"
+    install -dm750 "$pkgdir/etc/sudoers.d"
+    install -m440 sudoers-wheel "$pkgdir/etc/sudoers.d/taris-wheel"
+    install -Dm644 greeter-hyprland.lua "$pkgdir/usr/share/taris/greeter/hyprland.lua"
+
+    install -Dm644 greetd.toml "$pkgdir/etc/greetd/taris.toml"
+    install -Dm644 greetd-service.conf "$pkgdir/usr/lib/systemd/system/greetd.service.d/taris.conf"
+    install -Dm644 taris-login.tmpfiles "$pkgdir/usr/lib/tmpfiles.d/taris-login.conf"
+
+    # Disk encryption
+    install -Dm644 encrypt-initcpio-install "$pkgdir/usr/lib/initcpio/install/taris-encrypt"
+    install -Dm644 encrypt-initcpio-hook "$pkgdir/usr/lib/initcpio/hooks/taris-encrypt"
+    install -Dm644 taris-encrypt-finish.service -t "$pkgdir/usr/lib/systemd/system"
+    install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
+    ln -s ../taris-encrypt-finish.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/taris-encrypt-finish.service"
+    install -Dm644 taris.plymouth taris.script field.png -t "$pkgdir/usr/share/plymouth/themes/taris"
+
+    install -Dm644 taris-greeter-sync.service taris-greeter-sync.path -t "$pkgdir/usr/lib/systemd/user"
+    install -d "$pkgdir/usr/lib/systemd/user/default.target.wants"
+    ln -s ../taris-greeter-sync.path "$pkgdir/usr/lib/systemd/user/default.target.wants/taris-greeter-sync.path"
+    ln -s ../taris-greeter-sync.service "$pkgdir/usr/lib/systemd/user/default.target.wants/taris-greeter-sync.service"
+}

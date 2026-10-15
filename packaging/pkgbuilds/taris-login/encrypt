@@ -1,0 +1,135 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Disk encryption, turned on from Settings (through pkexec):
+#   encrypt status    plain | pending | encrypted | unsupported
+#   encrypt prepare   get the system ready and mark the disk; the next boot encrypts it
+#   encrypt finish    after that boot: the filesystem back to full size (taris-encrypt-finish)
+# Preparing moves /boot onto the EFI system partition (the boot loader can't read an encrypted
+# root), leaves room for the encryption header at the end of the root filesystem, adds the unlock to
+# the initramfs (the Plymouth prompt) and turns on autologin for the account that asked (the disk
+# password is the login). At the next boot the initramfs (taris-encrypt hook) asks for the new disk
+# password and encrypts the root in place before the system starts.
+set -euo pipefail
+
+backup=/var/lib/taris/boot-before-encryption
+root_dev=$(findmnt -n -o SOURCE / | sed 's/\[.*\]$//')
+
+die() {
+	echo "$*" >&2
+	exit 1
+}
+
+esp_mount() {
+	local m
+	for m in /boot/efi /boot; do
+		[[ $(findmnt -n -o FSTYPE "$m" 2>/dev/null) == vfat ]] && { echo "$m"; return 0; }
+	done
+	return 1
+}
+
+status() {
+	local esp
+	if [[ $(lsblk -n -d -o TYPE "$root_dev" 2>/dev/null) == crypt ]]; then
+		echo encrypted
+	elif esp=$(esp_mount) && [[ -e $esp/taris-encrypt ]]; then
+		echo pending
+	elif [[ $(findmnt -n -o FSTYPE /) == btrfs && $(lsblk -n -d -o TYPE "$root_dev" 2>/dev/null) == part ]] && esp_mount >/dev/null; then
+		echo plain
+	else
+		echo unsupported
+	fi
+}
+
+prepare() {
+	local user partuuid esp need free
+	[[ $(status) == plain ]] || die "This system can't be encrypted from here ($(status))."
+	partuuid=$(lsblk -n -d -o PARTUUID "$root_dev")
+	[[ -n $partuuid ]] || die "The root partition has no PARTUUID."
+	user=$(id -un "${PKEXEC_UID:-}" 2>/dev/null) || die "Run it from Settings."
+	esp=$(esp_mount)
+
+	# /boot onto the EFI system partition (mounted at /boot from now on); what /boot had is kept
+	# in $backup until the encryption is done
+	if [[ $esp == /boot/efi ]]; then
+		need=$(du -smx /boot | cut -f1)
+		free=$(df -m --output=avail /boot/efi | tail -1)
+		((free > need + 32)) || die "The EFI partition is too small for /boot (${need} MB needed, ${free} MB free)."
+		rm -rf "$backup"
+		mkdir -p "$backup"
+		umount /boot/efi
+		find /boot -mindepth 1 -maxdepth 1 ! -name efi -exec mv -t "$backup" {} +
+		sed -i -E 's|^([^#[:space:]]+[[:space:]]+)/boot/efi([[:space:]])|\1/boot\2|' /etc/fstab
+		systemctl daemon-reload
+		mount /boot || {
+			# Back as it was
+			find "$backup" -mindepth 1 -maxdepth 1 -exec mv -t /boot {} +
+			sed -i -E 's|^([^#[:space:]]+[[:space:]]+)/boot([[:space:]])|\1/boot/efi\2|' /etc/fstab
+			systemctl daemon-reload
+			mount /boot/efi
+			die "The EFI partition couldn't be mounted at /boot."
+		}
+		cp -rL --no-preserve=mode,ownership "$backup"/. /boot/
+	fi
+
+	# Room for the encryption header (the filesystem grows back to the end once it's done)
+	btrfs filesystem resize -64M / >/dev/null
+
+	mkdir -p /etc/taris /etc/default/grub.d /etc/mkinitcpio.conf.d
+	cat >/etc/default/grub.d/taris-crypt.cfg <<CFG
+# TarisOS: the encrypted root, unlocked by the initramfs (the Plymouth prompt)
+GRUB_CMDLINE_LINUX_DEFAULT="\${GRUB_CMDLINE_LINUX_DEFAULT} cryptdevice=PARTUUID=$partuuid:root:allow-discards quiet splash"
+CFG
+	cat >/etc/mkinitcpio.conf.d/taris-crypt.conf <<'CFG'
+# TarisOS: the boot screen and the disk unlock (and, once, its encryption), before the root is
+# mounted
+_taris_hooks=()
+for _taris_hook in "${HOOKS[@]}"; do
+    case $_taris_hook in
+    plymouth | taris-encrypt | encrypt | sd-encrypt) ;;
+    filesystems) _taris_hooks+=(plymouth taris-encrypt encrypt filesystems) ;;
+    *) _taris_hooks+=("$_taris_hook") ;;
+    esac
+done
+HOOKS=("${_taris_hooks[@]}")
+unset _taris_hooks _taris_hook
+CFG
+	plymouth-set-default-theme taris
+
+	# What a factory reset keeps (it brings back the system as installed, which had none of this)
+	cat >/etc/taris/encryption.keep <<'KEEP'
+/etc/fstab
+/etc/machine-id
+/etc/default/grub.d/taris-crypt.cfg
+/etc/mkinitcpio.conf.d/taris-crypt.conf
+/etc/plymouth/plymouthd.conf
+/etc/taris/encryption.keep
+KEEP
+
+	/usr/lib/taris/autologin "$user"
+
+	echo "$partuuid" >"$(esp_mount)/taris-encrypt"
+	mkinitcpio -P >/dev/null
+	update-grub >/dev/null
+	sync
+}
+
+# After the boot that encrypted it (the initramfs left taris-encrypt-done on the EFI partition):
+# the filesystem back to the encrypted disk's full size, and the old /boot's copy gone
+finish() {
+	local esp
+	esp=$(esp_mount) || exit 0
+	[[ -e $esp/taris-encrypt-done ]] || exit 0
+	[[ $(lsblk -n -d -o TYPE "$root_dev" 2>/dev/null) == crypt ]] || exit 0
+	btrfs filesystem resize max / >/dev/null || true
+	rm -rf "$backup"
+	rm -f "$esp/taris-encrypt-done"
+}
+
+case ${1:-} in
+status) status ;;
+prepare) prepare ;;
+finish) finish ;;
+*) die "Usage: encrypt status|prepare|finish" ;;
+esac

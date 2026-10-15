@@ -1,0 +1,33 @@
+#!/bin/sh
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Inside the greeter's Hyprland: the greeter, or the setup screen on first boot (until it has made
+# the first account), then quit Hyprland, so greetd starts the session they asked for. Their
+# colours and wallpaper are the ones the last session left in /var/lib/taris/greeter (copied: the
+# shell writes to its state as it runs).
+rt="${XDG_RUNTIME_DIR:-/tmp}/taris-greeter"
+rm -rf "$rt"
+mkdir -p "$rt/state" "$rt/config" "$rt/cache" "$rt/data"
+cp -R /var/lib/taris/greeter/state/. "$rt/state/" 2>/dev/null
+cp -R /var/lib/taris/greeter/config/. "$rt/config/" 2>/dev/null
+export XDG_STATE_HOME="$rt/state" XDG_CONFIG_HOME="$rt/config" XDG_CACHE_HOME="$rt/cache" XDG_DATA_HOME="$rt/data"
+
+qml=/etc/xdg/quickshell/taris/greeter.qml
+[ -e /var/lib/taris/setup-pending ] && qml=/etc/xdg/quickshell/taris/setup.qml
+
+# It quits by itself once the session is starting; a crash gets two more tries, then a plain text
+# login in a terminal (greetd's own agreety), so nobody is ever locked out by the greeter. What it
+# says goes to the journal (journalctl -t taris-greeter), which outlasts a restart.
+started=0
+for _ in 1 2 3; do
+	if systemd-cat -t taris-greeter taris-qs -p "$qml"; then
+		started=1
+		break
+	fi
+	sleep 1
+done
+if [ "$started" -eq 0 ] && command -v kitty >/dev/null; then
+	kitty --class taris-greeter-fallback -e agreety --cmd start-hyprland
+fi
+hyprctl dispatch 'hl.dsp.exit()'

@@ -1,0 +1,25 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's Chromium settings for every account (Google sign-in, saved passwords in the keyring,
+# the web app windows' extension, software rendering without a GPU, for VSCodium too), applied at
+# each login by chromium-flags. And no terms to accept on first run: Chromium asks unless its
+# initial_preferences (next to its binary) say otherwise, and a Chromium build has no terms to show,
+# only a blank placeholder.
+
+pkgname=taris-chromium
+pkgver=1.0.0
+pkgrel=3
+pkgdesc='TarisOS: Chromium settings for every account'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=('chromium' 'gnome-keyring' 'bash' 'sed')
+source=('chromium-flags' 'initial_preferences')
+sha256sums=('e453931128f1a8b4f513dab0499d8e1113251dbfd44d95ce40b1fd030b9b1b8c'
+            '10a9ed7388fc7dcc727001071692f99e562b20e579f32ef85c6e42206fe0176a')
+
+package() {
+    install -Dm755 chromium-flags "$pkgdir/usr/lib/taris/chromium-flags"
+    install -Dm644 initial_preferences "$pkgdir/usr/lib/chromium/initial_preferences"
+}

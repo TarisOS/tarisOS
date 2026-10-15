@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# After each resume (ordered after suspend.target, so it never holds the resume up, and after the
+# accounts' processes are thawed): the gvfs mounts detached before sleep come back
+[Unit]
+Description=Mount GNOME's file systems again after resume
+After=suspend.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/taris/fuse-sleep resume
+
+[Install]
+WantedBy=suspend.target

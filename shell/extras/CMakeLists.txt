@@ -1,0 +1,12 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Version
+add_executable(version version.cpp)
+target_compile_definitions(version PRIVATE
+    PROJECT_NAME="${PROJECT_NAME}"
+    VERSION="${VERSION}"
+    GIT_REVISION="${GIT_REVISION}"
+    DISTRIBUTOR="${DISTRIBUTOR}"
+)
+install(TARGETS version DESTINATION "${INSTALL_LIBDIR}")

@@ -1,0 +1,24 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's firewall: a static nftables ruleset (incoming blocked except replies, outgoing allowed),
+# loaded at boot; no daemon runs afterwards. On whenever the package is installed.
+
+pkgname=taris-firewall
+pkgver=1.0.0
+pkgrel=2
+pkgdesc='TarisOS: a minimal firewall (nftables, nothing running)'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=('nftables' 'systemd')
+source=('firewall.nft' 'taris-firewall.service')
+sha256sums=('02ac592395024788220adcdd09a9c5ae77e0927b2e624404fd0cbd6fed961dea'
+            '46053b2e1365c45d1047d980563248b289b5d8c45336eca16f1126c962ecc9bb')
+
+package() {
+    install -Dm644 firewall.nft "$pkgdir/usr/share/taris/firewall.nft"
+    install -Dm644 taris-firewall.service -t "$pkgdir/usr/lib/systemd/system"
+    install -d "$pkgdir/usr/lib/systemd/system/sysinit.target.wants"
+    ln -s ../taris-firewall.service "$pkgdir/usr/lib/systemd/system/sysinit.target.wants/taris-firewall.service"
+}

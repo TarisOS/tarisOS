@@ -1,0 +1,16 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# NordVPN, installed the first time it's opened: the launcher and the dock show it greyed out
+# until then (with its own icon, which taris-desktop carries for it), and TarisOS's entry for it
+# (taris-nordvpn, the Network page) takes over once it's installed
+[Desktop Entry]
+Type=Application
+Name=NordVPN
+GenericName=VPN
+Comment=Connect to the internet through NordVPN
+Exec=/usr/lib/taris/install-on-demand nordvpn
+Icon=taris-install-nordvpn
+Categories=Network;
+Keywords=vpn;nordvpn;nord;privacy;
+Terminal=false

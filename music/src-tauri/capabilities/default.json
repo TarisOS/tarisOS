@@ -1,0 +1,25 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-set-fullscreen",
+    "opener:default",
+    "dialog:allow-open",
+    "dialog:allow-message"
+  ],
+  "remote": {
+    "urls": [
+      "https://**",
+      "http://localhost/**",
+      "http://localhost:*/*",
+      "http://127.0.0.1/**",
+      "http://127.0.0.1:*/*"
+    ]
+  }
+}

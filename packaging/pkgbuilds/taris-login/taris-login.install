@@ -1,0 +1,41 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Failed logins: an account locks only after 10 failed attempts, for 10 minutes, the same on every
+# password prompt (faillock.conf decides for all of them: no option on a pam_faillock line may
+# lower it or make it silent), and every prompt says so when it's locked.
+_taris_faillock() {
+    local f=/etc/security/faillock.conf kv key
+    if [ -f "$f" ]; then
+        for kv in "deny = 10" "unlock_time = 600"; do
+            key=${kv%% *}
+            if grep -qE "^[[:space:]]*$key[[:space:]]*=" "$f"; then
+                sed -i -E "s/^[[:space:]]*$key[[:space:]]*=.*/$kv/" "$f"
+            else
+                printf '%s\n' "$kv" >>"$f"
+            fi
+        done
+        sed -i -E 's/^[[:space:]]*silent[[:space:]]*$/# silent/' "$f"
+    fi
+    for f in /etc/pam.d/system-auth /etc/pam.d/system-login; do
+        [ -f "$f" ] && sed -i -E '/pam_faillock\.so/ { s/[[:space:]]+silent\b//g; s/[[:space:]]+deny=[0-9]+//g; s/[[:space:]]+unlock_time=[0-9]+//g }' "$f"
+    done
+}
+
+# The keyring (saved passwords) unlocks with the password typed at the greeter
+_taris_greetd_keyring() {
+    local f=/etc/pam.d/greetd
+    [ -f "$f" ] || return 0
+    grep -q pam_gnome_keyring "$f" && return 0
+    sed -i -E '/^auth[[:space:]]+include[[:space:]]+system-local-login/a auth       optional     pam_gnome_keyring.so' "$f"
+    printf 'session    optional     pam_gnome_keyring.so auto_start\n' >>"$f"
+}
+
+post_install() {
+    _taris_faillock
+    _taris_greetd_keyring
+}
+
+post_upgrade() {
+    post_install
+}

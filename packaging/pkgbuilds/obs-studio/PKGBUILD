@@ -1,0 +1,111 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# OBS Studio for Apple Silicon, installed the first time it's opened (taris-desktop's stand-in). Arch
+# Linux ARM has no OBS, Flathub has no ARM build, and the AUR's all use OBS's prebuilt Chromium
+# (CEF) for the browser source, which exists for x86 only: this builds OBS's own release source
+# with the browser source left out and everything else in, as omarchy-mac does. The x86-only
+# encoders (NVENC, QSV) leave themselves out on ARM. AJA capture cards need libajantv2, which
+# Arch Linux ARM doesn't have.
+
+pkgname=obs-studio
+pkgver=32.2.2
+pkgrel=2
+pkgdesc='Free and open source software for video recording and live streaming (without the browser source)'
+arch=('aarch64')
+url='https://obsproject.com'
+license=('GPL-2.0-or-later')
+depends=(
+    'alsa-lib'
+    'curl'
+    'ffmpeg'
+    'fontconfig'
+    'freetype2'
+    'gcc-libs'
+    'glib2'
+    'glibc'
+    'jack'
+    'jansson'
+    'libdatachannel'
+    'libfdk-aac'
+    'libgl'
+    'libjuice'
+    'libpipewire'
+    'libpulse'
+    'librist'
+    'libva'
+    'libx11'
+    'libxcb'
+    'libxcomposite'
+    'libxkbcommon'
+    'luajit'
+    'mbedtls3'
+    'pciutils'
+    'python'
+    'qrcodegencpp-cmake'
+    'qt6-base'
+    'qt6-svg'
+    'qt6-wayland'
+    'rnnoise'
+    'sndio'
+    'speexdsp'
+    'srt'
+    'systemd-libs'
+    'util-linux-libs'
+    'v4l-utils'
+    'wayland'
+    'x264'
+    'zlib'
+)
+makedepends=(
+    'asio'
+    'cmake'
+    'extra-cmake-modules'
+    'nlohmann-json'
+    'simde'
+    'swig'
+    'uthash'
+    'vlc'
+    'websocketpp'
+)
+optdepends=(
+    'vlc: the VLC video source'
+    'v4l2loopback-dkms: the virtual camera'
+)
+source=("https://github.com/obsproject/obs-studio/releases/download/$pkgver/OBS-Studio-$pkgver-Sources.tar.gz")
+sha512sums=('6346b5bff255c9178ef57296489af11bc6949076b4084d3dff8d3da923c8b0d2ab64edb312629c54b8d4be1510bb4166b92838a8c6c2db55a7ee9e08108166de')
+
+build() {
+    # From an empty build folder: makepkg keeps the last one, made for the Qt it was built against
+    rm -rf build
+    local options=(
+        -S "obs-studio-$pkgver-sources"
+        -B build
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_INSTALL_PREFIX=/usr
+        -DCMAKE_INSTALL_LIBDIR=lib
+        -DENABLE_BROWSER=OFF
+        -DENABLE_AJA=OFF
+        -DENABLE_LIBFDK=ON
+        -DENABLE_JACK=ON
+        -DENABLE_SNDIO=ON
+        -DENABLE_VLC=ON
+        -DENABLE_WAYLAND=ON
+        # The source has no git history for OBS to read its version from
+        -DOBS_VERSION_OVERRIDE="$pkgver"
+        -DOBS_COMPILE_DEPRECATION_AS_WARNING=ON
+        # Arch keeps mbedtls 3 beside the newer one, where OBS doesn't look by itself
+        -DMbedTLS_DIR=/usr/lib/mbedtls3/cmake/MbedTLS
+        -DMbedTLS_INCLUDE_DIR=/usr/include/mbedtls3
+        -DMbedtls_LIBRARY=/usr/lib/mbedtls3/libmbedtls.so
+        -DMbedcrypto_LIBRARY=/usr/lib/mbedtls3/libmbedcrypto.so
+        -DMbedx509_LIBRARY=/usr/lib/mbedtls3/libmbedx509.so
+        -Wno-dev
+    )
+    cmake "${options[@]}"
+    cmake --build build
+}
+
+package() {
+    DESTDIR="$pkgdir" cmake --install build
+}

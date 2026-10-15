@@ -1,0 +1,13 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The time from the internet through Tor, while Tor is on (taris-tor-time.timer)
+
+[Unit]
+Description=TarisOS: the time from the internet, through Tor
+Requisite=taris-tor.service
+After=taris-tor.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/taris/tor-time

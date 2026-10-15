@@ -1,0 +1,14 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Unit]
+Description=Watch this account's look for the greeter
+
+[Path]
+PathChanged=%h/.local/state/taris/scheme.json
+PathChanged=%h/.local/state/taris/wallpaper/path.txt
+PathChanged=%h/.face
+Unit=taris-greeter-sync.service
+
+[Install]
+WantedBy=default.target

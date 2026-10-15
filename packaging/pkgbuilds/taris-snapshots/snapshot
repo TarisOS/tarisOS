@@ -1,0 +1,16 @@
+#!/bin/sh
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Snapshots around package changes (taris-snapshot-*.hook): `snapshot pre` before pacman changes
+# anything, `snapshot post` afterwards, which also drops the oldest beyond snapper's limit.
+# Nothing happens without snapper's root config (made when the system was built).
+[ -f /etc/snapper/configs/root ] || exit 0
+case "$1" in
+pre)
+	snapper --no-dbus -c root create --cleanup-algorithm number --description "Before package changes" || true
+	;;
+post)
+	snapper --no-dbus -c root cleanup number || true
+	;;
+esac

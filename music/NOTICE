@@ -1,0 +1,12 @@
+Taris Music
+Copyright 2026 George Dobreff ("Witcher") and contributors
+
+Taris Music is Zuno 1.4.0 (https://github.com/noFAYZ/zuno), by noFAYZ and its contributors,
+modified for TarisOS. Zuno and TarisOS's changes to it are licensed under the Apache License,
+Version 2.0 (LICENSE, next to this file).
+
+Every file TarisOS changed carries a notice saying so, except those that cannot hold a comment:
+package.json, package-lock.json, src-tauri/Cargo.lock, src-tauri/tauri.conf.json and
+src-tauri/capabilities/default.json, which TarisOS changed too. TarisOS also removed files from
+Zuno: its website, documentation, store manifests, packaging, screenshots and the code of the
+features it took out.

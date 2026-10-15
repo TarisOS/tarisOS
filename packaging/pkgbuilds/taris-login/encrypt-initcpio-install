@@ -1,0 +1,17 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+build() {
+    add_binary cryptsetup
+    add_module dm-crypt
+    add_full_dir /usr/share/asahi-scripts
+    add_runscript
+}
+
+help() {
+    cat <<HELPEOF
+TarisOS's disk encryption: encrypts the root in place once Settings asked for it (with a new disk
+password asked for on the boot screen), and carries on with an encryption that was interrupted.
+HELPEOF
+}

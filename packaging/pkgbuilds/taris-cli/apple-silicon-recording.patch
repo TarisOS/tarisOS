@@ -1,0 +1,110 @@
+--- a/src/taris/subcommands/record.py
++++ b/src/taris/subcommands/record.py
+@@ -10,7 +10,19 @@
+ from taris.utils.notify import close_notification, notify
+ from taris.utils.paths import get_config, recording_notif_path, recording_path, recordings_dir
+ 
+-RECORDER = "gpu-screen-recorder"
++
++
++def is_apple_silicon() -> bool:
++    try:
++        return b"apple" in Path("/proc/device-tree/compatible").read_bytes()
++    except OSError:
++        return False
++
++
++# gpu-screen-recorder can't capture monitors or regions on Apple Silicon (Asahi), and there
++# is no hardware encoder there anyway, so use wf-recorder with software encoding instead
++WF_RECORDER = is_apple_silicon()
++RECORDER = "wf-recorder" if WF_RECORDER else "gpu-screen-recorder"
+ 
+ 
+ class Command:
+@@ -21,6 +33,9 @@
+ 
+     def run(self) -> None:
+         if self.args.pause:
++            if WF_RECORDER:
++                notify("Recording", "Pausing is not supported by wf-recorder")
++                return
+             subprocess.run(["pkill", "-USR2", "-f", RECORDER], stdout=subprocess.DEVNULL)
+         elif self.proc_running():
+             self.stop()
+@@ -33,7 +48,38 @@
+     def intersects(self, a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
+         return a[0] < b[0] + b[2] and a[0] + a[2] > b[0] and a[1] < b[1] + b[3] and a[1] + a[3] > b[1]
+ 
++    def wf_args(self) -> list[str]:
++        monitors = hypr.message("monitors")
++        if self.args.region:
++            if self.args.region == "slurp":
++                region = subprocess.check_output(["slurp", "-f", "%wx%h+%x+%y"], text=True, stdin=subprocess.DEVNULL)
++            else:
++                region = self.args.region.strip()
++
++            m = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", region)
++            if not m:
++                raise ValueError(f"Invalid region: {region}")
++
++            w, h, x, y = m.groups()
++            args = ["-g", f"{x},{y} {w}x{h}"]
++        else:
++            focused_monitor = next(monitor for monitor in monitors if monitor["focused"])
++            args = ["-o", focused_monitor["name"]]
++
++        # Cap the framerate (CPU encoding) and keep audio at 48 kHz, as Asahi's speakers advertise
++        # 96 kHz, which many players play back as silence
++        args += ["-r", "60"]
++        if self.args.sound:
++            sink = subprocess.check_output(["pactl", "get-default-sink"], text=True).strip()
++            args += [f"--audio={sink}.monitor", "-R", "48000"]
++
++        return args
++
+     def start(self) -> None:
++        if WF_RECORDER:
++            self.start_wf()
++            return
++
+         args = ["-w"]
+ 
+         monitors = hypr.message("monitors")
+@@ -73,7 +119,25 @@
+ 
+         recording_path.parent.mkdir(parents=True, exist_ok=True)
+         proc = subprocess.Popen([RECORDER, *args, "-o", str(recording_path)], start_new_session=True)
++        self.check_started(proc)
++
++    def start_wf(self) -> None:
++        args = self.wf_args()
++
++        config = get_config()
++        try:
++            if "record" in config and "extraArgs" in config["record"]:
++                args += config["record"]["extraArgs"]
++        except TypeError as e:
++            raise ValueError(f"Config option 'record.extraArgs' should be an array: {e}")
++
++        recording_path.parent.mkdir(parents=True, exist_ok=True)
++        proc = subprocess.Popen(
++            [RECORDER, *args, "-y", "-f", str(recording_path)], start_new_session=True, stdin=subprocess.DEVNULL
++        )
++        self.check_started(proc)
+ 
++    def check_started(self, proc: subprocess.Popen) -> None:
+         notif = notify("-p", "Recording started", "Recording...")
+         recording_notif_path.write_text(notif)
+ 
+@@ -89,8 +153,9 @@
+             pass
+ 
+     def stop(self) -> None:
+-        # Start killing recording process
+-        subprocess.run(["pkill", "-f", RECORDER], stdout=subprocess.DEVNULL)
++        # Start killing recording process (wf-recorder only finalises the file on SIGINT)
++        signal = ["-INT"] if WF_RECORDER else []
++        subprocess.run(["pkill", *signal, "-f", RECORDER], stdout=subprocess.DEVNULL)
+ 
+         # Wait for recording to finish to avoid corrupted video file
+         while self.proc_running():

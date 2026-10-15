@@ -1,0 +1,13 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's login (greetd, through greetd.service.d/taris.conf): the greeter on the first VT. With
+# disk encryption an [initial_session] logs the account in once per boot (the disk passphrase was
+# the login); Settings writes it.
+
+[terminal]
+vt = 1
+
+[default_session]
+command = "/usr/lib/taris/greeter"
+user = "greeter"

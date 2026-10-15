@@ -1,0 +1,53 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The time from the internet while everything goes through Tor (taris-tor-time.service, hourly
+# while Tor is on), which refuses the usual time sync's NTP: the time several well-known sites send
+# with their pages over HTTPS, asked through Tor, as Tails does. The median of their answers sets
+# the clock when it's off by more than two seconds, so no one site can move it. Left alone when
+# "Set the time from the internet" is off.
+# Usage: /usr/lib/taris/tor-time
+set -u
+
+sites=(https://www.torproject.org https://www.eff.org https://archlinux.org https://www.debian.org https://www.mozilla.org)
+
+if [[ $(timedatectl show -p NTP --value) != "yes" ]]; then
+	exit 0
+fi
+
+# One site's offset from this clock, in seconds (the time it sent against the middle of the request)
+offset() {
+	local before after date
+	before=$(date +%s)
+	date=$(curl -sfI --max-time 60 "$1" | sed -n 's/^[Dd]ate: *//p' | tr -d '\r')
+	after=$(date +%s)
+	if [[ -z $date ]]; then
+		return 1
+	fi
+	echo $(($(date -d "$date" +%s) - (before + after) / 2))
+}
+
+# Tor may still be connecting when this starts: up to ten tries, a minute apart
+for (( try = 0; try < 10; try++ )); do
+	offsets=()
+	for site in "${sites[@]}"; do
+		if o=$(offset "$site"); then
+			offsets+=("$o")
+		fi
+	done
+	if (( ${#offsets[@]} >= 3 )); then
+		break
+	fi
+	sleep 60
+done
+if (( ${#offsets[@]} < 3 )); then
+	echo "tor-time: too few sites answered" >&2
+	exit 1
+fi
+
+median=$(printf '%s\n' "${offsets[@]}" | sort -n | sed -n "$(( (${#offsets[@]} + 1) / 2 ))p")
+if (( median > 2 || median < -2 )); then
+	date -s "@$(($(date +%s) + median))" >/dev/null
+	echo "tor-time: clock moved by ${median}s"
+fi

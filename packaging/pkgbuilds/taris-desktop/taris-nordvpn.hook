@@ -1,0 +1,13 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# NordVPN, installed on first use: its service and its group for every account
+[Trigger]
+Type = Package
+Operation = Install
+Target = nordvpn-bin
+
+[Action]
+Description = Setting up NordVPN for every account...
+When = PostTransaction
+Exec = /usr/lib/taris/nordvpn-setup install

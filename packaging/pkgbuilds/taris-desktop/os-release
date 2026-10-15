@@ -1,0 +1,14 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The system's name (installed as /usr/lib/os-release by name-system)
+NAME="TarisOS"
+PRETTY_NAME="TarisOS"
+ID=taris
+ID_LIKE="archarm arch"
+LOGO=taris
+BUILD_ID=rolling
+ANSI_COLOR="38;2;168;85;247"
+HOME_URL="https://github.com/TarisOS/tarisOS"
+SUPPORT_URL="https://github.com/TarisOS/tarisOS/issues"
+BUG_REPORT_URL="https://github.com/TarisOS/tarisOS/issues"

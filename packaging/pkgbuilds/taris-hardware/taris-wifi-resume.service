@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# After each resume (ordered after suspend.target, so it never holds the resume up)
+[Unit]
+Description=Recover Wi-Fi after resume
+After=suspend.target NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/taris/wifi-resume
+TimeoutStartSec=120
+
+[Install]
+WantedBy=suspend.target

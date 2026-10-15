@@ -1,0 +1,19 @@
+.direnv
+/shell/.qmlls.ini
+build/
+.cache/
+logs
+# Package builds
+packaging/pkgbuilds/*/src/
+packaging/pkgbuilds/*/pkg/
+packaging/pkgbuilds/*/*.pkg.tar.*
+packaging/pkgbuilds/*/*.tar.gz
+packaging/pkgbuilds/*/*.tar.xz
+packaging/pkgbuilds/*/*.tar.xz.asc
+packaging/pkgbuilds/*/build.log
+packaging/pkgbuilds/quickshell-taris/quickshell/
+packaging/pkgbuilds/qt6-m3shapes-git/qt6-m3shapes-git/
+packaging/pkgbuilds/ttf-rubik-vf/*.ttf
+packaging/pkgbuilds/ttf-rubik-vf/*.txt
+packaging/pkgbuilds/libva-v4l2-request-avd/libva-v4l2_request/
+distro/out/

@@ -1,0 +1,23 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's package signing key, so pacman trusts the TarisOS repository. taris.gpg and
+# taris-trusted come from distro/make-signing-key.sh (run once, on the machine that builds the
+# repository; the private key never leaves it).
+
+pkgname=taris-keyring
+pkgver=1.0.0
+pkgrel=2
+pkgdesc='TarisOS: the package signing key'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+install=taris-keyring.install
+source=('taris.gpg' 'taris-trusted' 'taris-revoked')
+sha256sums=('cb3f81a57d288c39c38202123279f3eaacbab4ead68d498c3500a4b4f3985416'
+            'd5e2eea3be67db181cf5660ac17dc3c54c47c5ff53f6d8f52d918228e79cb794'
+            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+
+package() {
+    install -Dm644 taris.gpg taris-trusted taris-revoked -t "$pkgdir/usr/share/pacman/keyrings"
+}

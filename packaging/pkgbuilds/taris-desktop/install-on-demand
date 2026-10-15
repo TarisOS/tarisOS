@@ -1,0 +1,44 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Apps installed on first use (their greyed-out stand-ins in the launcher and the dock):
+# install-on-demand <app> installs it (with the system's pending updates) in a terminal, then opens
+# it; once installed it just opens. NordVPN opens on the Network page, where it's switched on.
+# Usage: /usr/lib/taris/install-on-demand code|steam|obs|writer|calc|impress|firefox|nordvpn
+set -u
+
+case ${1:-} in
+code) package=vscodium-bin name=VSCodium run=(codium) ;;
+steam) package=steam name=Steam run=(steam) ;;
+obs) package=obs-studio name="OBS Studio" run=(obs) ;;
+writer) package=libreoffice-fresh name=LibreOffice run=(libreoffice --writer) ;;
+calc) package=libreoffice-fresh name=LibreOffice run=(libreoffice --calc) ;;
+impress) package=libreoffice-fresh name=LibreOffice run=(libreoffice --impress) ;;
+firefox) package=firefox name=Firefox run=(firefox) ;;
+nordvpn) package=nordvpn-bin name=NordVPN have=nordvpn run=(taris-qs -c taris ipc call nexus openPage network) ;;
+*)
+	echo "install-on-demand: unknown app: ${1:-}" >&2
+	exit 1
+	;;
+esac
+
+# Installed once its command is there (the app's own, unless it opens some other way)
+command -v "${have:-${run[0]}}" >/dev/null && exec "${run[@]}"
+
+# The terminal in the colour scheme's colours, as bash's own startup gives them (bash -c doesn't
+# read it, so the window stayed black)
+exec "${TERMINAL:-kitty}" -e bash -c '
+	package=$1 name=$2
+	shift 2
+	cat "${XDG_STATE_HOME:-$HOME/.local/state}/taris/sequences.txt" 2>/dev/null
+	printf "Installing %s…\n\n" "$name"
+	# The mirrors with the newest package lists first (an older one fails with 404s)
+	sudo /usr/lib/taris/mirrors
+	if sudo pacman -Syu --needed "$package"; then
+		setsid -f "$@" >/dev/null 2>&1
+		exit 0
+	fi
+	printf "\n%s could not be installed. Press Enter to close." "$name"
+	read -r
+' _ "$package" "$name" "${run[@]}"

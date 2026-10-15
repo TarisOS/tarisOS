@@ -1,0 +1,202 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Tor for the whole system (the taskbar's Tor icon and Settings > Network > Tor, through pkexec:
+# on and newnym need no password, everything else asks for one; status and settings need no root).
+# On sends the whole system through Tor, now and after every boot (taris-tor.service loads tor.nft,
+# then starts Tor); off stops Tor and lets everything out directly again. newnym gives everything
+# new circuits from now on (New identity). The bridges and the circuit isolation are kept in
+# /etc/taris/tor/settings and written as Tor's own settings to /etc/taris/tor/torrc, over
+# TarisOS's defaults (/usr/share/taris/tor/torrc); Tor starts again with them when it's on. mac
+# gives every Wi-Fi and ethernet connection a random hardware address, each time it connects
+# (NetworkManager's cloned-mac-address, with Tor on or off).
+# Usage: /usr/lib/taris/tor on|off
+#        /usr/lib/taris/tor status     (prints on, off, or failed when Tor couldn't start)
+#        /usr/lib/taris/tor newnym
+#        /usr/lib/taris/tor settings   (prints bridges=none|obfs4|snowflake|meek|custom, isolate=0|1,
+#                                       mac=0|1, then the custom bridge lines, one per line)
+#        /usr/lib/taris/tor bridges none|obfs4|snowflake|meek
+#        /usr/lib/taris/tor bridges custom <bridge line>...
+#        /usr/lib/taris/tor isolate on|off
+#        /usr/lib/taris/tor mac on|off
+set -u
+
+etc=/etc/taris/tor
+builtin=/usr/share/taris/tor/bridges
+mac_conf=/etc/NetworkManager/conf.d/50-taris-random-mac.conf
+
+setting() {
+	sed -n "s/^$1=//p" "$etc/settings" 2>/dev/null | head -1
+}
+
+# Tor's settings from TarisOS's: the bridges (lyrebird runs every transport Tor Browser uses), and
+# a circuit of its own for each site on the ports apps use. Each option given here takes the place
+# of the defaults' (TransPort, SocksPort)
+write_torrc() {
+	local bridges isolate line
+	bridges=$(setting bridges)
+	isolate=$(setting isolate)
+	{
+		echo "# Written by /usr/lib/taris/tor from $etc/settings (Settings > Network > Tor)"
+		if [[ -n $bridges && $bridges != "none" ]]; then
+			echo "UseBridges 1"
+			echo "ClientTransportPlugin meek_lite,obfs2,obfs3,obfs4,scramblesuit,webtunnel,snowflake exec /usr/bin/lyrebird"
+			if [[ $bridges == "custom" ]]; then
+				grep -v '^\s*$' "$etc/custom-bridges" 2>/dev/null
+			else
+				grep -v '^\s*\(#\|$\)' "$builtin/$bridges"
+			fi | while read -r line; do
+				echo "Bridge $line"
+			done
+		fi
+		if [[ $isolate == "1" ]]; then
+			echo "SocksPort 127.0.0.1:9052 IsolateDestAddr"
+			echo "TransPort 127.0.0.1:9040 IsolateDestAddr"
+		fi
+	} >"$etc/torrc.new"
+	mv -f "$etc/torrc.new" "$etc/torrc"
+}
+
+# key value: kept in the settings, Tor's settings written again, and Tor started again with them
+# when it's on (try-restart leaves it off when it's off)
+save_setting() {
+	mkdir -p "$etc"
+	touch "$etc/settings"
+	sed -i "/^$1=/d" "$etc/settings"
+	echo "$1=$2" >>"$etc/settings"
+	write_torrc
+	systemctl try-restart taris-tor.service
+}
+
+case ${1:-} in
+status)
+	if ! systemctl is-enabled --quiet taris-tor.service; then
+		echo off
+	elif systemctl is-failed --quiet taris-tor.service; then
+		echo failed
+	else
+		echo on
+	fi
+	;;
+on)
+	systemctl enable --now taris-tor.service
+	;;
+off)
+	systemctl disable --now taris-tor.service
+	# Tor stopping leaves the rules in place (tor.nft): only switching it off removes them
+	nft destroy table inet taris_tor
+	;;
+newnym)
+	# Through Tor's controller on loopback, with its cookie (torrc): authenticated, then the signal
+	cookie=$(od -An -tx1 -v /run/taris-tor/control.authcookie 2>/dev/null | tr -d ' \n')
+	if [[ -z $cookie ]] || ! { exec 3<>/dev/tcp/127.0.0.1/9051; } 2>/dev/null; then
+		echo "tor: Tor isn't running" >&2
+		exit 1
+	fi
+	printf 'AUTHENTICATE %s\r\nSIGNAL NEWNYM\r\nQUIT\r\n' "$cookie" >&3
+	reply=$(timeout 5 cat <&3)
+	if [[ $(grep -c '^250 OK' <<<"$reply") -lt 2 ]]; then
+		echo "tor: Tor refused: $reply" >&2
+		exit 1
+	fi
+	;;
+settings)
+	echo "bridges=$(setting bridges)"
+	echo "isolate=$(setting isolate)"
+	if [[ -e $mac_conf ]]; then
+		echo "mac=1"
+	else
+		echo "mac=0"
+	fi
+	cat "$etc/custom-bridges" 2>/dev/null
+	;;
+bridges)
+	case ${2:-} in
+	none | obfs4 | snowflake | meek)
+		if (($# != 2)); then
+			echo "usage: $0 bridges none|obfs4|snowflake|meek" >&2
+			exit 2
+		fi
+		save_setting bridges "$2"
+		;;
+	custom)
+		shift 2
+		if (($# == 0)); then
+			echo "tor: no bridge lines" >&2
+			exit 2
+		fi
+		# Bridge lines as bridges.torproject.org gives them ("Bridge " in front or not): a
+		# transport or an address first, then addresses, fingerprints and key=value options. Nothing
+		# that could end the line or start another setting in torrc
+		re='^[][A-Za-z0-9_.:-]+([[:blank:]]+[][A-Za-z0-9_.:/=+,%@?&~-]+)+$'
+		lines=()
+		for line in "$@"; do
+			if [[ $line == *[[:cntrl:]]* ]]; then
+				echo "tor: not a bridge line: $line" >&2
+				exit 2
+			fi
+			line=$(sed 's/^[[:blank:]]*\(Bridge[[:blank:]]\+\)\?//; s/[[:blank:]]*$//' <<<"$line")
+			[[ -n $line ]] || continue
+			if [[ ! $line =~ $re ]]; then
+				echo "tor: not a bridge line: $line" >&2
+				exit 2
+			fi
+			lines+=("$line")
+		done
+		if ((${#lines[@]} == 0)); then
+			echo "tor: no bridge lines" >&2
+			exit 2
+		fi
+		mkdir -p "$etc"
+		printf '%s\n' "${lines[@]}" >"$etc/custom-bridges"
+		save_setting bridges custom
+		;;
+	*)
+		echo "usage: $0 bridges none|obfs4|snowflake|meek|custom" >&2
+		exit 2
+		;;
+	esac
+	;;
+isolate)
+	case ${2:-} in
+	on) save_setting isolate 1 ;;
+	off) save_setting isolate 0 ;;
+	*)
+		echo "usage: $0 isolate on|off" >&2
+		exit 2
+		;;
+	esac
+	;;
+mac)
+	case ${2:-} in
+	on)
+		cat >"$mac_conf" <<-EOF
+			# Written by /usr/lib/taris/tor (Settings > Network > Tor): a random hardware address for
+			# every Wi-Fi and ethernet connection, a new one each time it connects
+			[connection-taris-random-mac]
+			wifi.cloned-mac-address=random
+			ethernet.cloned-mac-address=random
+		EOF
+		;;
+	off)
+		rm -f "$mac_conf"
+		;;
+	*)
+		echo "usage: $0 mac on|off" >&2
+		exit 2
+		;;
+	esac
+	nmcli general reload conf
+	# The connections up now connect again with it (each drops for a moment)
+	nmcli -t -f DEVICE,TYPE,STATE device | while IFS=: read -r dev type state; do
+		if [[ $state == "connected" && ($type == "wifi" || $type == "ethernet") ]]; then
+			nmcli device connect "$dev" >/dev/null 2>&1
+		fi
+	done
+	;;
+*)
+	echo "usage: $0 on|off|status|newnym|settings|bridges|isolate|mac" >&2
+	exit 2
+	;;
+esac

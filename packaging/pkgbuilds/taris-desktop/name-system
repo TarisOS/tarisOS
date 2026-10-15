@@ -1,0 +1,8 @@
+#!/bin/sh
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The system's name, TarisOS (taris-os-release.hook, after the filesystem package installs Arch's):
+# os-release, which everything reads it from, and the console's login banner
+install -m644 /usr/share/taris/os-release /usr/lib/os-release
+printf 'TarisOS \\r (\\l)\n\n' >/etc/issue

@@ -1,0 +1,13 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Daily, and at the next start when the Mac was off or asleep then
+[Unit]
+Description=Checking daily for TarisOS's automatic backup
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

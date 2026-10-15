@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# LibreOffice Impress, installed the first time it's opened: the launcher and the dock show it
+# greyed out until then, and its own entry takes over once it's installed
+[Desktop Entry]
+Type=Application
+Name=LibreOffice Impress
+GenericName=Presentation
+Comment=Presentations
+Exec=/usr/lib/taris/install-on-demand impress
+Icon=libreoffice-impress
+Categories=Office;Presentation;
+Keywords=libreoffice;powerpoint;ppt;pptx;odp;
+Terminal=false

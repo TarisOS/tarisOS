@@ -1,0 +1,25 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Everything updated at once (the Updates page runs it in a terminal): Arch Linux ARM, Asahi, the
+# TarisOS repository and the AUR (yay, else pacman; taris-snapshots takes a snapshot before any
+# package changes), then the Flatpak apps.
+set -u
+
+status=0
+# The freshest mirrors first, so the package lists read now are up to date
+sudo /usr/lib/taris/mirrors
+if command -v yay >/dev/null; then
+	# yay asks which packages to leave out before it upgrades (a partial upgrade, which can break
+	# Arch); "None" answers that question with nothing left out
+	yay -Syu --answerupgrade None || status=$?
+else
+	sudo pacman -Syu || status=$?
+fi
+
+if command -v flatpak >/dev/null; then
+	echo
+	flatpak update --system --noninteractive || status=$?
+fi
+exit "$status"

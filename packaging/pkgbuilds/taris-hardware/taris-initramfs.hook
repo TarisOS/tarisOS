@@ -1,0 +1,16 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The initramfs again when TarisOS's mkinitcpio settings change
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = etc/mkinitcpio.conf.d/taris-*.conf
+
+[Action]
+Description = Rebuilding the initramfs for TarisOS's settings...
+When = PostTransaction
+Depends = mkinitcpio
+Exec = /usr/bin/mkinitcpio -P

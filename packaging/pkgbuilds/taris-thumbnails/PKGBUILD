@@ -1,0 +1,33 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Thumbnails never older than their files: GNOME's thumbnail cache counts a thumbnail as current by
+# its file's path and modification time, which a rename or a copy keeping times can repeat; a
+# service deletes a file's thumbnails whenever it changes (thumbnails.cpp). On whenever the package
+# is installed.
+
+pkgname=taris-thumbnails
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='TarisOS: thumbnails never older than their files'
+arch=('aarch64')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=('glib2' 'glibc' 'gcc-libs' 'systemd')
+makedepends=('gcc' 'pkgconf')
+install=taris-thumbnails.install
+source=('thumbnails.cpp' 'taris-thumbnails.service')
+sha256sums=('ca950ae7aa8d091302f33d41de106fba0dc976a45a9fb22b397f60ec3a6b671f'
+            '6dcf10c784fb21a8c9b2dbf6744c5e4703032d87284d3239a641c4f1c0718e6c')
+
+build() {
+    # shellcheck disable=SC2046
+    g++ -std=c++20 -O2 -Wall -Wextra $CXXFLAGS thumbnails.cpp -o thumbnails $LDFLAGS $(pkg-config --cflags --libs glib-2.0)
+}
+
+package() {
+    install -Dm755 thumbnails -t "$pkgdir/usr/lib/taris"
+    install -Dm644 taris-thumbnails.service -t "$pkgdir/usr/lib/systemd/system"
+    install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
+    ln -s ../taris-thumbnails.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/taris-thumbnails.service"
+}

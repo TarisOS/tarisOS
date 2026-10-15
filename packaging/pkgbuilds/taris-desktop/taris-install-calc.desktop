@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# LibreOffice Calc, installed the first time it's opened: the launcher and the dock show it
+# greyed out until then, and its own entry takes over once it's installed
+[Desktop Entry]
+Type=Application
+Name=LibreOffice Calc
+GenericName=Spreadsheet
+Comment=Spreadsheets
+Exec=/usr/lib/taris/install-on-demand calc
+Icon=libreoffice-calc
+Categories=Office;Spreadsheet;
+Keywords=libreoffice;excel;xls;xlsx;ods;
+Terminal=false

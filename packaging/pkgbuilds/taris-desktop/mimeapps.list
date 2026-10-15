@@ -1,0 +1,41 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS's default apps (each account's own choices, in ~/.config/mimeapps.list, come first)
+[Default Applications]
+x-scheme-handler/http=chromium.desktop
+x-scheme-handler/https=chromium.desktop
+text/html=chromium.desktop
+application/xhtml+xml=chromium.desktop
+inode/directory=org.gnome.Nautilus.desktop
+text/plain=org.gnome.TextEditor.desktop
+text/markdown=org.gnome.TextEditor.desktop
+text/x-log=org.gnome.TextEditor.desktop
+application/x-shellscript=org.gnome.TextEditor.desktop
+application/json=org.gnome.TextEditor.desktop
+application/xml=org.gnome.TextEditor.desktop
+application/pdf=org.gnome.Evince.desktop
+image/png=imv.desktop
+image/jpeg=imv.desktop
+image/gif=imv.desktop
+image/webp=imv.desktop
+image/bmp=imv.desktop
+image/tiff=imv.desktop
+image/avif=imv.desktop
+image/heif=imv.desktop
+image/jxl=imv.desktop
+image/svg+xml=imv.desktop
+video/mp4=mpv.desktop
+video/webm=mpv.desktop
+video/x-matroska=mpv.desktop
+video/quicktime=mpv.desktop
+video/mpeg=mpv.desktop
+video/x-msvideo=mpv.desktop
+video/ogg=mpv.desktop
+audio/mpeg=mpv.desktop
+audio/flac=mpv.desktop
+audio/ogg=mpv.desktop
+audio/x-wav=mpv.desktop
+audio/mp4=mpv.desktop
+audio/opus=mpv.desktop
+x-scheme-handler/terminal=kitty.desktop

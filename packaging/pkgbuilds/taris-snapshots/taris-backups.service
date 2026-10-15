@@ -1,0 +1,12 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The list of backups Settings reads, at every start: after a restore, the one in the restored
+# system is the backup's own
+[Unit]
+Description=Listing TarisOS's backups
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/taris/backup index

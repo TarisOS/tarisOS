@@ -1,0 +1,16 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# logind reads its settings when it starts or reloads: a reload, not a restart, so nobody's session
+# goes (and nothing at all while the image is built, with no systemd running)
+
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/lib/systemd/logind.conf.d/taris.conf
+
+[Action]
+Description = Reloading logind's settings for TarisOS...
+When = PostTransaction
+Exec = /bin/bash -c '[[ -d /run/systemd/system ]] && systemctl reload systemd-logind.service || true'

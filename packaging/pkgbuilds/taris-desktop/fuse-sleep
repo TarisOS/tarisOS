@@ -1,0 +1,37 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# GNOME's file system mounts (gvfsd-fuse, /run/user/<uid>/gvfs, from Nautilus) around sleep, run as
+# root. A FUSE daemon can block the kernel freezing processes, and the machine then silently doesn't
+# sleep: before sleep (systemd-sleep, /usr/lib/systemd/system-sleep/taris-fuse) they're detached,
+# and after waking (taris-fuse-resume.service) each of those accounts' gvfs is started again, which
+# mounts it back.
+# Usage: fuse-sleep pre|post <operation>   (systemd-sleep)
+#        fuse-sleep resume
+
+detached=/run/taris/fuse-detached
+
+case ${1:-} in
+pre)
+	mkdir -p "${detached%/*}"
+	: >"$detached"
+	while read -r _ mountpoint fstype _; do
+		[[ $fstype == "fuse.gvfsd-fuse" ]] || continue
+		mountpoint=$(printf '%b' "$mountpoint") # /proc/mounts escapes spaces as \040
+		if fusermount3 -uz "$mountpoint" 2>/dev/null || umount -l "$mountpoint" 2>/dev/null; then
+			stat -c %u "${mountpoint%/*}" >>"$detached"
+		fi
+	done </proc/mounts
+	;;
+resume)
+	[[ -s $detached ]] || exit 0
+	sort -u "$detached" | while read -r uid; do
+		user=$(id -nu "$uid" 2>/dev/null) || continue
+		systemctl --user -M "$user@" restart gvfs-daemon.service ||
+			echo "gvfs couldn't be started again for $user" >&2
+	done
+	rm -f "$detached"
+	;;
+esac
+exit 0

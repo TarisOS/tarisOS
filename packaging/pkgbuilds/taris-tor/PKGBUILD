@@ -1,0 +1,42 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Everything through Tor, switched on and off from the shell (the taskbar's Tor icon and the Network
+# page): a Tor of its own, nftables rules that send every app's TCP and DNS through it and refuse
+# the rest, and the time from the internet through it. Off until it's switched on.
+
+pkgname=taris-tor
+pkgver=1.0.0
+pkgrel=2
+pkgdesc='TarisOS: the whole system through Tor, from the shell'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+# lyrebird: every bridge transport Tor Browser uses (obfs4, Snowflake, meek, webtunnel)
+depends=('tor' 'lyrebird-proxy' 'nftables' 'polkit' 'systemd' 'bash' 'curl' 'networkmanager')
+install=taris-tor.install
+source=('tor' 'tor-time' 'torrc' 'tor.nft' 'taris-tor.service' 'taris-tor-time.service' 'taris-tor-time.timer'
+        '50-taris-tor.rules' 'bridges-obfs4' 'bridges-snowflake' 'bridges-meek')
+sha256sums=('f3ea7718a7603aac649df06568ea1ab1a0ac2340b0f107a8ee300b82677268f9'
+            '7928e5a4e7f8e1d534ad39c66bae10f8159450c25f31e4397966bd79d718b59a'
+            'dafaa13b724c2a91dd16e1571a73599a2cf121725c561c30de28008f64578df7'
+            'c37c48ef8bbe5971b88b5369c4d8cc674f41f991fa651c39ec9a418364964bf2'
+            'b30c2ed2f5ef0c9e78b71351bc85212a6fb079f95c3e96c59d7f1abbcf8ffff6'
+            'c32ba60319c1a2b29cb8246aa10e42e49674f21de6de2acc8ea5ca49b255b2d4'
+            '3ca9eee0e72875b7da32215204a956fd18cfc0a2cdd2f5873b36f1be08324533'
+            'aff1bfed9e18ff883c20a9a14944785a29bc2da6e7d2c0163f2e26f73d0f1305'
+            'bc824c9b6d58865240d3916855e7bb1cfc8e13308da475a5af35930f1b9005b6'
+            'b8344e538036c72f40dd4f259ed0fa4a3a91ff898a052cd9674aaa7ca92f3ad3'
+            '5cf59cb49bab9efc4e3e6c08ae3020a8b19c34200a21cca7bcb327d7b32fdb48')
+
+package() {
+    install -Dm755 tor tor-time -t "$pkgdir/usr/lib/taris"
+    install -Dm644 torrc tor.nft -t "$pkgdir/usr/share/taris/tor"
+    # Tor's built-in bridges, as Tor Browser has them
+    local kind
+    for kind in obfs4 snowflake meek; do
+        install -Dm644 "bridges-$kind" "$pkgdir/usr/share/taris/tor/bridges/$kind"
+    done
+    install -Dm644 taris-tor.service taris-tor-time.service taris-tor-time.timer -t "$pkgdir/usr/lib/systemd/system"
+    install -Dm644 50-taris-tor.rules -t "$pkgdir/usr/share/polkit-1/rules.d"
+}

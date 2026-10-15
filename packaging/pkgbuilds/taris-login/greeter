@@ -1,0 +1,6 @@
+#!/bin/sh
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# greetd's greeter (default_session): a Hyprland of its own, with only the greeter in it
+exec start-hyprland -- --config /usr/share/taris/greeter/hyprland.lua

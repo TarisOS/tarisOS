@@ -1,0 +1,105 @@
+#!/usr/bin/python3 -I
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+"""First-boot setup (the setup screen, through pkexec): makes the first account (an administrator)
+and sets the time zone and keyboard layout, then gives the account its defaults, and starts
+installing the apps that aren't in the image in the background (taris-desktop's first-apps). Only
+while the system isn't set up yet (/var/lib/taris/setup-pending). Reads JSON on stdin:
+{"name", "user", "password", "timezone", "layout", "variant"}. Says what went wrong on stderr."""
+
+import grp
+import json
+import os
+import pwd
+import re
+import subprocess
+import sys
+
+FLAG = "/var/lib/taris/setup-pending"
+RESERVED = {"root", "greeter", "nobody", "bin", "daemon", "mail", "ftp", "http", "alpm", "dbus", "polkitd", "rtkit", "systemd-network", "systemd-resolve", "systemd-timesync", "systemd-coredump", "systemd-journal-remote", "uuidd", "nordvpn", "tor"}
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def run(*args, **kwargs):
+    subprocess.run(args, check=True, **kwargs)
+
+
+if not os.path.exists(FLAG):
+    fail("TarisOS is already set up.")
+
+try:
+    data = json.load(sys.stdin)
+    name = str(data.get("name", "")).strip()
+    user = str(data["user"])
+    password = str(data["password"])
+    timezone = str(data["timezone"])
+    layout = str(data.get("layout") or "us")
+    variant = str(data.get("variant") or "")
+except (ValueError, KeyError, TypeError):
+    fail("The setup screen sent something unreadable.")
+
+if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user) or user in RESERVED:
+    fail("That username can't be used.")
+try:
+    pwd.getpwnam(user)
+    fail("That username is taken.")
+except KeyError:
+    pass
+if any(c in name for c in ":,\n\\") or len(name) > 100:
+    fail("The name can't have : , or \\ in it.")
+if not password or "\n" in password or "\0" in password:
+    fail("The password can't be empty.")
+zones = subprocess.run(["timedatectl", "list-timezones"], capture_output=True, text=True).stdout.split()
+if timezone not in zones:
+    fail("That time zone isn't known.")
+if not re.fullmatch(r"[a-z0-9_]+(,[a-z0-9_]+)*", layout) or not re.fullmatch(r"[A-Za-z0-9_,-]*", variant):
+    fail("That keyboard layout isn't known.")
+
+try:
+    run("useradd", "--create-home", "--groups", "wheel", "--comment", name or user, "--shell", "/bin/bash", user)
+except subprocess.CalledProcessError:
+    fail("The account couldn't be made.")
+
+try:
+    run("chpasswd", input=f"{user}:{password}\n", text=True)
+    # NordVPN's app talks to its service as members of its group (the group only counts from the
+    # next login, which this account hasn't had yet)
+    for group in ("nordvpn",):
+        try:
+            grp.getgrnam(group)
+            run("usermod", "--append", "--groups", group, user)
+        except KeyError:
+            pass
+
+    # An encrypted install logs in with the disk password, once per boot (greetd's autologin)
+    root = subprocess.run(["findmnt", "-n", "-o", "SOURCE", "/"], capture_output=True, text=True).stdout.strip()
+    root = re.sub(r"\[.*\]$", "", root)
+    if root and subprocess.run(["lsblk", "-n", "-d", "-o", "TYPE", root], capture_output=True, text=True).stdout.strip() == "crypt":
+        subprocess.run(["/usr/lib/taris/autologin", user])
+
+    run("timedatectl", "set-timezone", timezone)
+    run("localectl", "set-x11-keymap", layout, "", variant)
+    subprocess.run(["/usr/lib/taris/regdom"])
+except subprocess.CalledProcessError as e:
+    # The account goes again, so the setup screen can try once more with the same name
+    subprocess.run(["userdel", "--remove", user], stderr=subprocess.DEVNULL)
+    subprocess.run(["/usr/lib/taris/autologin", "--off"], stderr=subprocess.DEVNULL)
+    fail(f"Setting up failed ({os.path.basename(str(e.cmd[0]))}).")
+
+# The account's defaults in its home folder, as the account, and its look for the greeter
+home = pwd.getpwnam(user).pw_dir
+env = {"HOME": home, "USER": user, "LOGNAME": user, "SHELL": "/bin/bash", "LANG": os.environ.get("LANG", "C.UTF-8"), "PATH": "/usr/local/bin:/usr/bin"}
+for helper in ("/usr/lib/taris/user-defaults", "/usr/lib/taris/greeter-sync"):
+    if os.access(helper, os.X_OK):
+        subprocess.run(["runuser", "-u", user, "--", helper], env=env, cwd=home)
+
+os.remove(FLAG)
+# The apps that aren't in the image, installed in the background from now on, as the account logs
+# in (a failure, offline say, is tried again by taris-first-apps.timer)
+subprocess.run(["systemctl", "start", "--no-block", "taris-first-apps.service"], stderr=subprocess.DEVNULL)
+print("ok")

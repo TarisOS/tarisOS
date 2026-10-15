@@ -1,0 +1,26 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# TarisOS: everything that makes it TarisOS (not the apps, which are installed on their own so any
+# of them can be removed)
+
+pkgname=taris
+pkgver=1.0.0
+pkgrel=2
+pkgdesc='TarisOS: a minimal, low-power desktop for Apple Silicon Macs'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=(
+    'taris-keyring'
+    'taris-hardware'
+    'taris-shell'
+    'taris-desktop'
+    'taris-login'
+    'taris-chromium'
+    'taris-snapshots'
+    'taris-firewall'
+    'taris-tor'
+    'taris-thumbnails'
+    'taris-wallpapers'
+)

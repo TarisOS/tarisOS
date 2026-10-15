@@ -1,0 +1,12 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Trigger]
+Type = Package
+Operation = Remove
+Target = taris-desktop
+
+[Action]
+Description = Removing the window title bar plugin...
+When = PreTransaction
+Exec = /usr/bin/rm -rf /usr/lib/taris/hyprbars

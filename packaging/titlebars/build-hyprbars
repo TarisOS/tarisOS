@@ -1,0 +1,79 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Builds the hyprbars plugin (hyprwm/hyprland-plugins) for the installed Hyprland, from the plugins
+# commit hyprpm.toml pins for it, into /usr/lib/taris/hyprbars/hyprbars.so (the taris-desktop
+# package's pacman hook runs it as root whenever Hyprland is installed or updated). Hyprland only
+# loads a plugin built from its own headers, so the result is checked against them before it's
+# put in place; the running Hyprland picks it up at the next login.
+#
+#   build-hyprbars           build unless the current build matches the installed Hyprland
+#   build-hyprbars --force   build anyway
+#   build-hyprbars --check   exit 0 when the current build matches the installed Hyprland
+
+set -euo pipefail
+
+dest="${TARIS_HYPRBARS_DIR:-/usr/lib/taris/hyprbars}"
+stamp="$dest/built-for"
+plugins_repo="https://raw.githubusercontent.com/hyprwm/hyprland-plugins"
+version_h=/usr/include/hyprland/src/version.h
+
+die() {
+	echo "build-hyprbars: $*" >&2
+	exit 1
+}
+
+[[ -f $version_h ]] || die "Hyprland isn't installed"
+commit=$(sed -n 's/^#define GIT_COMMIT_HASH *"\([0-9a-f]\{40\}\)".*/\1/p' "$version_h")
+[[ -n $commit ]] || die "can't tell which Hyprland is installed"
+
+current() {
+	[[ -f $dest/hyprbars.so && $(cat "$stamp" 2>/dev/null) == "$commit" ]]
+}
+
+case ${1:-} in
+--check)
+	current
+	exit
+	;;
+--force) ;;
+*)
+	if current; then
+		echo "hyprbars is already built for this Hyprland"
+		exit 0
+	fi
+	;;
+esac
+
+for tool in curl make g++ pkg-config jq; do
+	command -v "$tool" >/dev/null || die "$tool is missing"
+done
+pkg-config --exists hyprland || die "Hyprland's headers are missing"
+
+# The plugins commit made for this Hyprland commit
+pin=$(curl -fsSL --max-time 30 "$plugins_repo/main/hyprpm.toml" | grep -F "\"$commit\"" |
+	sed -E 's/.*"[0-9a-f]{40}", *"([0-9a-f]{40})".*/\1/' | head -1) || true
+[[ $pin =~ ^[0-9a-f]{40}$ ]] || die "hyprland-plugins has no build for Hyprland ${commit:0:8} yet (or there's no network); floating windows get no drag strip until there is"
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+files=$(curl -fsSL --max-time 30 "https://api.github.com/repos/hyprwm/hyprland-plugins/contents/hyprbars?ref=$pin" |
+	jq -r '.[] | select(.type == "file") | .name | select(test("\\.(cpp|hpp)$|^Makefile$"))') || true
+[[ -n $files ]] || die "couldn't list the hyprbars sources"
+for file in $files; do
+	curl -fsSL --max-time 30 "$plugins_repo/$pin/hyprbars/$file" -o "$work/$file"
+done
+
+echo "Building hyprbars for Hyprland ${commit:0:8}…"
+make -C "$work" >"$work/build.log" 2>&1 || {
+	tail -20 "$work/build.log" >&2
+	die "the build failed"
+}
+strings "$work/hyprbars.so" | grep -x "$commit" >/dev/null || die "the build doesn't match the installed Hyprland"
+
+install -d -m 755 "$dest"
+install -m 755 "$work/hyprbars.so" "$dest/hyprbars.so.new"
+mv "$dest/hyprbars.so.new" "$dest/hyprbars.so"
+printf '%s\n' "$commit" >"$stamp"
+echo "Built hyprbars for Hyprland ${commit:0:8}"

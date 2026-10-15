@@ -1,0 +1,115 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# A new account's TarisOS defaults, in its home folder: the Taris colour theme, its wallpaper and
+# the wallpaper collection, the standard folders, the preinstalled web apps, swappy's settings, the
+# agent skills and bash's extras. Run as the account by the setup screen when it creates it, and at
+# login (--if-new: only once per account, for accounts added later).
+set -u
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/taris"
+config="${XDG_CONFIG_HOME:-$HOME/.config}"
+data="${XDG_DATA_HOME:-$HOME/.local/share}"
+marker="$state/defaults-applied"
+share=/usr/share/taris
+
+[[ ${1:-} == --if-new && -e $marker ]] && exit 0
+mkdir -p "$state" "$config/taris" "$data"
+
+# The standard folders (Desktop, Documents, Downloads, Music, Pictures, Public, Videos...), named for
+# the account's language, and ~/.config/user-dirs.dirs, which apps read them from. No Templates: set
+# to the home folder, xdg-user-dirs leaves it out and doesn't make it again.
+xdg-user-dirs-update >/dev/null 2>&1 || true
+xdg-user-dirs-update --set TEMPLATES "$HOME" >/dev/null 2>&1 || true
+rmdir "$HOME/Templates" 2>/dev/null || true
+
+# The wallpapers, one collection in the wallpaper folder (a link: updates reach it), and the first
+# one on screen. Set before the colours: a fixed scheme isn't changed by it (--no-smart).
+walls="${TARIS_WALLPAPERS_DIR:-$HOME/Pictures/Wallpapers}"
+mkdir -p "$walls"
+[[ -e $walls/TarisOS || -L $walls/TarisOS ]] || ln -s /usr/share/backgrounds/taris "$walls/TarisOS"
+if [[ ! -s $state/wallpaper/path.txt && -f /usr/share/backgrounds/taris/17.webp ]]; then
+	taris wallpaper -f /usr/share/backgrounds/taris/17.webp -N >/dev/null 2>&1 || true
+fi
+
+# The Taris colour theme (gruvbox soft dark with its colours changed) among the saved themes on
+# Settings > Colours, and on
+theme="$share/defaults/taris-theme.json"
+if [[ -f $theme ]]; then
+	python3 -I - "$theme" "$config/taris/colour-overrides.json" <<'PY' || true
+import json, sys
+theme_path, overrides_path = sys.argv[1], sys.argv[2]
+theme = json.load(open(theme_path))
+try:
+    data = json.load(open(overrides_path))
+except (OSError, ValueError):
+    data = {}
+data.setdefault("overrides", {})
+themes = data.setdefault("themes", [])
+if not any(t.get("name") == theme["name"] for t in themes):
+    themes.append(theme)
+data["overrides"].setdefault(f"{theme['scheme']} {theme['flavour']} {theme['mode']}", dict(theme["colours"]))
+json.dump(data, open(overrides_path, "w"), indent=4)
+PY
+	read -r scheme flavour mode < <(python3 -I -c 'import json, sys; t = json.load(open(sys.argv[1])); print(t["scheme"], t["flavour"], t["mode"])' "$theme") &&
+		taris scheme set -n "$scheme" -f "$flavour" -m "$mode" >/dev/null 2>&1 || true
+	# The theme's colours on the scheme now, not only once the shell runs: the greeter's and the
+	# setup screen's look (the image's) are copied from what this leaves, with no shell ever running
+	python3 -I /etc/xdg/quickshell/taris/assets/scheme-overrides.py >/dev/null 2>&1 || true
+fi
+
+# The preinstalled web apps (list.tsv: name, address, icon file), with the icons that come with
+# them
+if [[ -f $share/webapps/list.tsv ]]; then
+	while IFS=$'\t' read -r name url icon; do
+		[[ -n $name && $name != \#* ]] || continue
+		/etc/xdg/quickshell/taris/assets/install-webapp.sh "$name" "$url" "$share/webapps/icons/$icon" >/dev/null 2>&1 || true
+	done <"$share/webapps/list.tsv"
+fi
+
+# NordVPN as the shell's VPN (its quick toggle), when it's installed
+if command -v nordvpn >/dev/null; then
+	python3 -I - "$config/taris/shell.json" <<'PY2' || true
+import json, sys
+path = sys.argv[1]
+try:
+    data = json.load(open(path))
+except (OSError, ValueError):
+    data = {}
+vpn = data.setdefault("utilities", {}).setdefault("vpn", {})
+if not vpn.get("provider"):
+    vpn["provider"] = [{"id": "vpn-nordvpn", "name": "nordvpn", "displayName": "NordVPN", "interface": "", "connectCmd": [], "disconnectCmd": []}]
+    vpn["selectedProvider"] = "vpn-nordvpn"
+    json.dump(data, open(path, "w"), indent=4)
+PY2
+fi
+
+# The dock: the files, the browser, the music player, the terminal, VSCodium (installed the first time it's opened), and
+# the Discord web app
+if [[ ! -e $state/dock.json ]]; then
+	printf '{\n    "pinned": ["org.gnome.Nautilus", "chromium", "taris-music", "kitty", "taris-install-code", "webapp-discord"]\n}\n' >"$state/dock.json"
+fi
+
+# swappy (the screenshot editor) reads its settings only from the account's folder. Its own
+# default saves to ~/Desktop, or the home folder without one, and stays open, so Save seemed to do
+# nothing: Save goes to the screenshots folder, and saving or copying closes it.
+if [[ ! -e $config/swappy/config ]]; then
+	mkdir -p "$config/swappy"
+	printf '[Default]\nsave_dir=$HOME/Pictures/Screenshots\nearly_exit=true\n' >"$config/swappy/config"
+fi
+
+# Instructions for coding agents, where the agents look for them
+for dir in "$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.codex/skills" "$HOME/.pi/agent/skills"; do
+	mkdir -p "$dir"
+	for skill in "$share"/agent-skills/*/; do
+		skill=${skill%/}
+		[[ -e $dir/${skill##*/} || -L $dir/${skill##*/} ]] || ln -s "$skill" "$dir/${skill##*/}"
+	done
+done
+
+# bash: TarisOS's interactive extras (apps installed on first use: claude, codium)
+line='[[ -r /usr/share/taris/bashrc ]] && . /usr/share/taris/bashrc'
+grep -qxF "$line" "$HOME/.bashrc" 2>/dev/null || printf '\n%s\n' "$line" >>"$HOME/.bashrc"
+
+touch "$marker"

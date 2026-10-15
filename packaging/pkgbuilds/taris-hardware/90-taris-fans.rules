@@ -1,0 +1,9 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Fan control (the bar's fan popout): lets the wheel group set Apple Silicon fan speeds. fanN_target
+# only takes writes with macsmc_hwmon.fan_control=1 on the kernel command line (taris-grub.cfg).
+ACTION=="add|change", SUBSYSTEM=="hwmon", ATTR{name}=="macsmc_hwmon", RUN+="/usr/bin/sh -c 'for f in /sys%p/fan*_target; do chgrp wheel $$f && chmod g+w $$f; done'"
+# Every fan on auto from the start: the SMC can still have one on the speed it last had (stopped,
+# after a restart), which the driver doesn't know about (/usr/lib/taris/fans-auto)
+ACTION=="add", SUBSYSTEM=="hwmon", ATTR{name}=="macsmc_hwmon", RUN+="/usr/lib/taris/fans-auto /sys%p"

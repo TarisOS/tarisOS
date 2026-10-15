@@ -1,0 +1,12 @@
+// Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// NordVPN's daemon stopped once it's disconnected (the shell's VPN service: it wakes the CPU about 30
+// times a second even when disconnected), without a password, by someone it serves (the nordvpn
+// group, signed in here). Only stopping it: its socket starts it again for the next connection.
+polkit.addRule(function (action, subject) {
+    if (action.id === "org.freedesktop.systemd1.manage-units" && action.lookup("unit") === "nordvpnd.service" &&
+        action.lookup("verb") === "stop" && subject.active && subject.local && subject.isInGroup("nordvpn"))
+        return polkit.Result.YES;
+    return polkit.Result.NOT_HANDLED;
+});

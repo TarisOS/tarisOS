@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Again after each start-up, and every 15 minutes, until they're installed (the setup screen's last
+# step starts the first go)
+[Unit]
+Description=Install TarisOS's apps that aren't in its image, until they are
+ConditionPathExists=!/var/lib/taris/first-apps-done
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

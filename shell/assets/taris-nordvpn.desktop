@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=NordVPN
+GenericName=VPN
+Comment=Connect to the internet through NordVPN
+Icon=nordvpn
+Exec=taris-qs -c taris ipc call nexus openPage network
+Categories=Network;
+Keywords=vpn;nordvpn;nord;privacy;
+X-Taris-Package=nordvpn-bin

@@ -1,0 +1,43 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The apps TarisOS comes with that aren't in its image (the image has to fit in a GitHub release's
+# 2 GiB): installed in the background as the first account is logged in, with the system's pending
+# updates, so they're there a few minutes later. The setup screen's last step starts it
+# (setup-apply, taris-login); taris-first-apps.timer tries again after each start-up until it has
+# worked (offline then, pacman busy). Once: /var/lib/taris/first-apps-done, which an upgrade from a
+# TarisOS that had these apps in its image sets at once (taris-desktop.install), so it never puts
+# back an app someone removed. Runs as root (taris-first-apps.service).
+# Usage: /usr/lib/taris/first-apps
+set -u
+
+done=/var/lib/taris/first-apps-done
+list=/usr/share/taris/first-apps
+
+if [[ -e $done || -e /var/lib/taris/setup-pending ]]; then
+	exit 0
+fi
+mapfile -t apps < <(grep -v '^[[:space:]]*\(#\|$\)' "$list")
+
+# Something else installing (an update, the App Store) goes first: up to ten minutes
+for _ in $(seq 1 60); do
+	if [[ ! -e /var/lib/pacman/db.lck ]]; then
+		break
+	fi
+	sleep 10
+done
+if [[ -e /var/lib/pacman/db.lck ]]; then
+	echo "first-apps: pacman is busy, trying again later" >&2
+	exit 1
+fi
+
+# The mirrors with the newest package lists first (an older one fails with 404s)
+/usr/lib/taris/mirrors || true
+if ((${#apps[@]} == 0)) || pacman -Syu --needed --noconfirm "${apps[@]}"; then
+	mkdir -p "${done%/*}"
+	touch "$done"
+else
+	echo "first-apps: couldn't install them, trying again later" >&2
+	exit 1
+fi

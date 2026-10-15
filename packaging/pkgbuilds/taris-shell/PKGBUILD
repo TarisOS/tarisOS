@@ -1,0 +1,101 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The TarisOS desktop shell (this repository's shell folder), with its greeter and first-boot setup
+# screen. Runs on quickshell-taris. The version is the shell's own (utils/Release.qml).
+#
+# TARIS_SRC=/path/to/shell builds another checkout's shell folder.
+
+pkgname=taris-shell
+pkgver=1.0.0
+pkgrel=17
+pkgdesc='The TarisOS desktop shell'
+arch=('aarch64')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=(
+    'taris-cli'
+    'quickshell-taris'
+    'glibc'
+    'gcc-libs'
+
+    # Brightness, and night light (Settings > Displays)
+    'ddcutil'
+    'brightnessctl'
+    'hyprsunset'
+
+    # Services
+    'libcava'
+    'networkmanager'
+    'lm_sensors'
+    'aubio'
+    'libpipewire'
+    'libqalculate'
+    'power-profiles-daemon'
+
+    # Fonts
+    'ttf-material-symbols-variable'
+    'ttf-rubik-vf'
+    'ttf-cascadia-code-nerd'
+    'noto-fonts-emoji'
+
+    # Icons (the shell resolves app icons through the GTK icon theme)
+    'papirus-icon-theme'
+
+    # Qt modules
+    'qt6-base'
+    'qt6-declarative'
+    'qt6-imageformats'
+    'qt6-m3shapes-git'
+
+    # The Agent tab's terminal (patched: qmltermwidget would be Arch's own), fan control, the
+    # Store, the file picker, web apps
+    'qmltermwidget-taris'
+    'python'
+    'python-gobject'
+    'mise'
+    'pacman-contrib'
+    'flatpak'
+    'archlinux-appstream-data'
+    'libjxl'
+    'file'
+    'curl'
+    'glib2'
+
+    # Extra functionality
+    'swappy'
+    'bash'
+
+    # The emoji picker: Unicode's list of emoji, and typing the one picked
+    'unicode-emoji'
+    'wtype'
+)
+optdepends=(
+    'yay: AUR apps in the App Store and >install'
+)
+makedepends=('cmake' 'ninja' 'qt6-shadertools')
+provides=('taris-silicon')
+conflicts=('taris-silicon')
+replaces=('taris-silicon')
+
+_src() {
+    echo "${TARIS_SRC:-$startdir/../../../shell}"
+}
+
+build() {
+    # From an empty build folder: makepkg keeps the last one, made for the Qt it was built against
+    rm -rf "$srcdir/build"
+    cmake -S "$(_src)" -B "$srcdir/build" -G Ninja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX=/ \
+        -DVERSION="$pkgver" \
+        -DGIT_REVISION="$pkgver-$pkgrel" \
+        -DDISTRIBUTOR="TarisOS (package: $pkgname)"
+    cmake --build "$srcdir/build"
+}
+
+package() {
+    DESTDIR="$pkgdir" cmake --install "$srcdir/build"
+    install -Dm644 "$(_src)/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "$(_src)/NOTICE" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+}

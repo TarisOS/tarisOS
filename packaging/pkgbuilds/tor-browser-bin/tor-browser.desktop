@@ -1,0 +1,14 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Desktop Entry]
+Type=Application
+Name=Tor Browser
+GenericName=Web Browser
+Comment=Browse the web anonymously through Tor
+Exec=tor-browser %u
+Icon=tor-browser
+Categories=Network;WebBrowser;
+Keywords=tor;onion;browser;privacy;anonymous;
+StartupWMClass=Tor Browser Alpha
+Terminal=false

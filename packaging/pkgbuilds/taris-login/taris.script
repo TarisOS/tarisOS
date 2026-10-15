@@ -1,0 +1,58 @@
+// Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// TarisOS's boot screen (only used to ask for the disk password): black, with the lock screen's
+// pill-shaped password field. Its placeholder is "Decrypt password", or what TarisOS's own prompts
+// ask for (a new disk password).
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+field.image = Image("field.png");
+field.sprite = Sprite(field.image);
+field.x = Window.GetX() + Window.GetWidth() / 2 - field.image.GetWidth() / 2;
+field.y = Window.GetY() + Window.GetHeight() / 2 - field.image.GetHeight() / 2;
+field.sprite.SetPosition(field.x, field.y, 1);
+field.sprite.SetOpacity(0);
+
+label.sprite = Sprite();
+label.sprite.SetZ(2);
+note.sprite = Sprite();
+note.sprite.SetZ(2);
+
+fun placeholder(prompt) {
+    if (prompt == "New disk password" || prompt == "Confirm disk password")
+        return prompt;
+    return "Decrypt password";
+}
+
+fun show_password(prompt, bullets) {
+    field.sprite.SetOpacity(1);
+    if (bullets == 0) {
+        image = Image.Text(placeholder(prompt), 0.58, 0.56, 0.6, 1);
+    } else {
+        dots = "";
+        for (i = 0; i < bullets && i < 40; i++)
+            dots += "•";
+        image = Image.Text(dots, 0.9, 0.88, 0.91, 1);
+    }
+    label.sprite.SetImage(image);
+    label.sprite.SetPosition(Window.GetX() + Window.GetWidth() / 2 - image.GetWidth() / 2, field.y + field.image.GetHeight() / 2 - image.GetHeight() / 2, 2);
+    label.sprite.SetOpacity(1);
+}
+
+fun show_normal() {
+    field.sprite.SetOpacity(0);
+    label.sprite.SetOpacity(0);
+}
+
+fun show_message(text) {
+    image = Image.Text(text, 0.95, 0.72, 0.71, 1);
+    note.sprite.SetImage(image);
+    note.sprite.SetPosition(Window.GetX() + Window.GetWidth() / 2 - image.GetWidth() / 2, field.y + field.image.GetHeight() * 1.6, 2);
+    note.sprite.SetOpacity(1);
+}
+
+Plymouth.SetDisplayPasswordFunction(show_password);
+Plymouth.SetDisplayNormalFunction(show_normal);
+Plymouth.SetMessageFunction(show_message);

@@ -1,0 +1,6 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Battery charge limit (Settings > Power): lets the wheel group set where charging stops. Asahi's
+# own rule keeps the value across reboots.
+ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", RUN+="/usr/bin/sh -c 'for f in /sys%p/charge_control_start_threshold /sys%p/charge_control_end_threshold; do [ -e $$f ] && chgrp wheel $$f && chmod g+w $$f; done; true'"

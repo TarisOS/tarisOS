@@ -1,0 +1,94 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Chinese, Japanese and Korean typing, installed when they're wanted (Settings > Keyboard & trackpad
+# runs this in a terminal): input-method add|remove zh|ja|ko. Adding installs fcitx5, the
+# language's engine and the CJK fonts (with the system's pending updates) and adds the engine to
+# this account's fcitx5 setup; removing the last one removes them all again. fcitx5 starts at
+# login once it's installed (its autostart entry), and Hyprland gives apps its settings.
+set -euo pipefail
+
+action=${1:-}
+lang=${2:-}
+case $lang in
+zh) engine=fcitx5-chinese-addons im=pinyin ;;
+ja) engine=fcitx5-mozc im=mozc ;;
+ko) engine=fcitx5-hangul im=hangul ;;
+*)
+	echo "Usage: input-method add|remove zh|ja|ko" >&2
+	exit 1
+	;;
+esac
+stack=(fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool noto-fonts-cjk)
+engines=(fcitx5-chinese-addons fcitx5-mozc fcitx5-hangul)
+profile="${XDG_CONFIG_HOME:-$HOME/.config}/fcitx5/profile"
+
+# This account's fcitx5 setup: the keyboard layout first, then each engine added
+set_profile() {
+	mkdir -p "$(dirname "$profile")"
+	python3 -I - "$profile" "$1" "$im" <<'PY'
+import configparser, subprocess, sys
+path, action, im = sys.argv[1:]
+cp = configparser.ConfigParser(interpolation=None)
+cp.optionxform = str
+cp.read(path)
+items = []
+i = 0
+while cp.has_section(f"Groups/0/Items/{i}"):
+    items.append(cp[f"Groups/0/Items/{i}"].get("Name", ""))
+    i += 1
+if not items:
+    layout = "us"
+    try:
+        out = subprocess.run(["hyprctl", "getoption", "input:kb_layout", "-j"], capture_output=True, text=True).stdout
+        import json
+        layout = (json.loads(out).get("str") or "us").split(",")[0] or "us"
+    except Exception:
+        pass
+    items = [f"keyboard-{layout}"]
+if action == "add" and im not in items:
+    items.append(im)
+if action == "remove":
+    items = [n for n in items if n != im]
+for section in [s for s in cp.sections() if s.startswith("Groups/")]:
+    cp.remove_section(section)
+cp["Groups/0"] = {"Name": "Default", "Default Layout": items[0].removeprefix("keyboard-"), "DefaultIM": items[-1]}
+for n, name in enumerate(items):
+    cp[f"Groups/0/Items/{n}"] = {"Name": name, "Layout": ""}
+cp["GroupOrder"] = {"0": "Default"}
+with open(path, "w") as f:
+    cp.write(f, space_around_delimiters=False)
+PY
+}
+
+case $action in
+add)
+	printf 'Installing %s typing…\n\n' "$im"
+	sudo pacman -Syu --needed "${stack[@]}" "$engine"
+	pkill -x fcitx5 2>/dev/null || true
+	set_profile add
+	setsid -f fcitx5 -d >/dev/null 2>&1
+	echo
+	echo "Switch between your keyboard and $im with CTRL + SPACE. Hyprland applies fcitx5's settings to apps started after you next log in."
+	;;
+remove)
+	pkill -x fcitx5 2>/dev/null || true
+	set_profile remove
+	remove=("$engine")
+	others=0
+	for e in "${engines[@]}"; do
+		[[ $e != "$engine" ]] && pacman -Q "$e" &>/dev/null && others=1
+	done
+	((others)) || remove+=("${stack[@]}")
+	mapfile -t remove < <(pacman -Qq "${remove[@]}" 2>/dev/null || true)
+	((${#remove[@]} == 0)) || sudo pacman -Rns "${remove[@]}"
+	if ((others)); then
+		setsid -f fcitx5 -d >/dev/null 2>&1
+	fi
+	;;
+*)
+	echo "Usage: input-method add|remove zh|ja|ko" >&2
+	exit 1
+	;;
+esac

@@ -1,0 +1,40 @@
+// Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+#pragma once
+
+#include <qquickitem.h>
+
+namespace taris::components {
+
+class ButtonRow : public QQuickItem {
+    Q_OBJECT
+    QML_ELEMENT
+
+    Q_PROPERTY(qreal spacing READ spacing WRITE setSpacing NOTIFY spacingChanged)
+
+public:
+    explicit ButtonRow(QQuickItem* parent = nullptr);
+
+    [[nodiscard]] qreal spacing() const;
+    void setSpacing(qreal spacing);
+
+signals:
+    void spacingChanged();
+
+protected:
+    void itemChange(QQuickItem::ItemChange change, const QQuickItem::ItemChangeData& data) override;
+    void updatePolish() override;
+
+private slots:
+    void invalidate();
+
+private:
+    void relayout();
+    static qreal getMorphExpansion(const QQuickItem* item);
+
+    bool m_dirty;
+    qreal m_spacing;
+};
+
+} // namespace taris::components

@@ -1,0 +1,88 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Quickshell (git) for the TarisOS shell, installed side by side with any other quickshell (in
+# /opt). Based on the AUR quickshell-git PKGBUILD. Stripped; its debug info goes into
+# quickshell-taris-debug, for diagnosing crashes. TarisOS's patches (taris-*.patch): audio nodes
+# that report more channel volumes than channels (Asahi's microphone, TarisOS's mono copy of it)
+# get their volume and mute state read and set instead of ignored. A patch that no longer applies
+# stops the build.
+
+_pkgname=quickshell
+pkgname=quickshell-taris
+pkgver=0.3.2.r0.g4f508be
+pkgrel=3
+pkgdesc='Quickshell (git) in /opt, used by the TarisOS shell'
+arch=(x86_64 aarch64)
+url='https://git.outfoxxed.me/quickshell/quickshell'
+options=(strip debug)
+license=('LGPL-3.0-only')
+depends=(
+  'qt6-declarative'
+  'qt6-base'
+  'jemalloc'
+  'qt6-svg'
+  'libpipewire'
+  'libxcb'
+  'wayland'
+  'libdrm'
+  'mesa'
+  'cpptrace'
+  'polkit'
+)
+makedepends=(
+  'vulkan-headers'
+  'spirv-tools'
+  'qt6-shadertools'
+  'wayland'
+  'wayland-protocols'
+  'cli11'
+  'ninja'
+  'cmake'
+  'git'
+)
+source=("$_pkgname::git+$url.git"
+        'taris-volume.patch')
+sha256sums=('SKIP'
+            'b4c8b2d65aa6a98759a376e68e9e5c7884b3e96ceab18d3320effd5fe6792e91')
+
+_prefix=/opt/quickshell-taris
+
+pkgver() {
+  cd "$_pkgname"
+  git describe --long --tags --abbrev=7 --exclude='*[a-zA-Z][a-zA-Z]*' \
+    | sed -E 's/^[^0-9]*//;s/([^-]*-g)/r\1/;s/-/./g'
+}
+
+prepare() {
+  cd "$_pkgname"
+  patch -Np1 -i ../taris-volume.patch
+}
+
+build() {
+  cd "$_pkgname"
+  # From an empty build folder: makepkg keeps the last one, and its cache and precompiled headers
+  # are for the Qt it was built against (a Qt update then fails inside Qt's own headers)
+  rm -rf build
+  cmake -GNinja -B build \
+    -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
+    -DCMAKE_INSTALL_PREFIX="$_prefix" \
+    -DDISTRIBUTOR="TarisOS (package: $pkgname)" \
+    -DINSTALL_QML_PREFIX=lib/qt6/qml
+
+  cmake --build build
+}
+
+package() {
+  cd "$_pkgname"
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 "LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"
+
+  install -dm755 "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/taris-qs" <<SH
+#!/bin/sh
+export QML_IMPORT_PATH="$_prefix/lib/qt6/qml\${QML_IMPORT_PATH:+:\$QML_IMPORT_PATH}"
+exec $_prefix/bin/qs "\$@"
+SH
+  chmod 755 "$pkgdir/usr/bin/taris-qs"
+}

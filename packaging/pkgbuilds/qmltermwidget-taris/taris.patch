@@ -1,0 +1,285 @@
+diff -ruN a/lib/ColorScheme.cpp b/lib/ColorScheme.cpp
+--- a/lib/ColorScheme.cpp	2026-01-26 13:52:32.000000000 +0000
++++ b/lib/ColorScheme.cpp	2026-10-13 19:18:45.819377767 +0100
+@@ -637,6 +637,15 @@
+     if ( dirs.isEmpty() )
+         return QString();
+ 
++    // Taris: a scheme in any of the folders (the shell's own one is in a folder added by the
++    // plugin, not the first), the first folder's path when none has it
++    for (const QString& schemeDir : dirs)
++    {
++        const QString found(schemeDir + QLatin1Char('/') + name + QLatin1String(".colorscheme"));
++        if (QFile::exists(found))
++            return found;
++    }
++
+     const QString dir = dirs.first();
+     QString path(dir + QLatin1Char('/')+ name + QLatin1String(".colorscheme"));
+     if ( !path.isEmpty() )
+diff -ruN a/lib/Emulation.cpp b/lib/Emulation.cpp
+--- a/lib/Emulation.cpp	2026-01-26 13:52:32.000000000 +0000
++++ b/lib/Emulation.cpp	2026-10-13 19:48:16.603832853 +0100
+@@ -316,8 +316,27 @@
+     return _currentScreen->getLines() + _currentScreen->getHistLines();
+ }
+ 
++// Taris: every update redraws the terminal in the shell and the compositor (the shell's whole
++// screen for its overlay terminal, the Agent tab's surface for that one). While a program streams
++// output, show its screen at most ~30 times a second (still immediate to the eye) instead of up to
++// ~100, and ~15 times a second while the user isn't typing (an agent working on its own: its
++// spinner and its output, at half the cost in the shell, the compositor and the battery).
++static const int MIN_BULK_INTERVAL = 33;
++static const int IDLE_BULK_INTERVAL = 66;
++// How long after a key press, a paste or a click the screen keeps the full rate
++static const int INPUT_FULL_RATE = 500;
++
+ void Emulation::showBulk()
+ {
++    const int interval = _lastInput.isValid() && _lastInput.elapsed() < INPUT_FULL_RATE ? MIN_BULK_INTERVAL : IDLE_BULK_INTERVAL;
++    if (_lastBulk.isValid() && _lastBulk.elapsed() < interval)
++    {
++        _bulkTimer1.setSingleShot(true);
++        _bulkTimer1.start(interval - static_cast<int>(_lastBulk.elapsed()));
++        return;
++    }
++    _lastBulk.start();
++
+     _bulkTimer1.stop();
+     _bulkTimer2.stop();
+ 
+diff -ruN a/lib/Emulation.h b/lib/Emulation.h
+--- a/lib/Emulation.h	2026-01-26 13:52:32.000000000 +0000
++++ b/lib/Emulation.h	2026-10-13 19:19:26.274180787 +0100
+@@ -30,6 +30,7 @@
+ #include <QKeyEvent>
+ //#include <QPointer>
+ #include <QTextStream>
++#include <QElapsedTimer>
+ #include <QTimer>
+ #include <QStringDecoder>
+ 
+@@ -498,11 +499,20 @@
+ 
+   void bracketedPasteModeChanged(bool bracketedPasteMode);
+ 
++protected:
++  // Taris: the user typed, pasted or clicked (Vt102Emulation): the screen follows at the full rate
++  // for a moment, so what they type shows at once
++  void noteInput() { _lastInput.start(); }
++
+ private:
+   bool _usesMouse;
+   bool _bracketedPasteMode;
+   QTimer _bulkTimer1{this};
+   QTimer _bulkTimer2{this};
++  // When the screen was last shown (Taris: at most one update every MIN_BULK_INTERVAL ms, or
++  // IDLE_BULK_INTERVAL ms while the user isn't typing), and when the user last typed
++  QElapsedTimer _lastBulk;
++  QElapsedTimer _lastInput;
+   QStringDecoder _toUtf16;
+ };
+ 
+diff -ruN a/lib/TerminalDisplay.cpp b/lib/TerminalDisplay.cpp
+--- a/lib/TerminalDisplay.cpp	2026-01-26 13:52:32.000000000 +0000
++++ b/lib/TerminalDisplay.cpp	2026-10-13 19:18:45.820143005 +0100
+@@ -233,6 +233,8 @@
+ {
+   QFontMetrics fm(font());
+   _fontHeight = fm.height() + _lineSpacing;
++  if (_scrollBar)
++    _scrollBar->setLineHeight(_fontHeight);
+ 
+   // waba TerminalDisplay 1.123:
+   // "Base character width on widest ASCII character. This prevents too wide
+@@ -441,6 +443,7 @@
+   // create scroll bar for scrolling output up and down
+   // set the scroll bar's slider to occupy the whole area of the scroll bar initially
+   _scrollBar = new ScrollBar();
++  _scrollBar->setLineHeight(_fontHeight);
+   // since the contrast with the terminal background may not be enough,
+   // the scrollbar should be auto-filled if not transient
+   if (!_scrollBar->isTransient())
+@@ -2914,14 +2917,31 @@
+   {
+     // terminal program wants notification of mouse activity
+ 
++    // A program that reads the mouse scrolls a few lines per wheel report, as for a wheel notch.
++    // A trackpad sends many small events per swipe: add them up and report once per three lines'
++    // height moved (once per notch for a wheel), rather than once per event, which raced
++    int reports = 0;
++    const int pixels = ev->pixelDelta().y();
++    if (pixels != 0) {
++        const int unit = qMax(1, 3 * _fontHeight);
++        _wheelPixels += pixels;
++        reports = _wheelPixels / unit;
++        _wheelPixels -= reports * unit;
++    } else {
++        _wheelAngle += ev->angleDelta().y();
++        reports = _wheelAngle / 120;
++        _wheelAngle -= reports * 120;
++    }
++
+     int charLine;
+     int charColumn;
+     getCharacterPosition( ev->position() , charLine , charColumn );
+ 
+-    emit mouseSignal( ev->angleDelta().y() > 0 ? 4 : 5,
+-                      charColumn + 1,
+-                      charLine + 1 +_scrollBar->value() -_scrollBar->maximum() ,
+-                      0);
++    for (int i = 0; i < abs(reports); i++)
++      emit mouseSignal( reports > 0 ? 4 : 5,
++                        charColumn + 1,
++                        charLine + 1 +_scrollBar->value() -_scrollBar->maximum() ,
++                        0);
+   }
+ }
+ 
+@@ -3943,7 +3963,15 @@
+ void TerminalDisplay::itemChange(ItemChange change, const ItemChangeData & value)
+ {
+     switch (change) {
++    // Taris: in a new window its picture is a new texture, which a partial repaint (only the
++    // lines that changed) leaves mostly uninitialised: magenta and noise. Repaint all of it.
++    case QQuickItem::ItemSceneChange:
++        if (value.window)
++            update();
++        break;
+     case QQuickItem::ItemVisibleHasChanged:
++        if (value.boolValue)
++            update();
+         if (value.boolValue && _screenWindow) {
+             if (this->columns() != _screenWindow->columnCount() ||
+                 this->lines() != _screenWindow->lineCount()) {
+@@ -4007,34 +4035,46 @@
+ void ScrollBar::setAutoFillBackground(bool) {}
+ void ScrollBar::setAttribute(Qt::WidgetAttribute) {}
+ bool ScrollBar::underMouse() const { return false; }
++void ScrollBar::setLineHeight(int pixels)
++{
++    m_lineHeight = qMax(1, pixels);
++}
++
+ void ScrollBar::handleEvent(QEvent* event)
+ {
+     auto *wheel = dynamic_cast<QWheelEvent*>(event);
+     if (!wheel) {
+         return;
+     }
++    wheel->accept();
+ 
+-    // Prefer pixelDelta for smooth/trackpad scrolling, fall back to angleDelta
+-    int deltaY = wheel->pixelDelta().y();
+-    if (deltaY == 0) {
+-        deltaY = wheel->angleDelta().y();
++    // A trackpad sends many small pixel deltas per swipe and a high-resolution wheel many small
++    // angle deltas per notch: add them up and scroll a line per line height moved (a step per
++    // notch for a wheel), rather than at least a line per event, which raced through the
++    // scrollback
++    int stepCount = 0;
++    const int pixels = wheel->pixelDelta().y();
++    if (pixels != 0) {
++        m_pixelRemainder += pixels;
++        stepCount = m_pixelRemainder / m_lineHeight;
++        m_pixelRemainder -= stepCount * m_lineHeight;
++    } else {
++        m_angleRemainder += wheel->angleDelta().y();
++        stepCount = m_angleRemainder / 120; // 120 == 15 deg * 8
++        m_angleRemainder -= stepCount * 120;
+     }
+-    if (deltaY == 0) {
++    if (stepCount == 0) {
+         return;
+     }
+ 
+     // Qt uses positive delta for scrolling up (towards the user), which is a
+     // smaller scrollbar value.
+-    const int steps = deltaY / 120; // 120 == 15 deg * 8
+-    int stepCount = steps != 0 ? steps : (deltaY > 0 ? 1 : -1);
+-
+     int increment = m_singleStep * stepCount;
+     if (wheel->modifiers() & Qt::ControlModifier) {
+         increment = (m_pageStep ? m_pageStep : m_singleStep) * stepCount;
+     }
+ 
+     setValue(m_value - increment);
+-    wheel->accept();
+ }
+ 
+ //#include "TerminalDisplay.moc"
+diff -ruN a/lib/TerminalDisplay.h b/lib/TerminalDisplay.h
+--- a/lib/TerminalDisplay.h	2026-01-26 13:52:32.000000000 +0000
++++ b/lib/TerminalDisplay.h	2026-10-13 19:18:45.820585123 +0100
+@@ -898,7 +898,9 @@
+     bool    _columnSelectionMode;
+ 
+     QClipboard*  _clipboard;
+-    ScrollBar* _scrollBar;
++    ScrollBar* _scrollBar{nullptr};
++    int _wheelPixels{0};
++    int _wheelAngle{0};
+     QTermWidget::ScrollBarPosition _scrollbarLocation;
+     QString     _wordCharacters;
+     int         _bellMode;
+@@ -1045,6 +1047,7 @@
+     void setRange(int min, int max);
+     void setSingleStep(int step);
+     void setPageStep(int step);
++    void setLineHeight(int pixels);
+     void setValue(int value);
+     int value() const;
+     int minimum() const;
+@@ -1077,6 +1080,9 @@
+     int m_value{0};
+     int m_singleStep{1};
+     int m_pageStep{0};
++    int m_lineHeight{1};
++    int m_pixelRemainder{0};
++    int m_angleRemainder{0};
+     int m_width{0};
+     int m_height{0};
+     bool m_hidden{false};
+diff -ruN a/lib/Vt102Emulation.cpp b/lib/Vt102Emulation.cpp
+--- a/lib/Vt102Emulation.cpp	2026-01-26 13:52:32.000000000 +0000
++++ b/lib/Vt102Emulation.cpp	2026-10-13 19:19:26.274444283 +0100
+@@ -926,6 +926,7 @@
+ 
+ void Vt102Emulation::sendMouseEvent( int cb, int cx, int cy , int eventType )
+ {
++    noteInput();
+     if (cx < 1 || cy < 1)
+       return;
+ 
+@@ -1032,6 +1033,8 @@
+ 
+ void Vt102Emulation::sendKeyEvent(QKeyEvent* origEvent, bool fromPaste)
+ {
++    // Taris: the screen shows what's typed (and pasted: sendText comes through here) at once
++    noteInput();
+ #if defined(Q_OS_MAC)
+     QScopedPointer<QKeyEvent> event(remapKeyModifiersForMac(origEvent));
+ #else
+diff -ruN a/src/qmltermwidget_plugin.cpp b/src/qmltermwidget_plugin.cpp
+--- a/src/qmltermwidget_plugin.cpp	2026-01-26 13:52:32.000000000 +0000
++++ b/src/qmltermwidget_plugin.cpp	2026-10-13 19:18:45.820727746 +0100
+@@ -1,6 +1,7 @@
+ #include "qmltermwidget_plugin.h"
+ 
+ #include "TerminalDisplay.h"
++#include "tools.h"
+ #include "ksession.h"
+ 
+ #include <qqml.h>
+@@ -35,4 +36,11 @@
+         setenv("KB_LAYOUT_DIR",kbl.toUtf8().constData(),1);
+         setenv("COLORSCHEMES_DIR",cs.toUtf8().constData(),1);
+     }
++
++    // Taris: the shell writes its terminals' colours (Taris.colorscheme, from the colour scheme)
++    // to $XDG_STATE_HOME/taris/terminal, which every account has its own of
++    QString state = qEnvironmentVariable("XDG_STATE_HOME");
++    if (state.isEmpty())
++        state = QDir::homePath() + QLatin1String("/.local/state");
++    add_custom_color_scheme_dir(state + QLatin1String("/taris/terminal/"));
+ }

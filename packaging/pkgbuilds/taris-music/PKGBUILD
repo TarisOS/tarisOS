@@ -1,0 +1,61 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Taris Music, TarisOS's music player ("Music"): this repository's music folder, Zuno 1.4.0
+# (YouTube Music as a desktop app; Apache-2.0, github.com/noFAYZ/zuno) modified for TarisOS
+# (music/NOTICE). Tauri: its interface in WebKitGTK, its Rust side playing the music (two decks,
+# for gapless and crossfade) without YouTube's player or its ads, which only takes over a stream
+# Rust is refused. Built for 64-bit ARM. Its launcher opens it as the music workspace over
+# everything (TarisOS's Hyprland config).
+#
+# TARIS_SRC=/path/to/music builds another checkout's music folder.
+
+pkgname=taris-music
+pkgver=1.4.0
+pkgrel=2
+pkgdesc='The TarisOS music player (YouTube Music), based on Zuno'
+arch=('aarch64')
+url='https://github.com/TarisOS/tarisOS'
+license=('Apache-2.0')
+depends=('webkit2gtk-4.1' 'gtk3' 'gst-plugins-base' 'gst-plugins-good' 'gst-libav'
+    'alsa-lib' 'dbus' 'openssl' 'glib2' 'hicolor-icon-theme')
+makedepends=('rust' 'nodejs' 'npm')
+optdepends=('gst-plugins-bad: more containers and codecs' 'xdg-utils: opening links from inside the app')
+provides=('zuno')
+conflicts=('zuno')
+replaces=('zuno')
+source=('taris-music.desktop')
+sha256sums=('e23337a054bd2a9b5451a20411060fcfff055ebf94830f8075f0d98c652d8cc0')
+
+_src() {
+    echo "${TARIS_SRC:-$startdir/../../../music}"
+}
+
+prepare() {
+    # A copy to build in (npm and cargo write into the tree), without a checkout's build output
+    rm -rf "$srcdir/music"
+    mkdir "$srcdir/music"
+    tar -C "$(_src)" --exclude=./node_modules --exclude=./dist --exclude=./src-tauri/target \
+        --exclude=./src-tauri/gen -cf - . | tar -C "$srcdir/music" -xf -
+    cd "$srcdir/music"
+    npm ci
+}
+
+build() {
+    cd "$srcdir/music"
+    export CARGO_HOME="$srcdir/cargo"
+    # The program only (no .deb or AppImage bundles)
+    npm run tauri build -- --no-bundle
+}
+
+package() {
+    cd "$srcdir/music"
+    install -Dm755 src-tauri/target/release/taris-music -t "$pkgdir/usr/bin"
+    install -Dm644 "$srcdir/taris-music.desktop" -t "$pkgdir/usr/share/applications"
+    local size
+    for size in 32 64 128; do
+        install -Dm644 "src-tauri/icons/${size}x$size.png" "$pkgdir/usr/share/icons/hicolor/${size}x$size/apps/taris-music.png"
+    done
+    install -Dm644 src-tauri/icons/128x128@2x.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/taris-music.png"
+    install -Dm644 LICENSE NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
+}

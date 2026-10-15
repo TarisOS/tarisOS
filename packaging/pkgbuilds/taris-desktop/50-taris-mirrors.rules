@@ -1,0 +1,11 @@
+// Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Putting the freshest Arch Linux ARM mirrors first (/usr/lib/taris/mirrors) needs no password: it
+// only reorders Arch Linux ARM's own mirrors, and the App Store does it before every install
+polkit.addRule(function (action, subject) {
+    if (action.id === "org.freedesktop.policykit.exec" && action.lookup("program") === "/usr/lib/taris/mirrors" &&
+        action.lookup("command_line") === "/usr/lib/taris/mirrors" && subject.active && subject.local)
+        return polkit.Result.YES;
+    return polkit.Result.NOT_HANDLED;
+});

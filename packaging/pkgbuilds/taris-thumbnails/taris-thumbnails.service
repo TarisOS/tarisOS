@@ -1,0 +1,30 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Thumbnails never older than their files (/usr/lib/taris/thumbnails): on whenever the package is
+# installed. Root for the kernel's reports on every filesystem; thumbnails themselves are deleted as
+# the account they belong to.
+
+[Unit]
+Description=TarisOS: thumbnails never older than their files
+After=local-fs.target
+
+[Service]
+ExecStart=/usr/lib/taris/thumbnails
+Restart=always
+StateDirectory=taris-thumbnails
+# Tops of btrfs filesystems are mounted under /run/taris-thumbnails, seen only by this service
+RuntimeDirectory=taris-thumbnails
+RuntimeDirectoryMode=0700
+PrivateMounts=yes
+# Reports on every filesystem, opening what they name, and acting as each account
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_DAC_READ_SEARCH CAP_SETUID CAP_SETGID
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

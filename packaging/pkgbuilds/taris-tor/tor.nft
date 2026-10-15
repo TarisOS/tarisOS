@@ -1,0 +1,54 @@
+#!/usr/bin/nft -f
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Everything through Tor (taris-tor.service loads this before Tor starts, /usr/lib/taris/tor off
+# removes it): every app's TCP and DNS is sent to Tor, and whatever else would leave the machine is
+# refused, so nothing goes around it. Tor's own connections, the local network (except for DNS)
+# and NordVPN's tunnel go out as they are: NordVPN marks its tunnel and its own connections
+# 0xe1f1, so with both on, Tor runs through NordVPN. The rules stay while Tor is stopped any other
+# way, so Tor stopping never lets anything out directly.
+
+destroy table inet taris_tor
+
+table inet taris_tor {
+	# The local network, reached directly (the router, printers, KDE Connect)
+	set lan4 {
+		type ipv4_addr
+		flags interval
+		elements = { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 }
+	}
+
+	chain to_tor {
+		type nat hook output priority dstnat; policy accept;
+
+		meta skuid "tor" return
+		meta mark 0xe1f1 return
+		ip daddr 127.0.0.0/8 return
+		# DNS before the local network's exception, so a resolver on the router isn't asked directly
+		meta nfproto ipv4 udp dport 53 redirect to :9053
+		# .onion addresses, which Tor's DNS maps into 10.192.0.0/10 (part of 10.0.0.0/8)
+		ip daddr 10.192.0.0/10 meta l4proto tcp redirect to :9040
+		ip daddr @lan4 return
+		meta nfproto ipv4 meta l4proto tcp redirect to :9040
+	}
+
+	chain output {
+		type filter hook output priority filter; policy drop;
+
+		oif "lo" accept
+		ct status dnat accept
+		meta skuid "tor" accept
+		meta mark 0xe1f1 accept
+		# DNS that wasn't sent to Tor above (over TCP, or over IPv6 to the router) is refused, before
+		# the local network's exceptions let it reach a resolver there
+		meta l4proto { tcp, udp } th dport 53 reject with icmpx admin-prohibited
+		ip daddr @lan4 accept
+		# Broadcast and multicast never leave the local network (KDE Connect finding phones, DHCP)
+		ip daddr { 224.0.0.0/4, 255.255.255.255 } accept
+		ip6 daddr { fe80::/10, ff02::/16 } accept
+		# Refused rather than dropped, so apps give up at once instead of waiting
+		meta l4proto tcp reject with tcp reset
+		reject with icmpx admin-prohibited
+	}
+}

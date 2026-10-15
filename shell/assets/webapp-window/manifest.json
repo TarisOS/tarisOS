@@ -1,0 +1,11 @@
+{
+    "manifest_version": 3,
+    "name": "TarisOS web app windows",
+    "version": "1.0",
+    "description": "Hides the scrollbars in web app windows",
+    "permissions": ["scripting", "webNavigation"],
+    "host_permissions": ["<all_urls>"],
+    "background": {
+        "service_worker": "background.js"
+    }
+}

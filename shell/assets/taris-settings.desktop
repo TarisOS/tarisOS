@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+GenericName=Settings
+Comment=Configure TarisOS
+Icon=preferences-system
+Exec=taris-qs -c taris ipc call nexus open
+Categories=Settings;
+Keywords=nexus;taris;preferences;

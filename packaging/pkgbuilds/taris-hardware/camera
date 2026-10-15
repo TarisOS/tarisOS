@@ -1,0 +1,61 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The camera's switch (the Camera quick toggle, through pkexec; status needs no root). Off takes
+# the FaceTime camera away from its driver at once, even from an app that has it open, and keeps
+# the driver (apple_isp) from loading again for anyone, across restarts; on undoes both.
+# Usage: /usr/lib/taris/camera off|on
+#        /usr/lib/taris/camera status   (prints on or off)
+
+conf=/etc/modprobe.d/taris-camera-off.conf
+driver=/sys/bus/platform/drivers/apple-isp
+
+# The camera's devices (apple,isp in the device tree), with or without a driver
+cameras() {
+	local dev
+	for dev in /sys/bus/platform/devices/*; do
+		[[ -r $dev/of_node/compatible ]] || continue
+		tr '\0' '\n' <"$dev/of_node/compatible" | grep -qx 'apple,isp' && basename "$dev"
+	done
+}
+
+case ${1-} in
+	status)
+		if [[ -e $conf ]]; then
+			echo off
+		else
+			echo on
+		fi
+		;;
+	off)
+		# modprobe runs this instead of loading the driver, whatever asks for it
+		printf '%s\n' '# The camera is off (the Camera quick toggle): its driver never loads' \
+			'install apple_isp /bin/false' >"$conf" || exit 1
+		for cam in $(cameras); do
+			if [[ -e $driver/$cam ]]; then
+				printf '%s' "$cam" >"$driver/unbind" || exit 1
+			fi
+		done
+		# Unloaded too unless an app still holds it open; either way it drives nothing now
+		modprobe -r apple_isp 2>/dev/null
+		exit 0
+		;;
+	on)
+		rm -f "$conf" || exit 1
+		if [[ -d /sys/module/apple_isp ]]; then
+			# Still loaded (an app held it when it went off): give it the camera back
+			for cam in $(cameras); do
+				if [[ ! -e $driver/$cam ]]; then
+					printf '%s' "$cam" >"$driver/bind" || exit 1
+				fi
+			done
+		else
+			modprobe apple_isp || exit 1
+		fi
+		;;
+	*)
+		echo "usage: $0 off|on|status" >&2
+		exit 2
+		;;
+esac

@@ -1,0 +1,18 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The title bar plugin, when it couldn't be built when Hyprland was installed or updated (no network
+# then, or no plugin release for that Hyprland yet). Does nothing once it's built.
+[Unit]
+Description=Build the window title bar plugin for this Hyprland
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecCondition=/bin/sh -c '! /usr/lib/taris/build-hyprbars --check'
+ExecStart=/usr/lib/taris/build-hyprbars
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

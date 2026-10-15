@@ -1,0 +1,29 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# NordVPN, installed on first use rather than with the system (taris-nordvpn*.hook, as root in
+# pacman's transaction). Installed: its service starts when it's first asked for, and every
+# person's account joins its group, which its service only answers (from the account's next
+# login). Removed: its service is switched off first, so nothing is left enabled.
+# Usage: /usr/lib/taris/nordvpn-setup install|remove
+set -u
+
+case ${1:-} in
+install)
+	systemctl enable --now nordvpnd.socket
+	# People's accounts: the user ids useradd gives them
+	while IFS=: read -r name _ uid _; do
+		if (( uid >= 1000 && uid < 60000 )); then
+			gpasswd -a "$name" nordvpn >/dev/null
+		fi
+	done </etc/passwd
+	;;
+remove)
+	systemctl disable --now nordvpnd.socket nordvpnd.service
+	;;
+*)
+	echo "usage: $0 install|remove" >&2
+	exit 2
+	;;
+esac

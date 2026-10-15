@@ -1,0 +1,5 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The web apps every new account starts with: name, address, icon (in icons/), tab-separated
+Discord	https://discord.com/app	discord.png

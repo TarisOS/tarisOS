@@ -1,0 +1,28 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# mise from its official release build, for installing the coding agent picked in Taris's
+# Settings > Apps > Agent. Asahi Linux's repos don't have it, so install.sh builds this.
+
+pkgname=mise-bin
+pkgver=2026.10.3
+pkgrel=1
+pkgdesc='The front-end to your dev env (official release build)'
+arch=('aarch64')
+url='https://github.com/jdx/mise'
+license=('MIT')
+provides=('mise')
+conflicts=('mise' 'mise-musl-bin' 'rtx')
+source=("$url/releases/download/v$pkgver/mise-v$pkgver-linux-arm64.tar.gz")
+sha256sums=('e79866e32624b346f6854d93ca8a24294516cd7c0b48ce0e80af508fb7c3d8b8')
+
+package() {
+    cd "$srcdir/mise"
+    install -Dm755 bin/mise "$pkgdir/usr/bin/mise"
+    # Installed by pacman, so mise leaves updating itself to pacman
+    install -Dm644 /dev/null "$pkgdir/usr/lib/mise/.disable-self-update"
+    install -Dm644 man/man1/mise.1 "$pkgdir/usr/share/man/man1/mise.1"
+    install -Dm644 share/fish/vendor_conf.d/mise-activate.fish "$pkgdir/usr/share/fish/vendor_conf.d/mise-activate.fish"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

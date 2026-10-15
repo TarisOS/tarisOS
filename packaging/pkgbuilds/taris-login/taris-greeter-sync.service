@@ -1,0 +1,12 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Unit]
+Description=Copy this account's look for the greeter
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/taris/greeter-sync
+
+[Install]
+WantedBy=default.target

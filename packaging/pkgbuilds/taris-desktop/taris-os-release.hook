@@ -1,0 +1,14 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = filesystem
+Target = taris-desktop
+
+[Action]
+Description = Naming the system TarisOS...
+When = PostTransaction
+Exec = /usr/lib/taris/name-system

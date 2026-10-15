@@ -1,0 +1,189 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Backups of the whole system: read-only snapshots of the root (@: apps, packages, system settings)
+# and of the home folders (@home: every account's files and settings), kept together in @backups at
+# the top of the btrfs volume, where restoring one doesn't reach them. At most 20 are kept: the
+# oldest go first. Runs as root: Settings > Backup & restore (through pkexec), taris-backups.service
+# at boot (index) and taris-backups-auto.timer (auto). Restoring marks the backup for the initramfs
+# (the taris-reset hook swaps @ and @home for it at the next start) and restarts.
+#
+#   backup create                              back up now
+#   backup auto                                back up if the schedule says one is due
+#   backup delete <id>
+#   backup restore <id>                        restart into it
+#   backup schedule off|daily|weekly|monthly   automatic backups
+#   backup index                               the list Settings reads (/var/lib/taris/backups.json)
+set -euo pipefail
+
+limit=20
+top=/run/taris-backups
+index=/var/lib/taris/backups.json
+
+usage() {
+	sed -n 's/^#   //p' "$0" >&2
+	exit 2
+}
+
+valid_id() {
+	if [[ ! $1 =~ ^[0-9]{8}-[0-9]{6}$ ]]; then
+		echo "Not a backup: $1" >&2
+		exit 2
+	fi
+}
+
+# The top of the btrfs volume, with @backups in it
+mount_top() {
+	local dev
+	dev=$(findmnt -n -o SOURCE / | sed 's/\[.*\]$//')
+	if [[ $(findmnt -n -o FSTYPE /) != "btrfs" || ! -b $dev ]]; then
+		echo "Backups need the system on btrfs." >&2
+		exit 1
+	fi
+	mkdir -p "$top"
+	mountpoint -q "$top" || mount -o subvolid=5 "$dev" "$top"
+	trap 'umount "$top" 2>/dev/null || true' EXIT
+	[[ -d $top/@backups ]] || btrfs subvolume create "$top/@backups" >/dev/null
+}
+
+# The backups, oldest first (their ids are their dates: YYYYmmdd-HHMMSS)
+ids() {
+	local dir
+	for dir in "$top"/@backups/*/; do
+		dir=${dir%/}
+		[[ ${dir##*/} =~ ^[0-9]{8}-[0-9]{6}$ ]] && echo "${dir##*/}"
+	done
+	return 0
+}
+
+remove() {
+	local dir=$top/@backups/$1 sub
+	for sub in "$dir/root" "$dir/home"; do
+		[[ -d $sub ]] && btrfs subvolume delete "$sub" >/dev/null
+	done
+	rm -rf "$dir"
+}
+
+# kind: manual or automatic
+create() {
+	local id dir ok=1
+	id=$(date +%Y%m%d-%H%M%S)
+	dir=$top/@backups/$id
+	mkdir "$dir"
+	btrfs subvolume snapshot -r "$top/@" "$dir/root" >/dev/null || ok=0
+	if (( ok )) && [[ -d $top/@home ]]; then
+		btrfs subvolume snapshot -r "$top/@home" "$dir/home" >/dev/null || ok=0
+	fi
+	if (( ok )); then
+		printf 'kind=%s\n' "$1" >"$dir/info"
+	else
+		remove "$id"
+		echo "Couldn't make the backup." >&2
+		exit 1
+	fi
+	local all
+	mapfile -t all < <(ids)
+	while (( ${#all[@]} > limit )); do
+		remove "${all[0]}"
+		all=("${all[@]:1}")
+	done
+}
+
+seconds_of() {
+	date -d "${1:0:4}-${1:4:2}-${1:6:2} ${1:9:2}:${1:11:2}:${1:13:2}" +%s
+}
+
+# A new automatic backup once the newest automatic one is a day, a week or a month old (an hour's
+# leeway, so a daily timer that runs a little early doesn't skip a day)
+auto() {
+	local schedule days id newest=0
+	schedule=$(cat "$top/@backups/schedule" 2>/dev/null || echo off)
+	case $schedule in
+	daily) days=1 ;;
+	weekly) days=7 ;;
+	monthly) days=30 ;;
+	*) return 0 ;;
+	esac
+	for id in $(ids); do
+		if grep -qx 'kind=automatic' "$top/@backups/$id/info" 2>/dev/null; then
+			newest=$(seconds_of "$id")
+		fi
+	done
+	if (( $(date +%s) - newest >= days * 86400 - 3600 )); then
+		create automatic
+	fi
+}
+
+write_index() {
+	local id kind first=1 schedule
+	schedule=$(cat "$top/@backups/schedule" 2>/dev/null || echo off)
+	mkdir -p "${index%/*}"
+	{
+		printf '{\n    "schedule": "%s",\n    "backups": [' "$schedule"
+		for id in $(ids); do
+			kind=$(sed -n 's/^kind=//p' "$top/@backups/$id/info" 2>/dev/null)
+			if (( first )); then
+				first=0
+			else
+				printf ','
+			fi
+			printf '\n        { "id": "%s", "kind": "%s" }' "$id" "${kind:-manual}"
+		done
+		printf '\n    ]\n}\n'
+	} >"$index.new"
+	chmod 644 "$index.new"
+	mv "$index.new" "$index"
+}
+
+# One at a time (the timer and Settings)
+exec 9>/run/taris-backups.lock
+flock 9
+
+case ${1:-} in
+create)
+	mount_top
+	create manual
+	write_index
+	;;
+auto)
+	mount_top
+	auto
+	write_index
+	;;
+delete)
+	valid_id "${2:-}"
+	mount_top
+	remove "$2"
+	write_index
+	;;
+restore)
+	valid_id "${2:-}"
+	mount_top
+	if [[ ! -d $top/@backups/$2/root ]]; then
+		echo "There's no backup $2." >&2
+		exit 1
+	fi
+	printf '%s\n' "$2" >"$top/taris-restore"
+	sync
+	umount "$top"
+	trap - EXIT
+	systemctl reboot
+	;;
+schedule)
+	case ${2:-} in
+	off | daily | weekly | monthly) ;;
+	*) usage ;;
+	esac
+	mount_top
+	printf '%s\n' "$2" >"$top/@backups/schedule"
+	write_index
+	;;
+index)
+	mount_top
+	write_index
+	;;
+*)
+	usage
+	;;
+esac

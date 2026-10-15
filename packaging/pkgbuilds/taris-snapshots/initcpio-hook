@@ -1,0 +1,102 @@
+#!/usr/bin/ash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Factory reset and restoring a backup (asked for by Settings: /usr/lib/taris/factory-reset and
+# /usr/lib/taris/backup), before the root is mounted. A factory reset makes @ a fresh snapshot of
+# @factory and @home a new empty subvolume, and deletes every backup; restoring makes @ and @home
+# fresh snapshots of the backup's (@backups/<id>/root and home). The old ones are deleted. Files an
+# installed system needs to boot (listed in its /etc/taris/*.keep: its fstab, the disk encryption's
+# settings) are carried over. The kernel running now may differ from the new root's: with /boot in
+# the root the Mac restarts into the new root's own kernel straight away; with /boot on the EFI
+# partition (encrypted installs) the kernel stays, so its modules come along (the next update
+# installs that kernel's package again).
+
+run_hook() {
+    local top=/taris-btrfs dev old keep path kernel mode="" id src home="" what newhome=1
+    dev=$(resolve_device "$root") || return 0
+    mkdir -p "$top"
+    mount -t btrfs -o subvolid=5 "$dev" "$top" 2>/dev/null || return 0
+    if [ -e "$top/taris-factory-reset" ] && [ -d "$top/@factory" ]; then
+        mode=factory
+        src="$top/@factory"
+        what="factory reset"
+    elif [ -e "$top/taris-restore" ]; then
+        id=$(cat "$top/taris-restore")
+        case "$id" in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9])
+            if [ -d "$top/@backups/$id/root" ]; then
+                mode=restore
+                src="$top/@backups/$id/root"
+                home="$top/@backups/$id/home"
+                what="restoring the backup from $id"
+            fi
+            ;;
+        esac
+        [ -n "$mode" ] || rm -f "$top/taris-restore"
+    fi
+    if [ -n "$mode" ] && [ -d "$top/@" ]; then
+        msg ":: TarisOS: $what..."
+        old="$top/@reset-old"
+        if [ -d "$old" ]; then
+            btrfs subvolume delete --recursive "$old"/@* >/dev/null 2>&1
+            rm -rf "$old"
+        fi
+        mkdir -p "$old"
+        mv "$top/@" "$old/@"
+        [ -d "$top/@home" ] && mv "$top/@home" "$old/@home"
+        if [ -d "$home" ]; then
+            btrfs subvolume snapshot "$home" "$top/@home" >/dev/null
+        elif [ "$mode" = restore ] && [ -d "$old/@home" ]; then
+            # A backup without the home folders (there were none then) keeps today's
+            mv "$old/@home" "$top/@home"
+            newhome=0
+        else
+            btrfs subvolume create "$top/@home" >/dev/null
+        fi
+        if [ -d "$top/@home" ] && btrfs subvolume snapshot "$src" "$top/@" >/dev/null; then
+            # snapper's folder is a subvolume of its own, which a snapshot leaves out
+            if [ -d "$top/@/.snapshots" ] && rmdir "$top/@/.snapshots" 2>/dev/null; then
+                btrfs subvolume create "$top/@/.snapshots" >/dev/null
+                chmod 750 "$top/@/.snapshots"
+            fi
+            for keep in "$old"/@/etc/taris/*.keep; do
+                [ -f "$keep" ] || continue
+                cp -a "$keep" "$top/@/etc/taris/" 2>/dev/null
+                while read -r path; do
+                    case "$path" in /etc/* | /var/lib/taris/*) ;; *) continue ;; esac
+                    [ -e "$old/@$path" ] || continue
+                    mkdir -p "$top/@$(dirname "$path")"
+                    cp -a "$old/@$path" "$top/@$path"
+                done <"$keep"
+            done
+            kernel=$(uname -r)
+            if [ ! -d "$top/@/usr/lib/modules/$kernel" ] && [ -d "$old/@/usr/lib/modules/$kernel" ]; then
+                cp -a "$old/@/usr/lib/modules/$kernel" "$top/@/usr/lib/modules/"
+            fi
+            rm -f "$top/taris-factory-reset" "$top/taris-restore"
+            # A factory reset erases the backups too
+            if [ "$mode" = factory ] && [ -d "$top/@backups" ]; then
+                btrfs subvolume delete --recursive "$top/@backups" >/dev/null 2>&1
+            fi
+            # (Snapshots under the old root, then the old root and homes)
+            btrfs subvolume delete --recursive "$old/@" "$old/@home" >/dev/null 2>&1
+            rm -rf "$old"
+            msg ":: TarisOS: $what done"
+            # /boot in the root: start again, with the new root's kernel
+            if ! grep -Eq '^[^#[:space:]]+[[:space:]]+/boot[[:space:]]' "$top/@/etc/fstab"; then
+                umount "$top"
+                sync
+                reboot -f
+            fi
+        else
+            err "TarisOS: $what failed; putting the system back as it was"
+            btrfs subvolume delete "$top/@" >/dev/null 2>&1
+            [ "$newhome" = 1 ] && btrfs subvolume delete "$top/@home" >/dev/null 2>&1
+            mv "$old/@" "$top/@"
+            [ -d "$old/@home" ] && mv "$old/@home" "$top/@home"
+            rm -f "$top/taris-factory-reset" "$top/taris-restore"
+        fi
+    fi
+    umount "$top"
+}

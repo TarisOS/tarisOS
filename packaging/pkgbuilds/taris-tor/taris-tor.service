@@ -1,0 +1,44 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Everything through Tor, switched on and off by /usr/lib/taris/tor (enabled while it's on, so it
+# stays on after a reboot). The rules go in first, before the network comes up, so nothing gets
+# out directly while Tor starts. The rest follows Arch's tor.service.
+
+[Unit]
+Description=TarisOS Tor (everything through Tor)
+# The time through Tor, since the rules refuse the usual time sync
+Wants=network-pre.target taris-tor-time.timer
+Before=network-pre.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+User=tor
+Group=tor
+StateDirectory=taris-tor
+StateDirectoryMode=0700
+# The controller's cookie (New identity)
+RuntimeDirectory=taris-tor
+RuntimeDirectoryMode=0700
+ExecStartPre=+/usr/bin/nft -f /usr/share/taris/tor/tor.nft
+# TarisOS's settings, then the account's choices over them (Settings > Network > Tor:
+# /usr/lib/taris/tor writes /etc/taris/tor/torrc, there only once something is chosen)
+ExecStartPre=/usr/bin/tor --defaults-torrc /usr/share/taris/tor/torrc -f /etc/taris/tor/torrc --ignore-missing-torrc --verify-config
+ExecStart=/usr/bin/tor --defaults-torrc /usr/share/taris/tor/torrc -f /etc/taris/tor/torrc --ignore-missing-torrc
+ExecReload=/bin/kill -HUP ${MAINPID}
+KillSignal=SIGINT
+TimeoutSec=60
+Restart=on-failure
+WatchdogSec=1m
+LimitNOFILE=32768
+
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Administrators (the wheel group: the account made at setup) may use sudo
+%wheel ALL=(ALL:ALL) ALL
