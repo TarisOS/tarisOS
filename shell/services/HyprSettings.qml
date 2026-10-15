@@ -6,6 +6,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Taris.Config
 import qs.utils
 
 // Every Hyprland option, from `hyprctl descriptions -j`. Changes apply live through
@@ -90,6 +91,18 @@ Singleton {
         trialPrevious = null;
     }
 
+    // Workspace 1 on the main display (Settings > Displays)
+    function mainDisplayLua(name: string): string {
+        return `hl.workspace_rule({ workspace = "1", monitor = ${JSON.stringify(name)}, default = true })`;
+    }
+
+    // The main display: workspace 1 moves there now and opens there from now on
+    function setMainDisplay(name: string): void {
+        GlobalConfig.general.mainDisplay = name;
+        Quickshell.execDetached(["hyprctl", "eval", `${mainDisplayLua(name)}; hl.dispatch(hl.dsp.workspace.move({ workspace = "1", monitor = ${JSON.stringify(name)} }))`]);
+        writeLua();
+    }
+
     // _G.taris_<name> = value, for a config that has it
     function tarisLua(name: string, value: var): string {
         return `if _G.taris_${name} ~= nil then _G.taris_${name} = ${luaValue(value)} end`;
@@ -168,6 +181,8 @@ Singleton {
             lines.push(`pcall(function() ${luaFor(name, value)} end)`);
         for (const [name, m] of Object.entries(adapter.monitors))
             lines.push(`pcall(function() ${monitorLua(name, m)} end)`);
+        if (GlobalConfig.general.mainDisplay)
+            lines.push(`pcall(function() ${mainDisplayLua(GlobalConfig.general.mainDisplay)} end)`);
         for (const [name, value] of Object.entries(adapter.taris))
             lines.push(tarisLua(name, value));
         luaFile.setText(lines.join("\n") + "\n");

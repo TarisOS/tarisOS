@@ -36,7 +36,6 @@ apps=(
 	qt6-multimedia-ffmpeg kdeconnect sshfs
 	flatpak                # apps from Flathub (the App Store)
 	yay base-devel git     # the AUR (the App Store, >install)
-	github-cli             # GitHub from the terminal (gh)
 	xdg-user-dirs          # Documents, Downloads, Pictures…
 	noto-fonts noto-fonts-emoji
 	power-profiles-daemon

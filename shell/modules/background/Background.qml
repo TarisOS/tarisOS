@@ -12,7 +12,8 @@ import qs.components.containers
 import qs.services
 
 Variants {
-    model: Screens.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
+    // Every display, with the shell or not (Settings > Displays)
+    model: Quickshell.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
 
     StyledWindow {
         id: win

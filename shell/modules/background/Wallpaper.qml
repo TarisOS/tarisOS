@@ -15,7 +15,8 @@ import qs.utils
 Item {
     id: root
 
-    property string source: Wallpapers.current
+    // This display's own wallpaper, else the shared one
+    property string source: Config.background.wallpaper || Wallpapers.current
     property CachingImage current
     property bool completed
 

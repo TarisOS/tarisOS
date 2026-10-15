@@ -1,0 +1,19 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Silicon Motion's display manager, started by its udev rule when an adapter is plugged in and
+# stopped when the last one goes (/opt/siliconmotion/smi-udev.sh). It drives the adapter's
+# displays through evdi (evdi-dkms).
+[Unit]
+Description=Silicon Motion USB display driver
+After=display-manager.service
+
+[Service]
+ExecStartPre=/usr/bin/modprobe evdi
+# Its call that crashes the system's libevdi, made safe (evdi-nullfix.c). Preloaded into the manager
+# alone: the shim takes the call's NULL-safe version from the libevdi the manager loads, so anything
+# else it were preloaded into (modprobe, with Environment=) wouldn't start
+ExecStart=/usr/bin/env LD_PRELOAD=/opt/siliconmotion/libevdi-nullfix.so /opt/siliconmotion/SMIUSBDisplayManager
+WorkingDirectory=/opt/siliconmotion
+Restart=always
+RestartSec=5

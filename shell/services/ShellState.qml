@@ -39,12 +39,13 @@ Singleton {
         return null;
     }
 
+    // The focused display's, or the main display's when the focused one has no shell
     function forActive(): ScreenState {
         const mon = Hypr.focusedMonitor;
         for (const s of states.instances)
             if (Hypr.monitorFor(s.modelData) === mon)
                 return s;
-        return null;
+        return states.instances.find(s => s.modelData.name === Screens.mainName) ?? null;
     }
 
     function componentsFor(screen: ShellScreen): Components {
@@ -54,12 +55,13 @@ Singleton {
         return null;
     }
 
+    // The focused display's, or the main display's when the focused one has no shell
     function componentsForActive(): Components {
         const mon = Hypr.focusedMonitor;
         for (const c of components.instances)
             if (Hypr.monitorFor(c.modelData) === mon)
                 return c;
-        return null;
+        return components.instances.find(c => c.modelData.name === Screens.mainName) ?? null;
     }
 
     Variants {

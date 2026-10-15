@@ -54,6 +54,9 @@ class BackgroundConfig : public settings::ObjectNode {
 
     CONFIG_PROPERTY(bool, enabled, true)
     CONFIG_PROPERTY(bool, wallpaperEnabled, true)
+    // A display's own wallpaper (set for that display only, Settings > Wallpaper & Style). Empty:
+    // the shared one
+    CONFIG_PROPERTY(QString, wallpaper, {})
     CONFIG_SUBOBJECT(DesktopClock, desktopClock)
     CONFIG_SUBOBJECT(BackgroundVisualiser, visualiser)
 };

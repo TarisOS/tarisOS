@@ -82,9 +82,9 @@ Item {
             }
         }
 
-        // Brightness
+        // Brightness, on a display whose brightness can be set
         WrappedLoader {
-            shouldBeActive: Config.osd.enableBrightness
+            shouldBeActive: Config.osd.enableBrightness && (root.monitor?.controllable ?? false)
 
             sourceComponent: CustomMouseArea {
                 function onWheel(event: WheelEvent) {

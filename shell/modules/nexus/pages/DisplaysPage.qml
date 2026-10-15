@@ -5,10 +5,13 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import Taris.Config
 import Taris.I18n
 import qs.components
+import qs.components.containers
 import qs.components.controls
 import qs.services
 import qs.modules.nexus.common
@@ -16,7 +19,10 @@ import qs.modules.nexus.common
 // Monitors, changed the way the Witcher's Tweaks settings change them: drag them into place,
 // pick resolution, scale, rotation and mirroring, then Apply. Applied changes revert by themselves
 // after 15 seconds unless kept (then they're saved to hypr-settings.lua), even with Settings closed
-// (HyprSettings keeps the countdown). Also brightness and night light.
+// (HyprSettings keeps the countdown). A dropped display snaps to the side of the nearest one,
+// lined up with its start, centre or end; the others make room for it and close the gaps, so
+// displays never overlap (Hyprland warns when they do). Also which display is the main one, which
+// have the shell, their numbers shown on them, brightness and night light.
 PageBase {
     id: root
 
@@ -24,18 +30,255 @@ PageBase {
     property var edits: [] // The same, with your changes
     property int picked: 0
     property bool changed
+    property bool identifying
     readonly property int keepSeconds: HyprSettings.trialSeconds
     readonly property var current: edits[picked] ?? null
+    readonly property var dimmable: Brightness.monitors.filter(m => m.controllable)
+
+    property Timer _timer3: Timer {
+        id: identifyTimer
+
+        interval: 3000
+        onTriggered: root.identifying = false
+    }
+
+    // Each display's number on it while identifying: on top of everything, never taking the
+    // keyboard, clicks going through
+    property Variants _variants4: Variants {
+        model: root.identifying ? Screens.ordered : []
+
+        StyledWindow {
+            id: numberWin
+
+            required property ShellScreen modelData
+
+            screen: modelData
+            name: "identify"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            WlrLayershell.exclusionMode: ExclusionMode.Ignore
+            mask: Region {}
+
+            anchors.top: true
+            anchors.left: true
+            margins.top: 24
+            margins.left: 24
+            implicitWidth: 120
+            implicitHeight: 120
+
+            StyledRect {
+                anchors.fill: parent
+                radius: Tokens.rounding.large
+                color: Colours.palette.m3primaryContainer
+                border.width: 4
+                border.color: Colours.palette.m3primary
+
+                StyledText {
+                    anchors.centerIn: parent
+                    text: String(Screens.numberOf(numberWin.modelData.name))
+                    color: Colours.palette.m3onPrimaryContainer
+                    font: Tokens.font.body.builders.large.size(64).weight(Font.Bold).build()
+                }
+            }
+        }
+    }
 
     function load(): void {
         monitorsProc.running = true;
     }
 
+    function setEdits(list: var): void {
+        edits = list;
+        changed = JSON.stringify(edits) !== JSON.stringify(saved);
+    }
+
     function edit(key: string, value: var): void {
         const list = JSON.parse(JSON.stringify(edits));
         list[picked][key] = value;
-        edits = list;
-        changed = JSON.stringify(edits) !== JSON.stringify(saved);
+        settle(list, picked, rectOf(edits[picked]));
+        setEdits(list);
+    }
+
+    // Shown and not mirroring another: these take room on the desktop and must never overlap
+    function placed(m: var): bool {
+        return !m.disabled && !m.mirror;
+    }
+
+    function rectOf(m: var): var {
+        const l = logical(m);
+        return {
+            x: m.x,
+            y: m.y,
+            w: l.w,
+            h: l.h
+        };
+    }
+
+    function overlap(a: var, b: var): bool {
+        return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    }
+
+    function anyOverlap(list: var): bool {
+        for (let i = 0; i < list.length; i++)
+            for (let j = i + 1; j < list.length; j++)
+                if (placed(list[i]) && placed(list[j]) && overlap(rectOf(list[i]), rectOf(list[j])))
+                    return true;
+        return false;
+    }
+
+    // Along the side two displays share: lined up with the other's start, centre or end when
+    // within snap of it, else where it was dropped, the side still partly shared
+    function alongSide(raw: real, start: int, length: int, size: int, snap: real): int {
+        let pos = raw;
+        let nearest = snap;
+        for (const target of [start, Math.round(start + (length - size) / 2), start + length - size]) {
+            if (Math.abs(raw - target) < nearest) {
+                pos = target;
+                nearest = Math.abs(raw - target);
+            }
+        }
+        return Math.round(Math.max(start - size + 1, Math.min(start + length - 1, pos)));
+    }
+
+    // Moves every display overlapping list[from] out of its way along axis ("x" or "y") in
+    // direction sign (1 or -1), and the ones those then overlap, leaving list[fixed] where it is
+    function pushFrom(list: var, from: int, axis: string, sign: int, fixed: int): void {
+        const size = axis === "x" ? "w" : "h";
+        const queue = [from];
+        for (let n = 0; queue.length > 0 && n < 100; n++) {
+            const pusher = queue.shift();
+            const p = rectOf(list[pusher]);
+            for (let i = 0; i < list.length; i++) {
+                if (i === pusher || i === fixed || !placed(list[i]))
+                    continue;
+                const r = rectOf(list[i]);
+                if (!overlap(p, r))
+                    continue;
+                list[i][axis] = sign > 0 ? p[axis] + p[size] : p[axis] - r[size];
+                queue.push(i);
+            }
+        }
+    }
+
+    // Closes every gap that runs across the whole desktop, so displays that touched still do
+    function closeGaps(list: var): void {
+        for (const [axis, size] of [["x", "w"], ["y", "h"]]) {
+            const order = list.map((m, i) => i).filter(i => placed(list[i])).sort((a, b) => list[a][axis] - list[b][axis]);
+            let end = null;
+            let shift = 0;
+            for (const i of order) {
+                let start = list[i][axis] - shift;
+                if (end !== null && start > end) {
+                    shift += start - end;
+                    start = end;
+                }
+                list[i][axis] = start;
+                end = Math.max(end ?? start, start + rectOf(list[i])[size]);
+            }
+        }
+    }
+
+    // After list[index] changed size, went off or came back (before: its place until then): the
+    // displays it now overlaps move out the way they were from it (beside, above, below), else
+    // along the side they're least far into, then the gaps close
+    function settle(list: var, index: int, before: var): void {
+        if (placed(list[index])) {
+            const p = rectOf(list[index]);
+            for (let i = 0; i < list.length; i++) {
+                if (i === index || !placed(list[i]))
+                    continue;
+                const r = rectOf(list[i]);
+                if (!overlap(p, r))
+                    continue;
+                let axis;
+                let sign;
+                if (r.x >= before.x + before.w || r.x + r.w <= before.x) {
+                    axis = "x";
+                    sign = r.x >= before.x + before.w ? 1 : -1;
+                } else if (r.y >= before.y + before.h || r.y + r.h <= before.y) {
+                    axis = "y";
+                    sign = r.y >= before.y + before.h ? 1 : -1;
+                } else {
+                    const dx = Math.min(p.x + p.w - r.x, r.x + r.w - p.x);
+                    const dy = Math.min(p.y + p.h - r.y, r.y + r.h - p.y);
+                    axis = dx < dy ? "x" : "y";
+                    sign = axis === "x" ? (r.x + r.w / 2 >= p.x + p.w / 2 ? 1 : -1) : (r.y + r.h / 2 >= p.y + p.h / 2 ? 1 : -1);
+                }
+                const size = axis === "x" ? "w" : "h";
+                list[i][axis] = sign > 0 ? p[axis] + p[size] : p[axis] - r[size];
+                pushFrom(list, i, axis, sign, index);
+            }
+        }
+        closeGaps(list);
+    }
+
+    // The picked display dropped at (rawX, rawY) on the desktop: against the side of the display
+    // nearest to there, the ones in its way moved along. Kept only when nothing overlaps
+    function dropAt(index: int, rawX: real, rawY: real, snap: real): void {
+        const list = JSON.parse(JSON.stringify(edits));
+        const d = rectOf(list[index]);
+        let best = null;
+        if (placed(list[index])) {
+            for (let i = 0; i < list.length; i++) {
+                if (i === index || !placed(list[i]))
+                    continue;
+                const o = rectOf(list[i]);
+                const sides = [
+                    {
+                        axis: "x",
+                        sign: -1,
+                        x: o.x - d.w,
+                        y: alongSide(rawY, o.y, o.h, d.h, snap)
+                    },
+                    {
+                        axis: "x",
+                        sign: 1,
+                        x: o.x + o.w,
+                        y: alongSide(rawY, o.y, o.h, d.h, snap)
+                    },
+                    {
+                        axis: "y",
+                        sign: -1,
+                        x: alongSide(rawX, o.x, o.w, d.w, snap),
+                        y: o.y - d.h
+                    },
+                    {
+                        axis: "y",
+                        sign: 1,
+                        x: alongSide(rawX, o.x, o.w, d.w, snap),
+                        y: o.y + o.h
+                    }
+                ];
+                for (const side of sides) {
+                    const dist = Math.hypot(side.x - rawX, side.y - rawY);
+                    if (!best || dist < best.dist)
+                        best = Object.assign({
+                            dist
+                        }, side);
+                }
+            }
+        }
+        if (best) {
+            list[index].x = best.x;
+            list[index].y = best.y;
+            pushFrom(list, index, best.axis, best.sign, index);
+            closeGaps(list);
+        } else {
+            list[index].x = Math.round(rawX);
+            list[index].y = Math.round(rawY);
+        }
+        // Back where it was otherwise
+        setEdits(anyOverlap(list) ? JSON.parse(JSON.stringify(edits)) : list);
+    }
+
+    // The Settings overlay is on a display about to lose the shell (and the overlay with it): it
+    // opens on the main display first
+    function keepSettingsOpen(losing: string, main: string): void {
+        if (root.nState.isWindow || root.nState.screen?.name !== losing)
+            return;
+        const screen = Quickshell.screens.find(s => s.name === main);
+        if (screen)
+            ShellState.componentsFor(screen)?.panels?.popouts.detach("displays");
     }
 
     // A monitor's size on the desktop (rotation and scale applied)
@@ -103,7 +346,9 @@ PageBase {
                                 mirror: m.mirrorOf && m.mirrorOf !== "none" ? m.mirrorOf : "",
                                 disabled: m.disabled === true
                             }));
-                    list.sort((a, b) => (a.x - b.x) || (a.y - b.y));
+                    // Numbered left to right then top to bottom, as everywhere else (Screens), the
+                    // displays that are off after
+                    list.sort((a, b) => (a.disabled - b.disabled) || (a.x - b.x) || (a.y - b.y));
                     root.saved = JSON.parse(JSON.stringify(list));
                     root.edits = list;
                     root.changed = false;
@@ -176,13 +421,14 @@ PageBase {
                 anchors.margins: Tokens.padding.large
 
                 Repeater {
-                    model: root.edits
+                    // By count, so the boxes stay and slide when the layout changes
+                    model: root.edits.length
 
                     StyledRect {
                         id: screenBox
 
-                        required property var modelData
                         required property int index
+                        readonly property var modelData: root.edits[index] ?? ({})
                         readonly property var size: root.logical(modelData)
                         readonly property bool isPicked: index === root.picked
 
@@ -194,15 +440,36 @@ PageBase {
                         border.width: 1
                         border.color: isPicked ? Colours.palette.m3primary : Colours.palette.m3outlineVariant
 
-                        // Placed from the monitor's position, except while it's dragged
+                        // Placed from the monitor's position, except while it's held. Nothing is put
+                        // back when it's picked up (the default would put back where the box was before
+                        // it was placed, and it would jump there)
                         Binding on x {
-                            when: !dragArea.drag.active
+                            when: !dragArea.pressed
+                            restoreMode: Binding.RestoreNone
                             value: arrangement.ox + (screenBox.modelData.x - arrangement.bounds.x) * arrangement.ratio
                         }
 
                         Binding on y {
-                            when: !dragArea.drag.active
+                            when: !dragArea.pressed
+                            restoreMode: Binding.RestoreNone
                             value: arrangement.oy + (screenBox.modelData.y - arrangement.bounds.y) * arrangement.ratio
+                        }
+
+                        // Sliding into place once let go, never while held
+                        Behavior on x {
+                            enabled: !dragArea.pressed
+
+                            Anim {
+                                type: Anim.DefaultSpatial
+                            }
+                        }
+
+                        Behavior on y {
+                            enabled: !dragArea.pressed
+
+                            Anim {
+                                type: Anim.DefaultSpatial
+                            }
                         }
 
                         StyledText {
@@ -223,29 +490,98 @@ PageBase {
                             drag.target: root.edits.length > 1 ? screenBox : null
                             onPressed: root.picked = screenBox.index
                             onReleased: {
-                                if (!drag.active && root.edits.length <= 1)
+                                if (!drag.active || root.edits.length <= 1)
                                     return;
-                                // Back to desktop coordinates, snapped to the other screens' edges
-                                let nx = Math.round((screenBox.x - arrangement.ox) / arrangement.ratio + arrangement.bounds.x);
-                                let ny = Math.round((screenBox.y - arrangement.oy) / arrangement.ratio + arrangement.bounds.y);
-                                const snap = 60;
-                                for (let i = 0; i < root.edits.length; i++) {
-                                    const o = root.edits[i];
-                                    if (i === screenBox.index || o.disabled)
-                                        continue;
-                                    const ol = root.logical(o);
-                                    for (const e of [o.x - screenBox.size.w, o.x + ol.w, o.x, o.x + ol.w - screenBox.size.w])
-                                        if (Math.abs(nx - e) < snap)
-                                            nx = e;
-                                    for (const e of [o.y - screenBox.size.h, o.y + ol.h, o.y, o.y + ol.h - screenBox.size.h])
-                                        if (Math.abs(ny - e) < snap)
-                                            ny = e;
-                                }
-                                const list = JSON.parse(JSON.stringify(root.edits));
-                                list[screenBox.index].x = nx;
-                                list[screenBox.index].y = ny;
-                                root.edits = list;
-                                root.changed = JSON.stringify(root.edits) !== JSON.stringify(root.saved);
+                                // Back to desktop coordinates; lining up snaps within 6 px here
+                                const rawX = (screenBox.x - arrangement.ox) / arrangement.ratio + arrangement.bounds.x;
+                                const rawY = (screenBox.y - arrangement.oy) / arrangement.ratio + arrangement.bounds.y;
+                                root.dropAt(screenBox.index, rawX, rawY, 6 / arrangement.ratio);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        TextButton {
+            Layout.alignment: Qt.AlignRight
+            Layout.topMargin: Tokens.spacing.small
+            visible: root.edits.length > 1
+            type: TextButton.Tonal
+            text: Tr.tr("Identify")
+            onClicked: {
+                root.identifying = true;
+                identifyTimer.restart();
+            }
+        }
+
+        // ---------- Main display and the shell ----------
+        SegmentedRow {
+            Layout.topMargin: Tokens.spacing.small
+            visible: Screens.ordered.length > 1
+            first: true
+            label: Tr.tr("Main display")
+            options: Screens.ordered.map(s => ({
+                        value: s.name,
+                        label: String(Screens.numberOf(s.name))
+                    }))
+            current: Screens.mainName
+            onChosen: v => {
+                const old = Screens.mainName;
+                if (!GlobalConfig.forScreen(old).enabled)
+                    root.keepSettingsOpen(old, v);
+                Qt.callLater(() => HyprSettings.setMainDisplay(v));
+            }
+        }
+
+        ConnectedRect {
+            Layout.fillWidth: true
+            visible: Screens.ordered.length > 1
+            last: true
+            implicitHeight: taskbarRow.implicitHeight + Tokens.padding.medium * 2
+
+            RowLayout {
+                id: taskbarRow
+
+                anchors.fill: parent
+                anchors.margins: Tokens.padding.medium
+                anchors.leftMargin: Tokens.padding.largeIncreased
+                anchors.rightMargin: Tokens.padding.largeIncreased
+                spacing: Tokens.spacing.large
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Tr.tr("Show taskbar on")
+                    font: Tokens.font.body.small
+                    elide: Text.ElideRight
+                }
+
+                Repeater {
+                    model: Screens.ordered
+
+                    RowLayout {
+                        id: taskbarToggle
+
+                        required property ShellScreen modelData
+                        readonly property bool isMain: modelData.name === Screens.mainName
+
+                        spacing: Tokens.spacing.small
+
+                        StyledText {
+                            text: String(Screens.numberOf(taskbarToggle.modelData.name))
+                            font: Tokens.font.body.small
+                        }
+
+                        StyledSwitch {
+                            cLayer: 2
+                            checked: taskbarToggle.isMain || GlobalConfig.forScreen(taskbarToggle.modelData.name).enabled
+                            disabled: taskbarToggle.isMain
+                            onToggled: {
+                                const name = taskbarToggle.modelData.name;
+                                const on = checked;
+                                if (!on)
+                                    root.keepSettingsOpen(name, Screens.mainName);
+                                Qt.callLater(() => GlobalConfig.forScreen(name).enabled = on);
                             }
                         }
                     }
@@ -407,7 +743,8 @@ PageBase {
         }
 
         Repeater {
-            model: Brightness.monitors
+            // Only the displays whose brightness can be set
+            model: root.dimmable
 
             RangeRow {
                 id: brightnessRow
@@ -417,7 +754,7 @@ PageBase {
 
                 first: index === 0
                 icon: "brightness_6"
-                label: Brightness.monitors.length > 1 ? Tr.tr("Brightness · %1").arg(modelData.modelData.name) : Tr.tr("Brightness")
+                label: root.dimmable.length > 1 ? Tr.tr("Brightness · %1").arg(modelData.modelData.name) : Tr.tr("Brightness")
                 from: 1
                 to: 100
                 step: 1
@@ -428,7 +765,7 @@ PageBase {
         }
 
         ToggleRow {
-            first: Brightness.monitors.length === 0
+            first: root.dimmable.length === 0
             text: Tr.tr("Night light")
             checked: NightLight.enabled
             onToggled: NightLight.setEnabled(checked)

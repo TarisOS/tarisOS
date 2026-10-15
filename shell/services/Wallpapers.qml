@@ -30,6 +30,44 @@ Searcher {
     readonly property string actualCurrentFile: CUtils.canonicalPath(actualCurrent)
     property bool previewColourLock
     property bool pendingPreviewClear
+    // The display Settings > Wallpaper & Style sets the wallpaper of (its output name), "" for all
+    property string pickFor
+
+    // A display's wallpaper: its own, else the shared one
+    function wallpaperOf(name: string): string {
+        return (name ? GlobalConfig.forScreen(name).background.wallpaper : "") || current;
+    }
+
+    // A wallpaper from Settings, for pickFor's display or every display. The main display's is
+    // the shared one, which the colours follow: a display that isn't the main one gets its own
+    function pick(path: string): void {
+        const name = Quickshell.screens.some(s => s.name === pickFor) ? pickFor : "";
+        if (name && name !== Screens.mainName) {
+            GlobalConfig.forScreen(name).background.wallpaper = path;
+            return;
+        }
+        clearOwn(name);
+        setWallpaper(path);
+    }
+
+    // A random one of those Settings shows, the same way as pick()
+    function pickRandom(): void {
+        const name = Quickshell.screens.some(s => s.name === pickFor) ? pickFor : "";
+        if (name && name !== Screens.mainName) {
+            if (list.length > 0)
+                GlobalConfig.forScreen(name).background.wallpaper = list[Math.floor(Math.random() * list.length)].path;
+            return;
+        }
+        clearOwn(name);
+        setRandom();
+    }
+
+    // The display's own wallpaper goes (every display's when name is "")
+    function clearOwn(name: string): void {
+        for (const s of Quickshell.screens)
+            if ((!name || s.name === name) && GlobalConfig.forScreen(s.name).background.wallpaper)
+                GlobalConfig.forScreen(s.name).background.wallpaper = "";
+    }
 
     function isCurrent(path: string): bool {
         return CUtils.canonicalPath(path) === actualCurrentFile;

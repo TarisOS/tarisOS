@@ -96,7 +96,8 @@ CustomMouseArea {
     // touch puts it back 2 px (inside the border, which is the shell's): pushing on brings it to the
     // edge again at once, touch after touch. It shows once the touches have kept coming for time ms
     // (Settings: each panel's push force), each within 0.1 s of the one before; a flick is over well
-    // before. A longer gap starts again.
+    // before. A longer gap starts again. Where another display carries on past the edge the pointer
+    // goes through instead of stopping, so nothing can be pushed: the panel shows on touch there.
     function pushToShow(panel: string, x: real, y: real, time: int): bool {
         const edges = ({
                 dashboard: "top",
@@ -104,6 +105,10 @@ CustomMouseArea {
                 sidebar: "top right",
                 utilities: "bottom right"
             })[panel];
+        if (edgeShared(edges, x, y)) {
+            stopPush();
+            return true;
+        }
         const room = Math.min(2, Config.border.clampedThickness - 1);
         if (time <= 0 || room <= 0)
             return true;
@@ -136,6 +141,23 @@ CustomMouseArea {
         }
         Hypr.dispatch(Hypr.usingLua ? `hl.dsp.cursor.move({ x = ${gx}, y = ${gy} })` : `movecursor ${gx} ${gy}`);
         return false;
+    }
+
+    // Whether another display carries on past one of this screen's edges ("top", "bottom", "right",
+    // as pushToShow names them) where the pointer is
+    function edgeShared(edges: string, x: real, y: real): bool {
+        const gx = screen.x + x;
+        const gy = screen.y + y;
+        return Quickshell.screens.some(s => {
+            if (s.name === screen.name)
+                return false;
+            const alongX = gx >= s.x && gx < s.x + s.width;
+            const alongY = gy >= s.y && gy < s.y + s.height;
+            const top = edges.includes("top") && alongX && Math.abs(s.y + s.height - screen.y) <= 1;
+            const bottom = edges.includes("bottom") && alongX && Math.abs(s.y - (screen.y + screen.height)) <= 1;
+            const right = edges.includes("right") && alongY && Math.abs(s.x - (screen.x + screen.width)) <= 1;
+            return top || bottom || right;
+        });
     }
 
     function stopPush(): void {

@@ -172,6 +172,10 @@ Singleton {
         readonly property bool isDdc: ddcInfo !== null
         readonly property string busNum: ddcInfo?.busNum ?? ""
         readonly property bool isAppleDisplay: root.appleDisplayPresent && modelData.model.startsWith("StudioDisplay")
+        // The laptop's own panel (its backlight, brightnessctl), or a monitor that takes brightness
+        // over DDC or Apple's link. Others (one on a USB display adapter) can't be dimmed: brightnessctl
+        // would dim the laptop's panel instead
+        readonly property bool controllable: isAppleDisplay || isDdc || modelData.name.startsWith("eDP")
         property real brightness
         property real queuedBrightness: NaN
 
@@ -200,6 +204,8 @@ Singleton {
         }
 
         function setBrightness(value: real): void {
+            if (!controllable)
+                return;
             value = Math.max(0, Math.min(1, value));
             const rounded = Math.round(value * 100);
             if (Math.round(brightness * 100) === rounded)
@@ -224,6 +230,8 @@ Singleton {
         }
 
         function initBrightness(): void {
+            if (!controllable)
+                return;
             if (isAppleDisplay)
                 initProc.command = ["asdbctl", "get"];
             else if (isDdc)

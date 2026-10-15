@@ -118,6 +118,9 @@ class GeneralConfig : public settings::ObjectNode {
     // What closing the lid does: "sleep" (logind's own), "stash" (the open apps kept, then shut
     // down) or "nothing"
     CONFIG_GLOBAL_PROPERTY(QString, lidAction, u"sleep"_s)
+    // The output (eDP-1, DVI-I-1…) that always has the shell, takes the shortcuts pressed on a
+    // display without it, and holds workspace 1 (Settings > Displays). Empty: the first screen
+    CONFIG_GLOBAL_PROPERTY(QString, mainDisplay, {})
     CONFIG_PROPERTY(bool, showOverFullscreen, false)
     CONFIG_PROPERTY(qreal, mediaGifSpeedAdjustment, 300)
     CONFIG_GLOBAL_SUBOBJECT(GeneralApps, apps)

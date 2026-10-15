@@ -50,7 +50,7 @@ PageBase {
                     filterLabel: Tr.tr("Image files")
                     filters: Images.validImageExtensions
                     onAccepted: path => {
-                        Wallpapers.setWallpaper(path);
+                        Wallpapers.pick(path);
                         root.nState.closeSubPage();
                     }
                 }
@@ -66,7 +66,7 @@ PageBase {
                 verticalPadding: Tokens.padding.medium
                 type: IconTextButton.Tonal
                 onClicked: {
-                    Wallpapers.setRandom();
+                    Wallpapers.pickRandom();
                     root.nState.closeSubPage();
                 }
             }
@@ -126,7 +126,7 @@ PageBase {
                             root.nState.selectedWallpaperCategory = Wallpapers.getCategoryFor(modelData);
                             root.nState.openSubPage(2); // Category page
                         } else {
-                            Wallpapers.setWallpaper(modelData.path);
+                            Wallpapers.pick(modelData.path);
                             root.nState.closeSubPage();
                         }
                     }

@@ -7,7 +7,7 @@
 
 pkgname=taris-hardware
 pkgver=1.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc='TarisOS: Apple Silicon hardware support and fixes'
 arch=('aarch64')
 url='https://github.com/TarisOS/tarisOS'
@@ -36,6 +36,10 @@ depends=(
 
     # Hardware video decoding (VA-API)
     'libva-v4l2-request-avd'
+
+    # More external displays than the chip's own outputs, through Silicon Motion's USB display
+    # adapters (with evdi, which DKMS builds for each kernel from its headers)
+    'smi-usbdisplay-taris'
 
     # Wi-Fi (NetworkManager alone; its regulatory domain) and Bluetooth
     'networkmanager'

@@ -45,7 +45,7 @@ PageBase {
 
                 source: String(modelData?.path ?? "")
                 onClicked: {
-                    Wallpapers.setWallpaper(modelData.path);
+                    Wallpapers.pick(modelData.path);
                     root.nState.closeSubPage();
                     root.nState.closeSubPage();
                 }

@@ -68,6 +68,9 @@ PageBase {
     property string iconTheme
     // Set until the dock has read its icons from the new pack
     property bool iconsWaiting
+    // The display the wallpaper is picked for (Wallpapers.pickFor while it's connected), "" for all
+    readonly property string wallTarget: Screens.ordered.some(s => s.name === Wallpapers.pickFor) ? Wallpapers.pickFor : ""
+    readonly property var wallScreen: Screens.ordered.find(s => s.name === wallTarget) ?? nState.screen
     property Connections _iconsDone: Connections {
         function onIconRevisionChanged(): void {
             root.iconsWaiting = false;
@@ -126,11 +129,11 @@ PageBase {
 
             Layout.alignment: Qt.AlignHCenter
             implicitWidth: {
-                const screen = root.nState.screen;
+                const screen = root.wallScreen;
                 return implicitHeight / screen.height * screen.width;
             }
             implicitHeight: {
-                const screen = root.nState.screen;
+                const screen = root.wallScreen;
                 const cWidth = root.cappedWidth;
                 return Math.min(Math.round(cWidth * 0.4), cWidth / screen.width * screen.height);
             }
@@ -223,7 +226,7 @@ PageBase {
                     id: wallImg
 
                     anchors.fill: parent
-                    source: Wallpapers.current
+                    source: Wallpapers.wallpaperOf(root.wallTarget)
                     preventInit: wallIndicatorLoader.opacity > 0
                     fadeOutAnim: Anim.DefaultEffects
                     fadeInAnim: Anim.SlowEffects
@@ -238,6 +241,24 @@ PageBase {
                     }
                 }
             }
+        }
+
+        SegmentedRow {
+            visible: Screens.ordered.length > 1
+            first: true
+            last: true
+            label: Tr.tr("Display")
+            options: [
+                {
+                    value: "",
+                    label: Tr.tr("All")
+                }
+            ].concat(Screens.ordered.map(s => ({
+                        value: s.name,
+                        label: String(Screens.numberOf(s.name))
+                    })))
+            current: root.wallTarget
+            onChosen: v => Wallpapers.pickFor = v
         }
 
         ButtonRow {

@@ -36,14 +36,18 @@ Singleton {
 
     Component.onCompleted: refresh()
 
+    // hyprsunset keeps its temperature while it's off (identity), so whether it's off is asked too.
+    // While it isn't running each answer is an error naming its socket (/run/user/1000/…), whose
+    // numbers aren't a temperature: only exact answers count, and it's off otherwise
     Process {
         id: query
 
-        command: ["hyprctl", "hyprsunset", "temperature"]
+        command: ["sh", "-c", "hyprctl hyprsunset identity get; hyprctl hyprsunset temperature"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const t = parseInt(text.match(/\d+/)?.[0] ?? "");
-                root.temperature = isNaN(t) ? root.identity : t;
+                const [identityAnswer, kelvin] = text.trim().split("\n").map(l => l.trim());
+                const on = identityAnswer === "false" && /^\d+$/.test(kelvin ?? "");
+                root.temperature = on ? parseInt(kelvin) : root.identity;
                 if (root.enabled)
                     root.warmth = root.temperature;
             }

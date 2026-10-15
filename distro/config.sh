@@ -16,13 +16,13 @@ TARIS_IMAGE_NAME=tarisos
 
 # Built from the AUR into the repository (fetched when the repository is built; a changed
 # PKGBUILD is shown for review before it's built)
-TARIS_AUR_PACKAGES=(yay vscodium-bin nordvpn-bin lyrebird-proxy tela-icon-theme whitesur-icon-theme fluent-icon-theme-git)
+TARIS_AUR_PACKAGES=(yay vscodium-bin nordvpn-bin lyrebird-proxy tela-icon-theme whitesur-icon-theme fluent-icon-theme-git evdi-dkms)
 
 # This repository's own packages, in build order (each needs the ones before it installed to build)
 TARIS_PACKAGES=(
 	libcava qt6-m3shapes-git ttf-rubik-vf python-materialyoucolor mise-bin libva-v4l2-request-avd obs-studio tor-browser-bin taris-music
 	quickshell-taris taris-cli qmltermwidget-taris taris-shell
-	taris-keyring taris-hardware taris-desktop taris-login taris-chromium taris-snapshots taris-firewall taris-tor taris-thumbnails taris-wallpapers taris
+	taris-keyring smi-usbdisplay-taris taris-hardware taris-desktop taris-login taris-chromium taris-snapshots taris-firewall taris-tor taris-thumbnails taris-wallpapers taris
 )
 
 # Where builds go (big: not in /tmp, which is RAM here)

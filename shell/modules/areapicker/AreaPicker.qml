@@ -35,7 +35,8 @@ Scope {
         property bool clipboardOnly
 
         Variants {
-            model: Screens.screens
+            // Every display, with the shell or not (Settings > Displays)
+            model: Quickshell.screens
 
             StyledWindow {
                 id: win
