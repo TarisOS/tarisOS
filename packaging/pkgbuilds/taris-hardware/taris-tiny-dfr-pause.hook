@@ -1,0 +1,16 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The Touch Bar's daemon stopped before its files in /etc/tiny-dfr change (it panics if it reloads
+# in the middle), and started again afterwards by taris-tiny-dfr-resume.hook
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = etc/tiny-dfr/*
+
+[Action]
+Description = Pausing the Touch Bar while its files change...
+When = PreTransaction
+Exec = /usr/lib/taris/tiny-dfr-pause pre

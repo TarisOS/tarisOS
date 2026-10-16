@@ -12,7 +12,6 @@ IconImage {
 
     required property color colour
 
-    asynchronous: true
 
     layer.enabled: true
     layer.effect: Colouriser {

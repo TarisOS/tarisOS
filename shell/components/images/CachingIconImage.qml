@@ -41,7 +41,6 @@ Item {
 
         IconImage {
             source: root.source
-            asynchronous: true
         }
     }
 }

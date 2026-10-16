@@ -1,0 +1,32 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Keeps the Touch Bar's daemon out of the way while pacman replaces its files in /etc/tiny-dfr (the
+# taris-tiny-dfr-pause and -resume hooks). tiny-dfr reloads its config whenever pacman so much as
+# reads it, and loads the screenshot icon again then: caught while pacman rewrites the icon, it
+# panics and hangs instead of exiting, so systemd never restarts it. Stopped before and started
+# after, it only goes blank for the transaction. Machines where it isn't running are left alone.
+# Usage: tiny-dfr-pause pre|post
+set -euo pipefail
+
+marker=/run/taris-tiny-dfr-paused
+
+case ${1:-} in
+	pre)
+		if systemctl is-active --quiet tiny-dfr.service; then
+			touch "$marker"
+			systemctl stop tiny-dfr.service
+		fi
+		;;
+	post)
+		if [[ -e $marker ]]; then
+			rm -f "$marker"
+			systemctl start tiny-dfr.service
+		fi
+		;;
+	*)
+		echo "Usage: tiny-dfr-pause pre|post" >&2
+		exit 2
+		;;
+esac

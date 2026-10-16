@@ -16,6 +16,9 @@ PageBase {
 
     title: Tr.tr("Audio")
 
+    // WirePlumber can start after the shell
+    Component.onCompleted: SpatialAudio.refresh()
+
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
@@ -37,6 +40,14 @@ PageBase {
             text: Tr.trCtx("Muted", "audio output muted")
             checked: Audio.muted
             onToggled: Audio.setStreamMuted(Audio.sink, checked)
+        }
+
+        ToggleRow {
+            visible: SpatialAudio.available
+            text: Tr.tr("Spatial audio")
+            checked: SpatialAudio.enabled
+            enabled: !SpatialAudio.busy
+            onToggled: SpatialAudio.toggle()
         }
 
         AudioDeviceList {

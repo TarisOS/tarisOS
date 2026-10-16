@@ -27,7 +27,6 @@ Item {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
             implicitSize: root.width
-            asynchronous: true
             source: root.source
         }
     }

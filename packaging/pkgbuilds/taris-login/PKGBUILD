@@ -10,13 +10,13 @@
 
 pkgname=taris-login
 pkgver=1.0.0
-pkgrel=4
+pkgrel=5
 pkgdesc='TarisOS: the login screen (greetd and the shell greeter)'
 arch=('any')
 url='https://github.com/TarisOS/tarisOS'
 license=('GPL-3.0-only')
 depends=('taris-shell' 'greetd' 'hyprland' 'gnome-keyring' 'pam' 'polkit' 'sudo' 'python' 'python-gobject' 'xkeyboard-config'
-         'cryptsetup' 'plymouth' 'btrfs-progs' 'mkinitcpio' 'asahi-scripts' 'bash' 'systemd')
+         'cryptsetup' 'plymouth' 'btrfs-progs' 'mkinitcpio' 'asahi-scripts' 'brightnessctl' 'bash' 'systemd')
 optdepends=('kitty: a text login if the greeter fails to start')
 makedepends=('python-pillow')
 backup=('etc/greetd/taris.toml')
@@ -46,7 +46,7 @@ source=(
 )
 sha256sums=('71427847d0d0a1f00c7836c37112fae0d1c5662fd2686f581804b87b9db97a0b'
             '08cbc376d68b951445698013374fa321f22774817c42d5fed8ea52c2615d75ef'
-            '8fc22a851aee003105def7e3f3e9d973b8ea4fb7a6bd61b79c9c13c8eac7bf2c'
+            '90e95ca655432e4c98561b03717531fba3afd830f9977dead9b57e0314513409'
             'c019e310b51eb6330ba3be5d33b9ca0d5a9398aa0956662cce1162c7741b162d'
             'a70266177de5c369346c9d80a5097a00129809362eb2f68cc005dcecf860ecee'
             '579bbdbeb1fa231f0072532dfbc09990e60d717d0102d97dba438bb8339beb8f'

@@ -175,7 +175,6 @@ GridView {
             anchors.top: parent.top
             anchors.topMargin: Tokens.padding.medium
             implicitSize: Math.round(root.cellWidth * 0.5)
-            asynchronous: true
             source: Quickshell.iconPath(app.modelData.icon, "image-missing")
             opacity: app.installing || app.greyed ? 0.5 : 1
         }

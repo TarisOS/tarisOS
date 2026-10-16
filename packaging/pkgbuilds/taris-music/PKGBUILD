@@ -12,7 +12,7 @@
 
 pkgname=taris-music
 pkgver=1.4.0
-pkgrel=2
+pkgrel=3
 pkgdesc='The TarisOS music player (YouTube Music), based on Zuno'
 arch=('aarch64')
 url='https://github.com/TarisOS/tarisOS'

@@ -22,10 +22,6 @@ PageBase {
 
     title: Tr.tr("Security")
 
-    // Remote login: whether sshd is installed, and running
-    property bool hasSshd
-    property bool sshd
-
     // Disk encryption (/usr/lib/taris/encrypt): plain, pending (at the next restart), encrypted or
     // unsupported (not a TarisOS disk layout)
     property string encryption
@@ -104,25 +100,6 @@ PageBase {
         }
     }
 
-    property Process _sshdGet: Process {
-        id: sshdGet
-
-        running: true
-        command: ["sh", "-c", "systemctl list-unit-files sshd.service --no-legend | grep -q . && echo installed; systemctl is-active --quiet sshd && echo active"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.hasSshd = text.includes("installed");
-                root.sshd = text.includes("active");
-            }
-        }
-    }
-
-    property Process _sshdSet: Process {
-        id: sshdSet
-
-        onExited: sshdGet.running = true
-    }
-
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
@@ -153,24 +130,6 @@ PageBase {
             subtext: Tr.tr("Shut down, restart, sleep and stash without unlocking")
             checked: GlobalConfig.lock.enableSessionControls
             onToggled: GlobalConfig.lock.enableSessionControls = checked
-        }
-
-        SectionHeader {
-            visible: root.hasSshd
-            text: Tr.tr("Access")
-        }
-
-        ToggleRow {
-            visible: root.hasSshd
-            first: true
-            last: true
-            text: Tr.tr("Remote login (SSH)")
-            subtext: Tr.tr("Let other computers sign in to this one over the network")
-            checked: root.sshd
-            onToggled: {
-                sshdSet.command = ["pkexec", "systemctl", checked ? "enable" : "disable", "--now", "sshd.service"];
-                sshdSet.running = true;
-            }
         }
 
         SectionHeader {

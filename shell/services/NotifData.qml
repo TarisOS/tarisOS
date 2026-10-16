@@ -118,7 +118,9 @@ QtObject {
                 source: Qt.resolvedUrl(notif.image)
                 fillMode: Image.PreserveAspectCrop
                 cache: false
-                asynchronous: true
+                // Theme icons (image://icon/) come from Quickshell's icon provider, which builds QPixmaps and
+                // must run on the main thread; only files load in the background
+                asynchronous: !notif.image.startsWith("image://icon/")
                 opacity: 0
 
                 onStatusChanged: tryCache()

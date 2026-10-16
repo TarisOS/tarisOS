@@ -7,7 +7,7 @@
 
 pkgname=taris-hardware
 pkgver=1.0.0
-pkgrel=6
+pkgrel=7
 pkgdesc='TarisOS: Apple Silicon hardware support and fixes'
 arch=('aarch64')
 url='https://github.com/TarisOS/tarisOS'
@@ -22,7 +22,7 @@ depends=(
     # Sound: the speakers stay muted without speakersafetyd and asahi-audio's DSP; PipeWire's
     # PulseAudio, ALSA and JACK servers for the apps, and its LV2 host for the DSP's plugins (the
     # other providers of jack and lv2-host are whole audio workstations); rtkit, or the DSP crackles
-    # under load
+    # under load; libmysofa's head (HRTF) for spatial audio on headphones
     'asahi-audio'
     'speakersafetyd'
     'pipewire'
@@ -33,6 +33,7 @@ depends=(
     'wireplumber'
     'rtkit'
     'libpulse'
+    'libmysofa'
 
     # Hardware video decoding (VA-API)
     'libva-v4l2-request-avd'
@@ -85,6 +86,11 @@ source=(
     'tiny-dfr-screenshot.png'
     'camera'
     '50-taris-camera.rules'
+    'spatial-audio.lua'
+    '99-taris-spatial-audio.conf'
+    'tiny-dfr-pause'
+    'taris-tiny-dfr-pause.hook'
+    'taris-tiny-dfr-resume.hook'
 )
 sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '73fdc58084b4892dcd508aa35ee60222220d035b2e87f511fbd93d90cf723534'
@@ -104,7 +110,12 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '04a112e07062e3a181f9342c51c7e6abf4c7852485452ddbb21b25afbb3b0943'
             'a0ed3e66481179c48131f26fe688d60282485030900011f41f5356ae7c243d31'
             'e0edaf8862535caf67876b03d8e59856d9596d476d32a65a04d853b193d7089f'
-            '3049a09d109802e520415b259fd49b3332e615c5e733880b0685bb07755f1497')
+            '3049a09d109802e520415b259fd49b3332e615c5e733880b0685bb07755f1497'
+            '0cee075b4bf62fed0cbab2dee9b25bdf2b9ff5e41ae4c27fe9504a95a8e91d39'
+            'a28b4da184f1f9bf5c291bfa7b7bcc7e9c11d48d588c9bee5f081bd34665e6b2'
+            '2fcc2999fedcbdd2ede31efb65868faf71b9d2ebcf9bb3acf8f1c9575e8f3c72'
+            '096b4d8128de9713d99f6cf814871e3b57e96bdf2c605a74ecdffaf6cc98e859'
+            '33539ca02930bf6b879f38530009dd71f463c33416fac00adee361c47b3c03e6')
 
 package() {
     install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/50-taris.conf"
@@ -135,7 +146,14 @@ package() {
     install -Dm755 camera "$pkgdir/usr/lib/taris/camera"
     install -Dm644 50-taris-camera.rules -t "$pkgdir/usr/share/polkit-1/rules.d"
 
+    # Spatial audio: crosstalk cancellation on the speakers, virtual speakers on headphones
+    install -Dm644 spatial-audio.lua "$pkgdir/usr/share/wireplumber/scripts/taris/spatial-audio.lua"
+    install -Dm644 99-taris-spatial-audio.conf -t "$pkgdir/usr/share/wireplumber/wireplumber.conf.d"
+
     # The Touch Bar's keys (MacBook Pros with one): media and brightness keys and a screenshot key
     install -Dm644 tiny-dfr.toml "$pkgdir/etc/tiny-dfr/config.toml"
     install -Dm644 tiny-dfr-screenshot.png "$pkgdir/etc/tiny-dfr/screenshot.png"
+    # Stopped while those files change, which it can't take (tiny-dfr-pause)
+    install -Dm755 tiny-dfr-pause "$pkgdir/usr/lib/taris/tiny-dfr-pause"
+    install -Dm644 taris-tiny-dfr-pause.hook taris-tiny-dfr-resume.hook -t "$pkgdir/usr/share/libalpm/hooks"
 }

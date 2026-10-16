@@ -763,7 +763,7 @@ const MAX_ARTWORK_BYTES: usize = 12 * 1024 * 1024;
 fn read_text_file(path: String) -> Result<String, CommandError> {
     const MAX_IMPORT_BYTES: u64 = 16 * 1024 * 1024;
 
-    let path = PathBuf::from(path);
+    let path = playlist_file_path(path)?;
     let metadata = fs::metadata(&path)
         .map_err(|error| cache_error(format!("file read failed: {error}")))?;
     if metadata.len() > MAX_IMPORT_BYTES {
@@ -776,12 +776,27 @@ fn read_text_file(path: String) -> Result<String, CommandError> {
 /// Writes a user-chosen text file. Used for playlist export.
 #[tauri::command]
 fn write_text_file(path: String, contents: String) -> Result<(), CommandError> {
-    let path = PathBuf::from(path);
+    let path = playlist_file_path(path)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| cache_error(format!("directory creation failed: {error}")))?;
     }
     fs::write(&path, contents).map_err(|error| cache_error(format!("file write failed: {error}")))
+}
+
+/// Only the playlist files that import and export handle (JSON and M3U): whatever the page asks
+/// for, these two commands never read or write a shell profile, an autostart entry or any other
+/// file that could run code or hold secrets.
+fn playlist_file_path(path: String) -> Result<PathBuf, CommandError> {
+    let path = PathBuf::from(path);
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase);
+    match extension.as_deref() {
+        Some("json" | "m3u" | "m3u8") => Ok(path),
+        _ => Err(cache_error("only JSON and M3U playlist files can be read or written")),
+    }
 }
 
 #[tauri::command]

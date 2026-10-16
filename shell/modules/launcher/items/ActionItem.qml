@@ -52,7 +52,6 @@ Item {
             id: appIcon
 
             IconImage {
-                asynchronous: true
                 source: Quickshell.iconPath(root.modelData?.appIcon, "image-missing")
                 implicitSize: (root.implicitHeight - Tokens.padding.small * 2) * 0.8
             }

@@ -15,7 +15,6 @@
   ],
   "remote": {
     "urls": [
-      "https://**",
       "http://localhost/**",
       "http://localhost:*/*",
       "http://127.0.0.1/**",

@@ -44,6 +44,11 @@ hl.config({
   ecosystem = { no_update_news = true, no_donation_nag = true },
 })
 
+-- The screen's brightness keys (the Touch Bar's, or the keyboard's), as in the session: the
+-- greeter's logind session may set it. The other media keys wait for the session.
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl s 10%+"), { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl s 10%-"), { locked = true, repeating = true })
+
 hl.on("hyprland.start", function()
   hl.exec_cmd("/usr/lib/taris/greeter-session")
 end)

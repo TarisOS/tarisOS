@@ -121,7 +121,7 @@ export function isEqualizerFlat(settings: EqualizerSettings): boolean {
 /** The bypass switch — independent of the curve. See `ENABLED_STORAGE_KEY`. */
 export function isEqualizerEnabled(): boolean {
   if (enabledCached === null) {
-    enabledCached = readLocalBooleanSetting(ENABLED_STORAGE_KEY, true);
+    enabledCached = readLocalBooleanSetting(ENABLED_STORAGE_KEY, false);
   }
   return enabledCached;
 }
@@ -192,7 +192,7 @@ if (typeof window !== "undefined") {
 
 export async function hydrateEqualizer(): Promise<void> {
   await hydrateLocalJsonSetting(STORAGE_KEY, isEqualizerSettings);
-  await hydrateLocalBooleanSetting(ENABLED_STORAGE_KEY, true, ENABLED_CHANGE_EVENT);
+  await hydrateLocalBooleanSetting(ENABLED_STORAGE_KEY, false, ENABLED_CHANGE_EVENT);
   cached = null;
   enabledCached = null;
   /*
@@ -209,5 +209,5 @@ export function useEqualizer(): EqualizerSettings {
 }
 
 export function useEqualizerEnabled(): boolean {
-  return useSyncExternalStore(subscribeEnabled, isEqualizerEnabled, () => true);
+  return useSyncExternalStore(subscribeEnabled, isEqualizerEnabled, () => false);
 }

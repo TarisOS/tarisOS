@@ -25,7 +25,6 @@ Item {
     IconImage {
         anchors.fill: parent
         visible: root.isTheme
-        asynchronous: true
         source: root.isTheme ? Quickshell.iconPath(root.icon.slice(6), "application-x-executable") : ""
         implicitSize: root.size
     }

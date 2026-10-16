@@ -140,7 +140,9 @@ StyledRect {
                             return Qt.size(size, size);
                         }
                         cache: false
-                        asynchronous: true
+                        // Theme icons (image://icon/) come from Quickshell's icon provider, which builds QPixmaps and
+                        // must run on the main thread; only files load in the background
+                        asynchronous: !root.modelData.image.startsWith("image://icon/")
                     }
                 }
             }
