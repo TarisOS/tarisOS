@@ -28,8 +28,7 @@ need, and every fix Apple Silicon hardware needs on Linux. Nothing runs unless i
 the machine stays quiet, cool and long-lasting on battery.
 
 > [!NOTE]
-> TarisOS 1.0.0 is the first release and is still being tested. Back up anything important on your
-> Mac before installing it.
+> Back up anything important on your Mac before installing it.
 
 ## Contents
 
@@ -299,20 +298,25 @@ Settings doesn't show, live in `~/.config/taris/shell.json`. Options you leave o
 
 ### Per-monitor configuration
 
-You can configure per-monitor options in `~/.config/taris/monitors/<monitor_name>/shell.json`.
-List the names of your available monitors by running:
+You can configure per-monitor options in `~/.config/taris/monitors/<monitor>/shell.json`. Each
+monitor's folder is named after the monitor itself (its make, model and serial number), so its
+settings follow it to any port or adapter. List them by running:
 
 ```sh
-hyprctl monitors -j | jq -r '.[].name'
+hyprctl monitors -j | jq -r '.[].description'
 ```
+
+The built-in display has no description: its folder is named after its output (`eDP-1`). So are
+those of identical monitors without serial numbers, which nothing else tells apart. A `/` in a
+description becomes `-` in the folder's name.
 
 Options set in these files will **override** the respective options in the global config. Any options not present in
 per-monitor configs will inherit their values from the global config.
 
 
-For example, to automatically hide the bar on the monitor named `DP-1`:
+For example, to automatically hide the bar on a monitor described as `Dell Inc. P2422H 7Q1KX`:
 
-**`~/.config/taris/monitors/DP-1/shell.json`**
+**`~/.config/taris/monitors/Dell Inc. P2422H 7Q1KX/shell.json`**
 
 ```json
 {
@@ -1047,7 +1051,7 @@ certain components. The appearance scale values in `shell.json` are multiplied a
 token values to produce the final computed values.
 
 Per-monitor token overrides are also available at
-`~/.config/taris/monitors/<monitor_name>/shell-tokens.json`.
+`~/.config/taris/monitors/<monitor>/shell-tokens.json` (the folder named as above).
 
 
 ## Repository layout

@@ -13,7 +13,7 @@ import qs.services
 
 Variants {
     // Every display, with the shell or not (Settings > Displays)
-    model: Quickshell.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
+    model: Quickshell.screens.filter(s => GlobalConfig.forScreen(Screens.configOf(s.name)).background.enabled)
 
     StyledWindow {
         id: win

@@ -50,7 +50,6 @@ MouseArea {
     onClicked: expanded = false
 
     opacity: expanded ? 1 : 0
-    layer.enabled: opacity < 1
 
     Behavior on opacity {
         Anim {

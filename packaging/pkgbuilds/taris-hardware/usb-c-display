@@ -1,0 +1,258 @@
+#!/usr/bin/python3 -I
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+"""A display on the M1 Macs' USB-C, on one port: the left-front one of the MacBook Air and Pro, the
+back-right one (next to HDMI) of the Mac mini, the back-left one of the iMac with two and the
+back-right-middle one of the iMac with four. The kernel has the drivers,
+and its device trees describe the hardware but leave the external display processor (dcpext) off
+and unlinked; these are the kernel's device trees with Asahi Linux's "dp-altmode dts hacks" applied,
+which its kernels leave out. The port's PHY keeps its common power domain on, or it loses the
+display link over sleep (the PHY driver can't restore it). The device trees go to
+/var/lib/taris/dtbs, with the kernel they were made from in kernel; /etc/default/update-m1n1 puts
+them in m1n1's boot image when they're for the kernel it takes, otherwise the kernel's own. One a
+change doesn't fit exactly (a kernel that already does it, or one laid out differently) stays as
+it is. Run by the pacman hook when the kernel's device trees change (before m1n1's own builds the
+boot image) and by taris-hardware's install script.
+Usage: /usr/lib/taris/usb-c-display"""
+
+import os
+import shutil
+import struct
+import subprocess
+import sys
+
+OUT = "/var/lib/taris/dtbs"
+
+FDT_BEGIN_NODE, FDT_END_NODE, FDT_PROP, FDT_NOP, FDT_END = 1, 2, 3, 4, 9
+PHY_TYPE_DP = 6
+
+
+class Node:
+    def __init__(self, name):
+        self.name = name
+        self.props = {}  # name -> bytes, in the file's order
+        self.children = []
+
+    def child(self, name):
+        return next((c for c in self.children if c.name == name), None)
+
+
+class Tree:
+    def __init__(self, data):
+        magic, _, off_struct, off_strings, off_rsvmap, version, _, self.boot_cpu, size_strings = \
+            struct.unpack(">9I", data[:36])
+        if magic != 0xd00dfeed or version < 16:
+            raise ValueError("not a flattened device tree")
+        # The memory reservations as they are, up to their empty entry
+        end = off_rsvmap
+        while data[end:end + 16] != bytes(16):
+            end += 16
+        self.rsvmap = data[off_rsvmap:end + 16]
+        strings = data[off_strings:off_strings + size_strings]
+        self.root, pos, stack = None, off_struct, []
+        while True:
+            token, = struct.unpack(">I", data[pos:pos + 4])
+            pos += 4
+            if token == FDT_BEGIN_NODE:
+                end = data.index(b"\0", pos)
+                node = Node(data[pos:end].decode())
+                pos = (end + 4) & ~3
+                if stack:
+                    stack[-1].children.append(node)
+                else:
+                    self.root = node
+                stack.append(node)
+            elif token == FDT_END_NODE:
+                stack.pop()
+            elif token == FDT_PROP:
+                length, name_off = struct.unpack(">II", data[pos:pos + 8])
+                pos += 8
+                name = strings[name_off:strings.index(b"\0", name_off)].decode()
+                stack[-1].props[name] = data[pos:pos + length]
+                pos = (pos + length + 3) & ~3
+            elif token == FDT_END:
+                break
+            elif token != FDT_NOP:
+                raise ValueError("bad token %#x" % token)
+
+    def node(self, path):
+        node = self.root
+        for part in path.strip("/").split("/"):
+            node = node.child(part) if node else None
+        return node
+
+    def nodes(self, node=None):
+        node = node or self.root
+        yield node
+        for c in node.children:
+            yield from self.nodes(c)
+
+    def handle(self, node):
+        """The node's phandle, None if it has none"""
+        return cells(node.props["phandle"])[0] if node and "phandle" in node.props else None
+
+    def phandle(self, node):
+        """The node's phandle, given a new one if it has none"""
+        if "phandle" not in node.props:
+            used = [cells(n.props["phandle"])[0] for n in self.nodes() if "phandle" in n.props]
+            node.props["phandle"] = u32(max(used, default=0) + 1)
+        return cells(node.props["phandle"])[0]
+
+    def pack(self):
+        strings, offsets = bytearray(), {}
+        struct_block = bytearray()
+
+        def emit(node):
+            name = node.name.encode() + b"\0"
+            struct_block.extend(struct.pack(">I", FDT_BEGIN_NODE) + name + bytes(-len(name) % 4))
+            for key, value in node.props.items():
+                if key not in offsets:
+                    offsets[key] = len(strings)
+                    strings.extend(key.encode() + b"\0")
+                struct_block.extend(struct.pack(">III", FDT_PROP, len(value), offsets[key]))
+                struct_block.extend(value + bytes(-len(value) % 4))
+            for c in node.children:
+                emit(c)
+            struct_block.extend(struct.pack(">I", FDT_END_NODE))
+
+        emit(self.root)
+        struct_block.extend(struct.pack(">I", FDT_END))
+        off_rsvmap = 40 + (-40 % 8)
+        off_struct = off_rsvmap + len(self.rsvmap)
+        off_strings = off_struct + len(struct_block)
+        total = off_strings + len(strings)
+        header = struct.pack(">10I", 0xd00dfeed, total, off_struct, off_strings, off_rsvmap, 17, 16,
+                             self.boot_cpu, len(strings), len(struct_block))
+        return header + bytes(off_rsvmap - 40) + self.rsvmap + bytes(struct_block) + bytes(strings)
+
+
+def cells(value):
+    return struct.unpack(">%dI" % (len(value) // 4), value)
+
+
+def u32(*values):
+    return struct.pack(">%dI" % len(values), *values)
+
+
+def string(value):
+    return value.encode() + b"\0"
+
+
+def strings(node, prop):
+    value = node.props.get(prop, b"") if node else b""
+    return value[:-1].decode(errors="replace").split("\0") if value else []
+
+
+def is_(node, suffix):
+    return any(c.endswith(suffix) for c in strings(node, "compatible"))
+
+
+# The nodes Asahi's patch changes, where the M1's device trees have them (t8103.dtsi,
+# t8103-jxxx.dtsi)
+M1 = {
+    "dcpext": "/soc/dcp@271c00000",
+    "dcpext_dart": "/soc/iommu@27130c000",
+    "dispext0_dart": "/soc/iommu@271304000",
+    "dcpext_mbox": "/soc/mbox@271c08000",
+    "dpaudio1": "/soc/audio-controller@238334000",
+    "display": "/soc/display-subsystem",
+    "atcphy1": "/soc/phy@503000000",
+    "atcphy1_xbar": "/soc/mux@50304c000",
+    "typec1": "/soc/i2c@235010000/usb-pd@3f/connector",
+    "ps_atc1_common": "/soc/power-management@23b700000/power-controller@448",
+}
+
+
+def patch_m1(tree):
+    """Asahi Linux's "arm64: dts: apple: t8103: Add dp-altmode dts hacks" and "Mark ps_atc1_common
+    as always on"; False, the tree untouched, when it isn't laid out as they expect"""
+    n = {label: tree.node(path) for label, path in M1.items()}
+    aliases = tree.node("/aliases")
+    if not aliases or "dcpext" in aliases.props or not all(n.values()):
+        return False
+    phy_endpoint = tree.node(M1["atcphy1"] + "/ports/port@0/endpoint")
+    typec1_endpoint = tree.node(M1["typec1"] + "/ports/port@1/endpoint")
+    piodma = n["dcpext"].child("piodma")
+
+    def points_to(node, prop, target):
+        value = cells(node.props.get(prop, b"")) if node else ()
+        return bool(value) and value[0] == tree.handle(target)
+
+    if not (is_(n["dcpext"], ",dcpext") and is_(n["dcpext_dart"], "-dart") and
+            is_(n["dispext0_dart"], "-dart") and is_(n["dcpext_mbox"], "asc-mailbox-v4") and
+            is_(n["dpaudio1"], ",dpaudio") and is_(n["display"], ",display-subsystem") and
+            is_(n["atcphy1"], "-atcphy") and is_(n["atcphy1_xbar"], "-display-crossbar") and
+            is_(n["typec1"], "usb-c-connector") and
+            strings(n["ps_atc1_common"], "label") == ["atc1_common"] and
+            # dcpext still off and not routed anywhere (a kernel that does it some other way keeps
+            # its own), with its own DART, mailbox and piodma DART; the connector on this PHY; the
+            # display on disp0's DART alone
+            strings(n["dcpext"], "status") == ["disabled"] and
+            not any(p in n["dcpext"].props for p in ("phys", "mux-controls", "apple,dptx-phy")) and
+            points_to(n["dcpext"], "iommus", n["dcpext_dart"]) and
+            points_to(n["dcpext"], "mboxes", n["dcpext_mbox"]) and
+            points_to(piodma, "iommus", n["dispext0_dart"]) and
+            points_to(typec1_endpoint, "remote-endpoint", phy_endpoint) and
+            "displayport" not in n["typec1"].props and
+            len(n["display"].props.get("iommus", b"")) == 8):
+        return False
+
+    aliases.props["dcpext"] = string(M1["dcpext"])
+    n["typec1"].props["displayport"] = u32(tree.phandle(n["dcpext"]))
+    n["display"].props["iommus"] += u32(tree.phandle(n["dispext0_dart"]), 0)
+    for label in ("dispext0_dart", "dcpext_dart", "dcpext_mbox", "dcpext", "dpaudio1"):
+        n[label].props["status"] = string("okay")
+    n["dcpext"].props.update({
+        "apple,connector-type": string("DP"),
+        "apple,dptx-phy": u32(1),
+        "phys": u32(tree.phandle(n["atcphy1"]), PHY_TYPE_DP),
+        "phy-names": string("dp-phy"),
+        "mux-controls": u32(tree.phandle(n["atcphy1_xbar"]), 0),
+        "mux-control-names": string("dp-xbar"),
+        "mux-index": u32(0),
+    })
+    n["ps_atc1_common"].props["apple,always-on"] = b""
+    return True
+
+
+def main():
+    if sys.argv[1:]:
+        sys.exit(__doc__.split("Usage: ")[1])
+    # The kernel update-m1n1 takes the device trees of
+    kernel = subprocess.run(["/bin/sh", "-c", "/bin/ls -d /lib/modules/*-ARCH | sort -rV | head -1"],
+                            capture_output=True, text=True).stdout.strip()
+    source = os.path.join(kernel, "dtbs") if kernel else "/lib/modules"
+    new, old = OUT + ".new", OUT + ".old"
+    shutil.rmtree(new, ignore_errors=True)
+    shutil.rmtree(old, ignore_errors=True)
+    try:
+        names = sorted(f for f in os.listdir(source) if f.endswith(".dtb")) if kernel else []
+        if not names:
+            raise FileNotFoundError("no device trees in " + source)
+        os.makedirs(new)
+        for name in names:
+            with open(os.path.join(source, name), "rb") as f:
+                data = f.read()
+            if name.startswith("t8103-"):
+                tree = Tree(data)
+                if patch_m1(tree):
+                    data = tree.pack()
+                else:
+                    print("usb-c-display: %s left as it is (not laid out as expected)" % name)
+            with open(os.path.join(new, name), "wb") as f:
+                f.write(data)
+        with open(os.path.join(new, "kernel"), "w") as f:
+            f.write(kernel + "\n")
+        if os.path.isdir(OUT):
+            os.rename(OUT, old)
+        os.rename(new, OUT)
+        shutil.rmtree(old, ignore_errors=True)
+    except Exception as e:
+        # None at all then: m1n1's boot image takes the kernel's own
+        for d in (new, OUT, old):
+            shutil.rmtree(d, ignore_errors=True)
+        sys.exit("usb-c-display: %s; m1n1 takes the kernel's own device trees" % e)
+
+
+main()

@@ -18,9 +18,12 @@ WlSessionLockSurface {
     required property Pam pam
 
     readonly property alias unlocking: unlockAnim.running
+    // The lock's own layout on the main display only (Settings > Displays); the others show their
+    // wallpaper, blurred, with the logo. The greeter keeps it on every display.
+    readonly property bool showLayout: pam.greeter || screen?.name === Screens.mainName
 
-    contentItem.Config.screen: screen.name
-    contentItem.Tokens.screen: screen.name
+    contentItem.Config.screen: Screens.configOf(screen.name)
+    contentItem.Tokens.screen: Screens.configOf(screen.name)
 
     color: "transparent"
 
@@ -176,7 +179,32 @@ WlSessionLockSurface {
         Loader {
             anchors.fill: parent
             // (The greeter has no desktop behind it: the wallpaper)
-            sourceComponent: Config.lock.useWallpaper || root.pam.greeter ? wallpaperBackground : screencopyBackground
+            sourceComponent: !root.showLayout ? screenWallpaper : Config.lock.useWallpaper || root.pam.greeter ? wallpaperBackground : screencopyBackground
+        }
+    }
+
+    Logo {
+        anchors.centerIn: parent
+        implicitWidth: lockContent.size
+        implicitHeight: lockContent.size
+
+        visible: !root.showLayout
+        opacity: background.opacity
+    }
+
+    // Hyprland gives the keyboard to one lock surface, maybe one of these: what's typed here goes to
+    // the same password as the main display's field
+    Loader {
+        active: !root.showLayout
+        focus: active
+
+        sourceComponent: Item {
+            focus: true
+
+            Keys.onPressed: event => {
+                if (!root.unlocking)
+                    root.pam.handleKey(event);
+            }
         }
     }
 
@@ -196,7 +224,17 @@ WlSessionLockSurface {
         }
     }
 
-    Item {
+    // This display's own wallpaper (the desktop's), under the blur
+    Component {
+        id: screenWallpaper
+
+        CachingImage {
+            path: Config.background.wallpaper || Wallpapers.current
+        }
+    }
+
+    // A focus scope so its password field takes the keyboard only where it shows
+    FocusScope {
         id: lockContent
 
         readonly property int size: lockIcon.implicitHeight + Tokens.padding.large * 4
@@ -206,7 +244,8 @@ WlSessionLockSurface {
         implicitWidth: size
         implicitHeight: size
 
-        visible: Config.lock.enabled || root.pam.greeter
+        focus: root.showLayout
+        visible: (Config.lock.enabled || root.pam.greeter) && root.showLayout
         rotation: 180
         scale: 0
 

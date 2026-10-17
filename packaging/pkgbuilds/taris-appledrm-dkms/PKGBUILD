@@ -1,0 +1,124 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# A USB-C display that can be unplugged while on: the Apple display driver (appledrm), from the
+# source of the kernel TarisOS runs (Asahi Linux's asahi-7.1.13-3, as asahi-alarm's linux-asahi
+# builds it), with Christian Bartels's fix for its power-off. Unplugged while on, the display
+# processor can answer the last clear swap late; the kernel's own driver then marks it crashed and
+# refuses every later modeset until a reboot. DKMS builds it for that kernel only (dkms.conf): a
+# kernel from newer source keeps its own driver (pkgver is the source's tag; dkms.conf names the same
+# version and kernel).
+
+pkgname=taris-appledrm-dkms
+pkgver=7.1.13.3
+pkgrel=1
+_tag=asahi-7.1.13-3
+pkgdesc='TarisOS: the Apple display driver that survives unplugging a USB-C display, for DKMS'
+arch=('aarch64')
+url='https://github.com/AsahiLinux/linux'
+license=('GPL-2.0-only')
+depends=('dkms' 'linux-asahi-headers')
+_files=(Makefile afk.c afk.h apple_drv.c audio.c audio.h av.c av.h connector.c connector.h dcp-internal.h dcp.c dcp.h dcp_backlight.c dcp_trace.c dptxep.c dptxep.h hdmi-codec-chmap.h ibootep.c iomfb.c iomfb.h iomfb_internal.h iomfb_plane.h iomfb_template.c iomfb_template.h iomfb_v12_3.c iomfb_v12_3.h iomfb_v13_3.c iomfb_v13_3.h parser.c parser.h plane.c plane.h systemep.c trace.c trace.h version_utils.h epic/dpavservep.c epic/dpavservep.h)
+_raw="https://raw.githubusercontent.com/AsahiLinux/linux/$_tag/drivers/gpu/drm/apple"
+source=("$_tag-Makefile::$_raw/Makefile"
+        "$_tag-afk.c::$_raw/afk.c"
+        "$_tag-afk.h::$_raw/afk.h"
+        "$_tag-apple_drv.c::$_raw/apple_drv.c"
+        "$_tag-audio.c::$_raw/audio.c"
+        "$_tag-audio.h::$_raw/audio.h"
+        "$_tag-av.c::$_raw/av.c"
+        "$_tag-av.h::$_raw/av.h"
+        "$_tag-connector.c::$_raw/connector.c"
+        "$_tag-connector.h::$_raw/connector.h"
+        "$_tag-dcp-internal.h::$_raw/dcp-internal.h"
+        "$_tag-dcp.c::$_raw/dcp.c"
+        "$_tag-dcp.h::$_raw/dcp.h"
+        "$_tag-dcp_backlight.c::$_raw/dcp_backlight.c"
+        "$_tag-dcp_trace.c::$_raw/dcp_trace.c"
+        "$_tag-dptxep.c::$_raw/dptxep.c"
+        "$_tag-dptxep.h::$_raw/dptxep.h"
+        "$_tag-hdmi-codec-chmap.h::$_raw/hdmi-codec-chmap.h"
+        "$_tag-ibootep.c::$_raw/ibootep.c"
+        "$_tag-iomfb.c::$_raw/iomfb.c"
+        "$_tag-iomfb.h::$_raw/iomfb.h"
+        "$_tag-iomfb_internal.h::$_raw/iomfb_internal.h"
+        "$_tag-iomfb_plane.h::$_raw/iomfb_plane.h"
+        "$_tag-iomfb_template.c::$_raw/iomfb_template.c"
+        "$_tag-iomfb_template.h::$_raw/iomfb_template.h"
+        "$_tag-iomfb_v12_3.c::$_raw/iomfb_v12_3.c"
+        "$_tag-iomfb_v12_3.h::$_raw/iomfb_v12_3.h"
+        "$_tag-iomfb_v13_3.c::$_raw/iomfb_v13_3.c"
+        "$_tag-iomfb_v13_3.h::$_raw/iomfb_v13_3.h"
+        "$_tag-parser.c::$_raw/parser.c"
+        "$_tag-parser.h::$_raw/parser.h"
+        "$_tag-plane.c::$_raw/plane.c"
+        "$_tag-plane.h::$_raw/plane.h"
+        "$_tag-systemep.c::$_raw/systemep.c"
+        "$_tag-trace.c::$_raw/trace.c"
+        "$_tag-trace.h::$_raw/trace.h"
+        "$_tag-version_utils.h::$_raw/version_utils.h"
+        "$_tag-epic-dpavservep.c::$_raw/epic/dpavservep.c"
+        "$_tag-epic-dpavservep.h::$_raw/epic/dpavservep.h"
+        '0001-drm-apple-a-late-clear-swap-at-power-off-is-not-a-DCP-crash.patch'
+        'dkms.conf')
+sha256sums=('2a222d361919694d7255d38184768fc453d9a380f4390798daa08a193c9d7bf3'
+            'f7621b5a3abea4b18fb1c4db7fab59d58711161d903729bdb948b49f33cdbdc2'
+            '0fb2178303a27bcf48f836e091dea11dd1608b5aa8ceb37373581a07b846cf68'
+            '6bf749dac5a74a50f1b5d62ce64326d9f291b7218af79123ae3359bf641d2946'
+            '8633302049d2b6186eb82697c63092bfe8e0ff350800568dd16d3d7e4f3de5e1'
+            '99f1c58af02b7968342afb543125056f6b2075fe6903bd6650fe4a7e66d2961f'
+            '5165ed857931cd84bf3fb058cdef4675f893202ec31df8b29d2c2f9dff17c122'
+            '977ae8ae3a915c5a3cfbd2cce639b4e0a96ba5d10bb946813931e46c25b59d38'
+            'bbc24737128162405fa06a6a4344b48997bb2aa409cd6f7cef5eade88b479359'
+            'ca018ad0b77f71e97da53680056bca0dca286d910b9dd3d12041f25a8cf53116'
+            'db2a475b98f6b774178637eb066d49cd3898054b4ef167c030cf7ecb7b1cbce8'
+            'a9dbcde6d6f16e6b1da494807d579317f20c88088b8c203af8be53f9a2da2fcb'
+            'fb90336889a7646033b9fcddccc4dcbc2a3c015b89a394f0702acd2b21458ef8'
+            '36bff5ab1c1a20aeeb3f7b8f46992946ce18a182d639dcffbb4b404c1ed9c661'
+            '73edc3671a058a66cd7d8788cf5fdd13d01523f0c64fffb9894cda9203301c4f'
+            '1c2fd002b44b9141728107f9cd99c74df4851e58fe0008f78fb0c6362893176a'
+            '330c4aa2ff4586c88badf0fd649b1b01b518d99ca01e6dbbf050b0ae7e6ec649'
+            '15544ec641593e883b824e4db6b1fbdd7700575df8f51af28e0605fc945d4587'
+            '45c35bc2a0ebcef41f0ac81edfa806d3dfe72ed27571d4f8c71fd42217b85d44'
+            '9b0e7d0952f87f9c1b3c6483f00071ecc7480d58e9570382c2323b8dcd0da12e'
+            '1d33f7f98ce8e2e7f4f1f01a354742c7ae878139268e03e515a2f3b756521068'
+            '217f68f604bb129f32d6d3cb71fdef537c91edef984ca92470c71720fc43df0e'
+            '8f184e2f6c20390467a6cbd2fbf4b5a5decfaced9ebddbf3e2efdc8e6f4922bc'
+            '616b8a453e78cdb8dc957514e2175b535b9f57e90f7446d30ee9d24a765084d3'
+            'c45bb599efc740fe87b63317ffdddcf297be73ac62f7d3dea495f2eabedfbb88'
+            '046bf6d2edfb7f3a4f3c0e926f98e3112b6ae4ed614063ff68a107aff06f4dfd'
+            'fd8655f342ccad73b130038f8abd1cc5cddd40d0d6f5743914f7754622b94f29'
+            '108bd3f94f2325d9ea58ed6a5f2c364d7aa80cc633e4c4d428be3d5c8c97ef4d'
+            'abbb838cf241d9d6c203febf7aae1881eebad690fef64bb89d095b9b64097a29'
+            'c920eccb3c85056a9f3df8737ac976be1d68ba7e3d281c284c6b7347e670e762'
+            '0de2487ffe5af1942d480949a106cfe0c0d5c23136c9216146e4a8b73b36ec07'
+            'd4b2167f6d6c786f963bf614451cb501eccdc66571c9a9078020ae142eb80185'
+            '261c8042e9a9e6a708f2623a4034d184b2e9d8b02ff4685f6fea291588fb3a46'
+            '1872a1f3617d95b0e6a47370c444fe373b9a8a893bca7f546617b81bd880beaa'
+            '1958fa5810f7db05c82fe2db2bc7d6df31991228b0bd9b7258e4d6d74e195a8d'
+            '53392a9e760f564a91703df538152b77c0a671367b9f37f28ff1c23fc2ed2580'
+            '899df2323081bd46ec5bc25ddd210502e2619db5837b414cb9b56775127cc58b'
+            '4befdad91d6ad90035f84c5ed78688c97210a1c8a8f0d8c85ffadab7cc747291'
+            'cb3360528d7a08c693aa0e540f47d5d4c98af0b33f90f85f120105aa9f085d26'
+            '850f2d91e29c8257ea0cfe1cfef42e1f995f133ec6d088cac981fbab1ae16575'
+            '6ab53f55d59154eca5c044b96aa0737bdb7806d1f549d1c188388e74000e99b2')
+
+prepare() {
+    local f
+    rm -rf apple
+    mkdir -p apple/epic
+    for f in "${_files[@]}"; do
+        cp "$_tag-${f//\//-}" "apple/$f"
+    done
+    # The commit is against the whole kernel tree (drivers/gpu/drm/apple/...)
+    patch -d apple -Np5 <0001-drm-apple-a-late-clear-swap-at-power-off-is-not-a-DCP-crash.patch
+}
+
+package() {
+    grep -qx "PACKAGE_VERSION=\"$pkgver\"" dkms.conf || {
+        error "dkms.conf isn't for $pkgver"
+        return 1
+    }
+    install -Dm644 apple/*.[ch] apple/Makefile dkms.conf -t "$pkgdir/usr/src/taris-appledrm-$pkgver"
+    install -Dm644 apple/epic/* -t "$pkgdir/usr/src/taris-appledrm-$pkgver/epic"
+}

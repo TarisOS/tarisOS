@@ -1,13 +1,17 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# The initramfs again when TarisOS's mkinitcpio settings change
+# The initramfs again when TarisOS's mkinitcpio settings change, or the USB-C controller's or the
+# display's driver it loads (taris-tipd-dkms, taris-appledrm-dkms, which DKMS's own hook has built
+# by then)
 [Trigger]
 Type = Path
 Operation = Install
 Operation = Upgrade
 Operation = Remove
 Target = etc/mkinitcpio.conf.d/taris-*.conf
+Target = usr/src/taris-tipd-*/dkms.conf
+Target = usr/src/taris-appledrm-*/dkms.conf
 
 [Action]
 Description = Rebuilding the initramfs for TarisOS's settings...

@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The device trees with the USB-C display again when the kernel's change, before m1n1's own hook
+# (95-m1n1-install.hook) builds the boot image from them
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/lib/modules/*/dtbs/*
+
+[Action]
+Description = Switching on the USB-C display in the kernel's device trees...
+When = PostTransaction
+Exec = /usr/lib/taris/usb-c-display

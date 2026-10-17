@@ -13,7 +13,7 @@ pkgname=smi-usbdisplay-taris
 _pkgname=SiliconMotion-Driver-Fix
 _commit=e81bf12b377d51abfa8e08eea6175ad64eaa6ce4
 pkgver=4.3.6.0
-pkgrel=1
+pkgrel=2
 pkgdesc='Silicon Motion USB display adapter driver, on the system evdi'
 arch=('aarch64')
 url='https://github.com/xxwitcher/SiliconMotion-Driver-Fix'
@@ -35,7 +35,7 @@ source=("$_pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz"
         'smiusbdisplay.service')
 sha256sums=('8686047445a70f5a6f1d0be6da0725b1e5f41e44fdef0a0ad54ef1a210544bbb'
             'aa033263ec6c1f180a105ad8bf091e5a7aa52d068f3fc08cc791eb3a3878bdb7'
-            'ceffbfd3ba338245125a887c666c5f8d5b1c79c1f0171778f2e329988328742c')
+            '6d11c57810ec3967f8bded8e9d6e60ab3d0e32a6d9366742150d81886f288579')
 
 build() {
     # Not linked to libevdi: its one call resolves from the libevdi the manager loads (the service

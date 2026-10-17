@@ -1,0 +1,46 @@
+From 9b65351d9cf850ec8273f138f04480dc1e93f15a Mon Sep 17 00:00:00 2001
+From: Janne Grunau <j@jannau.net>
+Date: Thu, 11 Sep 2025 00:01:39 +0200
+Subject: [PATCH] usb: typec: tipd: Track data_status changes for CD321x
+
+HDP status for DisplayPort alt-mode is signaled data_status. Track
+changes to have a debounced HPD to forward to the DRM KMS driver.
+
+Signed-off-by: Janne Grunau <j@jannau.net>
+---
+ drivers/usb/typec/tipd/core.c     | 2 ++
+ drivers/usb/typec/tipd/tps6598x.h | 1 +
+ 2 files changed, 3 insertions(+)
+
+diff --git a/drivers/usb/typec/tipd/core.c b/drivers/usb/typec/tipd/core.c
+index 7433887eece72c..45c6e088cedab2 100644
+--- a/drivers/usb/typec/tipd/core.c
++++ b/drivers/usb/typec/tipd/core.c
+@@ -643,6 +643,7 @@ static void cd321x_update_work(struct work_struct *work)
+ 
+ 	st = cd321x->update_status;
+ 	cd321x->update_status.status_changed = 0;
++	cd321x->update_status.data_status_changed = 0;
+ 
+ 	bool old_connected = !!tps->partner;
+ 	bool new_connected = st.status & TPS_STATUS_PLUG_PRESENT;
+@@ -741,6 +742,7 @@ static void cd321x_update_work(struct work_struct *work)
+ static void cd321x_queue_status(struct cd321x *cd321x)
+ {
+ 	cd321x->update_status.status_changed |= cd321x->update_status.status ^ cd321x->tps.status;
++	cd321x->update_status.data_status_changed |= cd321x->update_status.data_status ^ cd321x->tps.data_status;
+ 
+ 	cd321x->update_status.status = cd321x->tps.status;
+ 	cd321x->update_status.pwr_status = cd321x->tps.pwr_status;
+diff --git a/drivers/usb/typec/tipd/tps6598x.h b/drivers/usb/typec/tipd/tps6598x.h
+index ab60aeb0c274c9..846fb24891fe5c 100644
+--- a/drivers/usb/typec/tipd/tps6598x.h
++++ b/drivers/usb/typec/tipd/tps6598x.h
+@@ -350,6 +350,7 @@ struct cd321x_status {
+ 	u32 pwr_status;
+ 	u32 data_status;
+ 	u32 status_changed;
++	u32 data_status_changed;
+ 	struct usb_pd_identity partner_identity;
+ 	struct tps6598x_dp_sid_status_reg dp_sid_status;
+ 	struct tps6598x_intel_vid_status_reg intel_vid_status;

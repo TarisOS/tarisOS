@@ -50,7 +50,7 @@ Singleton {
     // The Agent tab is turned on (on any screen the shell is on; the global setting while there's
     // none, so screens coming and going don't end the session), and the agent workspace (Settings >
     // Panels > Taskbar > Workspaces)
-    readonly property bool tabEnabled: Screens.screens.length > 0 ? Screens.screens.some(s => GlobalConfig.forScreen(s.name).dashboard.showAgent) : GlobalConfig.dashboard.showAgent
+    readonly property bool tabEnabled: Screens.screens.length > 0 ? Screens.screens.some(s => GlobalConfig.forScreen(Screens.configOf(s.name)).dashboard.showAgent) : GlobalConfig.dashboard.showAgent
     readonly property bool workspaceEnabled: GlobalConfig.bar.workspaces.agentWorkspace
     // The session's wanted and may run; Quit keeps it from starting again until Start
     property bool wanted

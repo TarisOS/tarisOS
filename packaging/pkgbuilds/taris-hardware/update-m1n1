@@ -1,0 +1,9 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# update-m1n1's settings (sourced by it, with set -e). m1n1's boot image takes the kernel's device
+# trees with the M1's USB-C display switched on (/usr/lib/taris/usb-c-display), when they were made
+# from the kernel update-m1n1 takes; otherwise the kernel's own, as Asahi has it.
+if [ "$(cat /var/lib/taris/dtbs/kernel 2>/dev/null)" = "$(/bin/ls -d /lib/modules/*-ARCH | sort -rV | head -1)" ]; then
+    DTBS="/var/lib/taris/dtbs/*.dtb"
+fi

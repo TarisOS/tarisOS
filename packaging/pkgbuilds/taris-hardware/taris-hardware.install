@@ -1,12 +1,20 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# 1.0.0-4 added CPU and GPU temperature sensors to the device trees in m1n1's boot image; the Macs'
-# SMCs don't have those keys, so it showed nothing. Where its copies of the device trees are still
-# here, they go, and the boot image is built again with the kernel's own (as Asahi has it)
+# m1n1's boot image with the device trees that have the USB-C display (usb-c-display). They replace
+# the copies 1.0.0-4 left in /var/lib/taris/dtbs (with CPU and GPU temperature sensors the Macs'
+# SMCs don't have)
+post_install() {
+    /usr/lib/taris/usb-c-display
+    /usr/bin/update-m1n1
+}
+
 post_upgrade() {
-    if [[ -d /var/lib/taris/dtbs ]]; then
-        rm -rf /var/lib/taris/dtbs
-        /usr/bin/update-m1n1
-    fi
+    post_install
+}
+
+# The kernel's own device trees again
+post_remove() {
+    rm -rf /var/lib/taris/dtbs
+    /usr/bin/update-m1n1
 }

@@ -4,6 +4,7 @@
 import Quickshell
 import Quickshell.Wayland
 import Taris.Config
+import qs.services
 
 // qmllint disable uncreatable-type
 PanelWindow {
@@ -13,6 +14,6 @@ PanelWindow {
     WlrLayershell.namespace: `taris-${name}`
     color: "transparent"
 
-    contentItem.Config.screen: screen.name
-    contentItem.Tokens.screen: screen.name
+    contentItem.Config.screen: Screens.configOf(screen.name)
+    contentItem.Tokens.screen: Screens.configOf(screen.name)
 }

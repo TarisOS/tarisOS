@@ -83,6 +83,16 @@ PageBase {
         }
     }
 
+    // A display plugged in, unplugged or back under another output name: read them again, or the
+    // boxes keep the old names, and their numbers and saved positions go to the wrong monitors
+    property Connections _connections5: Connections {
+        function onKeysChanged(): void {
+            reloadTimer.restart();
+        }
+
+        target: Screens
+    }
+
     function load(): void {
         monitorsProc.running = true;
     }
@@ -346,9 +356,9 @@ PageBase {
                                 mirror: m.mirrorOf && m.mirrorOf !== "none" ? m.mirrorOf : "",
                                 disabled: m.disabled === true
                             }));
-                    // Numbered left to right then top to bottom, as everywhere else (Screens), the
-                    // displays that are off after
-                    list.sort((a, b) => (a.disabled - b.disabled) || (a.x - b.x) || (a.y - b.y));
+                    // In the order displays are numbered everywhere (Screens.ordered, by monitor),
+                    // so a display keeps its number and stays picked, the displays that are off after
+                    list.sort((a, b) => (a.disabled - b.disabled) || (Screens.numberOf(a.name) - Screens.numberOf(b.name)) || a.name.localeCompare(b.name));
                     root.saved = JSON.parse(JSON.stringify(list));
                     root.edits = list;
                     root.changed = false;
@@ -477,7 +487,7 @@ PageBase {
                             width: parent.width - Tokens.padding.small * 2
                             horizontalAlignment: Text.AlignHCenter
                             elide: Text.ElideRight
-                            text: `${screenBox.index + 1}  ${screenBox.modelData.description}`
+                            text: `${Screens.numberOf(screenBox.modelData.name) || screenBox.index + 1}  ${screenBox.modelData.description}`
                             color: screenBox.isPicked ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurface
                             font: Tokens.font.label.medium
                         }
@@ -528,7 +538,7 @@ PageBase {
             current: Screens.mainName
             onChosen: v => {
                 const old = Screens.mainName;
-                if (!GlobalConfig.forScreen(old).enabled)
+                if (!GlobalConfig.forScreen(Screens.configOf(old)).enabled)
                     root.keepSettingsOpen(old, v);
                 Qt.callLater(() => HyprSettings.setMainDisplay(v));
             }
@@ -574,14 +584,14 @@ PageBase {
 
                         StyledSwitch {
                             cLayer: 2
-                            checked: taskbarToggle.isMain || GlobalConfig.forScreen(taskbarToggle.modelData.name).enabled
+                            checked: taskbarToggle.isMain || GlobalConfig.forScreen(Screens.configOf(taskbarToggle.modelData.name)).enabled
                             disabled: taskbarToggle.isMain
                             onToggled: {
                                 const name = taskbarToggle.modelData.name;
                                 const on = checked;
                                 if (!on)
                                     root.keepSettingsOpen(name, Screens.mainName);
-                                Qt.callLater(() => GlobalConfig.forScreen(name).enabled = on);
+                                Qt.callLater(() => GlobalConfig.forScreen(Screens.configOf(name)).enabled = on);
                             }
                         }
                     }

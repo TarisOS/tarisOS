@@ -33,7 +33,9 @@ class ConfigRoot : public settings::RootNode {
     CONFIG_NODE_NO_CTOR(ConfigRoot, settings::RootNode)
     QML_ANONYMOUS
 
-    CONFIG_PROPERTY(bool, enabled, true)
+    // The shell (bar, dock and panels) on this display: the main display always has it
+    // (services/Screens.qml), the others only once turned on in Settings > Displays
+    CONFIG_PROPERTY(bool, enabled, false)
     CONFIG_SUBOBJECT(AppearanceConfig, appearance)
     CONFIG_SUBOBJECT(GeneralConfig, general)
     CONFIG_SUBOBJECT(BackgroundConfig, background)

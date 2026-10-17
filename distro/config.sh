@@ -22,7 +22,7 @@ TARIS_AUR_PACKAGES=(yay vscodium-bin nordvpn-bin lyrebird-proxy tela-icon-theme 
 TARIS_PACKAGES=(
 	libcava qt6-m3shapes-git ttf-rubik-vf python-materialyoucolor mise-bin libva-v4l2-request-avd obs-studio tor-browser-bin taris-music
 	quickshell-taris taris-cli qmltermwidget-taris taris-shell
-	taris-keyring smi-usbdisplay-taris taris-hardware taris-desktop taris-login taris-chromium taris-snapshots taris-firewall taris-tor taris-thumbnails taris-wallpapers taris
+	taris-keyring smi-usbdisplay-taris taris-tipd-dkms taris-appledrm-dkms taris-hardware taris-desktop taris-login taris-chromium taris-snapshots taris-firewall taris-tor taris-thumbnails taris-wallpapers taris
 )
 
 # Where builds go (big: not in /tmp, which is RAM here)

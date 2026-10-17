@@ -53,8 +53,8 @@ Singleton {
             minimumSize.width: contentItem.Tokens.sizes.nexus.minWidth
             minimumSize.height: contentItem.Tokens.sizes.nexus.minHeight
 
-            contentItem.Config.screen: screen.name
-            contentItem.Tokens.screen: screen.name
+            contentItem.Config.screen: Screens.configOf(screen.name)
+            contentItem.Tokens.screen: Screens.configOf(screen.name)
 
             title: Tr.tr("Nexus — %1").arg(PageRegistry.pages[nexus.nState.currentPageIdx].label)
 

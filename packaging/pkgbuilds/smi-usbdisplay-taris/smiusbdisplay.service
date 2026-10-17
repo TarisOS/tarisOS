@@ -9,6 +9,11 @@ Description=Silicon Motion USB display driver
 After=display-manager.service
 
 [Service]
+# Only with an adapter plugged in. The manager crashes whenever its adapter is unplugged, and
+# Restart= would start it again without one: it stops at "Init Error" and stays up, so the udev
+# rule's start on the next plug-in finds it running and the adapter is never driven. Skipped
+# instead, the service stays stopped until that start.
+ExecCondition=/bin/sh -c 'grep -qsx 090c /sys/bus/usb/devices/*/idVendor'
 ExecStartPre=/usr/bin/modprobe evdi
 # Its call that crashes the system's libevdi, made safe (evdi-nullfix.c). Preloaded into the manager
 # alone: the shim takes the call's NULL-safe version from the libevdi the manager loads, so anything
