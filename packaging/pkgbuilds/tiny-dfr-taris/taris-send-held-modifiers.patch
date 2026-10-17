@@ -1,0 +1,175 @@
+TarisOS: the modifiers held on the other keyboards (Ctrl, Alt, Shift, Super) are sent with a Touch
+Bar button's keys from tiny-dfr's own device. Hyprland reads the Ctrl+Alt+F-key switch to a text
+console with the modifiers of the keyboard the F-key came from alone, so Ctrl+Alt (keyboard) with
+F2 (Touch Bar) never switched.
+
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -98,8 +98,25 @@
+     changed: bool,
+     active: bool,
+     action: Vec<Key>,
++    // The modifiers sent with the action while the button is held (see MODIFIERS)
++    mods: Vec<Key>,
+ }
+ 
++// The modifiers held on the other keyboards (Ctrl, Alt, Shift, Super) are sent with a button's keys
++// from this device too: a compositor can read a key with the modifiers of the keyboard it came from
++// alone (Hyprland's Ctrl+Alt+F-key switch to a text console does), and this device has none.
++const MODIFIERS: [Key; 8] = [
++    Key::LeftCtrl,
++    Key::RightCtrl,
++    Key::LeftAlt,
++    Key::RightAlt,
++    Key::LeftShift,
++    Key::RightShift,
++    Key::LeftMeta,
++    Key::RightMeta,
++];
++const DEVICE_NAME: &str = "Dynamic Function Row Virtual Input Device";
++
+ fn try_load_svg(path: &str) -> Result<ButtonImage> {
+     Ok(ButtonImage::Svg(
+         Handle::from_file(path)?.ok_or(anyhow!("failed to load image"))?,
+@@ -264,6 +281,7 @@
+             action: vec![],
+             active: false,
+             changed: false,
++            mods: vec![],
+             image: ButtonImage::Spacer,
+         }
+     }
+@@ -272,6 +290,7 @@
+             action,
+             active: false,
+             changed: false,
++            mods: vec![],
+             image: ButtonImage::Text(text),
+         }
+     }
+@@ -282,6 +301,7 @@
+             image,
+             active: false,
+             changed: false,
++            mods: vec![],
+         }
+     }
+     fn load_battery_image(icon: &str, theme: Option<impl AsRef<str>>) -> Handle {
+@@ -317,6 +337,7 @@
+             action,
+             active: false,
+             changed: false,
++            mods: vec![],
+             image: ButtonImage::Battery(battery, battery_mode, BatteryImages {
+                 plain, bolt, charging
+             }),
+@@ -342,6 +363,7 @@
+             action,
+             active: false,
+             changed: false,
++            mods: vec![],
+             image: ButtonImage::Time(format_items, locale),
+         }
+     }
+@@ -461,7 +483,7 @@
+             ButtonImage::Spacer => (),
+         }
+     }
+-    fn set_active<F>(&mut self, uinput: &mut UInputHandle<F>, active: bool)
++    fn set_active<F>(&mut self, uinput: &mut UInputHandle<F>, active: bool, held: &[Key])
+     where
+         F: AsRawFd,
+     {
+@@ -469,7 +491,17 @@
+             self.active = active;
+             self.changed = true;
+ 
+-            toggle_keys(uinput, &self.action, active as i32);
++            if active {
++                // The held modifiers first, as a keyboard sends them, then the button's keys
++                if !self.action.is_empty() {
++                    self.mods = held.iter().copied().filter(|m| !self.action.contains(m)).collect();
++                }
++                toggle_keys(uinput, &self.mods, 1);
++                toggle_keys(uinput, &self.action, 1);
++            } else {
++                toggle_keys(uinput, &self.action, 0);
++                toggle_keys(uinput, &std::mem::take(&mut self.mods), 0);
++            }
+         }
+     }
+     fn set_background_color(&self, c: &Context, color: f64) {
+@@ -833,6 +865,9 @@
+         .add(&udev_monitor, EpollEvent::new(EpollFlags::EPOLLIN, 3))
+         .unwrap();
+     uinput.set_evbit(EventKind::Key).unwrap();
++    for k in MODIFIERS {
++        uinput.set_keybit(k).unwrap();
++    }
+     for layer in &layers {
+         for button in &layer.buttons {
+             for k in &button.1.action {
+@@ -841,7 +876,7 @@
+         }
+     }
+     let mut dev_name_c = [0 as c_char; 80];
+-    let dev_name = "Dynamic Function Row Virtual Input Device".as_bytes();
++    let dev_name = DEVICE_NAME.as_bytes();
+     for i in 0..dev_name.len() {
+         dev_name_c[i] = dev_name[i] as c_char;
+     }
+@@ -861,6 +896,8 @@
+ 
+     let mut digitizer: Option<InputDevice> = None;
+     let mut touches = HashMap::new();
++    // The modifiers held on the other keyboards now (MODIFIERS)
++    let mut held_mods: Vec<Key> = Vec::new();
+     let mut last_redraw_ts = if layers[active_layer].faster_refresh {
+         Local::now().second()
+     } else {
+@@ -943,6 +980,19 @@
+                     }
+                 }
+                 Event::Keyboard(KeyboardEvent::Key(key)) => {
++                    // This device's own keys come back here too: only the other keyboards count
++                    if let Some(m) = MODIFIERS.iter().find(|m| **m as u32 == key.key()) {
++                        if key.device().name() != DEVICE_NAME {
++                            match key.key_state() {
++                                KeyState::Pressed => {
++                                    if !held_mods.contains(m) {
++                                        held_mods.push(*m);
++                                    }
++                                }
++                                KeyState::Released => held_mods.retain(|h| h != m),
++                            }
++                        }
++                    }
+                     if key.key() == Key::Fn as u32 {
+                         let new_layer = match key.key_state() {
+                             KeyState::Pressed => 1,
+@@ -966,7 +1016,7 @@
+                                 touches.insert(dn.seat_slot(), (active_layer, btn));
+                                 layers[active_layer].buttons[btn]
+                                     .1
+-                                    .set_active(&mut uinput, true);
++                                    .set_active(&mut uinput, true, &held_mods);
+                             }
+                         }
+                         TouchEvent::Motion(mtn) => {
+@@ -980,14 +1030,14 @@
+                             let hit = layers[active_layer]
+                                 .hit(width, height, x, y, Some(btn))
+                                 .is_some();
+-                            layers[layer].buttons[btn].1.set_active(&mut uinput, hit);
++                            layers[layer].buttons[btn].1.set_active(&mut uinput, hit, &held_mods);
+                         }
+                         TouchEvent::Up(up) => {
+                             if !touches.contains_key(&up.seat_slot()) {
+                                 continue;
+                             }
+                             let (layer, btn) = *touches.get(&up.seat_slot()).unwrap();
+-                            layers[layer].buttons[btn].1.set_active(&mut uinput, false);
++                            layers[layer].buttons[btn].1.set_active(&mut uinput, false, &held_mods);
+                         }
+                         _ => {}
+                     }

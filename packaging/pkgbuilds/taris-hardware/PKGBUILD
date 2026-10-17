@@ -72,7 +72,6 @@ install=taris-hardware.install
 backup=(
     'etc/mkinitcpio.conf.d/taris-hid.conf'
     'etc/default/grub.d/taris.cfg'
-    'etc/tiny-dfr/config.toml'
     'etc/default/update-m1n1'
     'etc/mkinitcpio.conf.d/taris-usb-c-display.conf'
 )
@@ -105,6 +104,7 @@ source=(
     'taris-usb-c-display.hook'
     'update-m1n1'
     'taris-usb-c-display.conf'
+    'touchbar-owner'
 )
 sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '73fdc58084b4892dcd508aa35ee60222220d035b2e87f511fbd93d90cf723534'
@@ -121,7 +121,7 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '054d401130e0394f0295bb68bd3e57fdbea58b90d473d750d2c681c4ef4fac47'
             '32ac2d4eb2b8ef9d20d40b0721b1526628dcca57bf6322cec3ba9cd20faecbad'
             '2bab147586f5aaf22e7fc0367d215f2c0e27393accf6dbd96fe78a2882a68ed4'
-            '04a112e07062e3a181f9342c51c7e6abf4c7852485452ddbb21b25afbb3b0943'
+            'a79e2d56a6ae96b28ed40cb531513bd592868395126805fc257385f5b6fabfc6'
             'a0ed3e66481179c48131f26fe688d60282485030900011f41f5356ae7c243d31'
             'e0edaf8862535caf67876b03d8e59856d9596d476d32a65a04d853b193d7089f'
             '3049a09d109802e520415b259fd49b3332e615c5e733880b0685bb07755f1497'
@@ -133,7 +133,8 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '94e6390653efd425cca417440d81d515935d7b6626022a9bb3492ca0d7618e7c'
             'ad75d3f06a142c4ad40123b0feee3ef3b9acaf83f81ca9c678ec4ff0f2f5ee38'
             'b55a8b1dfce72363c87b65bc2fd8f8edb6825fd88c0c22a3ce333431018eaea3'
-            '090a6517f6fd6c51f42b391fad5a94cd42d769db0be895fd412e860cc361c4bb')
+            '090a6517f6fd6c51f42b391fad5a94cd42d769db0be895fd412e860cc361c4bb'
+            '1a0a35641d5649cb100ec7bb58a754c865ea70f0373076f3bf313f7cee683dfe')
 
 package() {
     install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/50-taris.conf"
@@ -168,8 +169,12 @@ package() {
     install -Dm644 spatial-audio.lua "$pkgdir/usr/share/wireplumber/scripts/taris/spatial-audio.lua"
     install -Dm644 99-taris-spatial-audio.conf -t "$pkgdir/usr/share/wireplumber/wireplumber.conf.d"
 
-    # The Touch Bar's keys (MacBook Pros with one): media and brightness keys and a screenshot key
-    install -Dm644 tiny-dfr.toml "$pkgdir/etc/tiny-dfr/config.toml"
+    # The Touch Bar's keys (MacBook Pros with one): media and brightness keys and a screenshot key.
+    # TarisOS's settings, which the machine's own start from: those are
+    # /var/lib/taris/touchbar/config.toml (the install script), which /etc/tiny-dfr/config.toml links
+    # to, handed to the owner account (touchbar-owner)
+    install -Dm644 tiny-dfr.toml "$pkgdir/usr/share/taris/tiny-dfr/config.toml"
+    install -Dm755 touchbar-owner "$pkgdir/usr/lib/taris/touchbar-owner"
     install -Dm644 tiny-dfr-screenshot.png "$pkgdir/etc/tiny-dfr/screenshot.png"
     # Stopped while those files change, which it can't take (tiny-dfr-pause)
     install -Dm755 tiny-dfr-pause "$pkgdir/usr/lib/taris/tiny-dfr-pause"

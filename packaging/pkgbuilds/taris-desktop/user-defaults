@@ -24,6 +24,18 @@ xdg-user-dirs-update >/dev/null 2>&1 || true
 xdg-user-dirs-update --set TEMPLATES "$HOME" >/dev/null 2>&1 || true
 rmdir "$HOME/Templates" 2>/dev/null || true
 
+# Files' sidebar: the standard folders pinned as its bookmarks (~/.config/gtk-3.0/bookmarks), in
+# this order, right after Home, Recent, Starred, Network and Trash. Never over the account's own.
+bookmarks="$config/gtk-3.0/bookmarks"
+if [[ ! -e $bookmarks ]]; then
+	mkdir -p "${bookmarks%/*}"
+	for dir in DOWNLOAD DOCUMENTS PROJECTS PICTURES VIDEOS MUSIC; do
+		path=$(xdg-user-dir "$dir")
+		[[ -n $path && $path != "$HOME" && -d $path ]] || continue
+		python3 -I -c 'import pathlib, sys; print(pathlib.Path(sys.argv[1]).as_uri())' "$path"
+	done >"$bookmarks"
+fi
+
 # The wallpapers, one collection in the wallpaper folder (a link: updates reach it), and the first
 # one on screen. Set before the colours: a fixed scheme isn't changed by it (--no-smart).
 walls="${TARIS_WALLPAPERS_DIR:-$HOME/Pictures/Wallpapers}"
@@ -99,14 +111,9 @@ if [[ ! -e $config/swappy/config ]]; then
 	printf '[Default]\nsave_dir=$HOME/Pictures/Screenshots\nearly_exit=true\n' >"$config/swappy/config"
 fi
 
-# Instructions for coding agents, where the agents look for them
-for dir in "$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.codex/skills" "$HOME/.pi/agent/skills"; do
-	mkdir -p "$dir"
-	for skill in "$share"/agent-skills/*/; do
-		skill=${skill%/}
-		[[ -e $dir/${skill##*/} || -L $dir/${skill##*/} ]] || ln -s "$skill" "$dir/${skill##*/}"
-	done
-done
+# Instructions for coding agents, where the agents look for them (skills, and the rules every
+# session reads)
+/usr/lib/taris/agent-setup || true
 
 # bash: TarisOS's interactive extras (apps installed on first use: claude, codium)
 line='[[ -r /usr/share/taris/bashrc ]] && . /usr/share/taris/bashrc'

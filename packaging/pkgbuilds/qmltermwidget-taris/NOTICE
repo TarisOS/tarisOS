@@ -1,0 +1,17 @@
+qmltermwidget-taris
+
+QMLTermWidget (https://github.com/Swordfish90/qmltermwidget, commit ce8e09a), by Swordfish90 and
+the QTermWidget and Konsole authors. It's licensed under the GNU General Public License version 2
+or later; some of its files are under the GNU Library or Lesser General Public License version 2
+or 2.1 or later, or the BSD 3-clause licence, as their headers say (LICENSE, LICENSE.LGPL2+,
+LICENSE.BSD-3-clause and COPYING-CMAKE-SCRIPTS, next to this file).
+
+Changed by TarisOS (https://github.com/TarisOS/tarisOS) in 2026, in taris.patch:
+
+- At most about 30 screen updates a second.
+- A full repaint when the terminal is put in a window or shown again.
+- Colour schemes also read from each account's $XDG_STATE_HOME/taris/terminal.
+- Wheel scrolling by the distance moved, in the scrollback and in programs that read the mouse.
+
+Every file it changes says so at its top (taris-notices.patch). Both patches are in TarisOS's
+source, packaging/pkgbuilds/qmltermwidget-taris.

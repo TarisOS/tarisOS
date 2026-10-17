@@ -14,7 +14,10 @@ Conflicts=shutdown.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/nft -f /usr/share/taris/firewall.nft
+# The administrator's own rules after it, apart: a mistake in them leaves TarisOS's rules on
+ExecStart=-/usr/bin/nft -f /usr/share/taris/firewall-user.nft
 ExecReload=/usr/bin/nft -f /usr/share/taris/firewall.nft
+ExecReload=-/usr/bin/nft -f /usr/share/taris/firewall-user.nft
 ExecStop=/usr/bin/nft destroy table inet taris_firewall
 
 [Install]

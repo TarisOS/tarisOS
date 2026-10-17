@@ -4,6 +4,8 @@
 
 # TarisOS's firewall: nothing gets in unless it answers something this machine started (or is
 # local); everything may go out. Loaded at boot by taris-firewall.service; nothing keeps running.
+# The administrator's own rules (/etc/taris/firewall.d/*.nft) are added after it by
+# firewall-user.nft.
 
 destroy table inet taris_firewall
 

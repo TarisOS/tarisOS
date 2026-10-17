@@ -93,7 +93,8 @@ Item {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
 
-            active: `${root.modelData?.name} ${root.modelData?.flavour}` === Schemes.currentScheme
+            // A saved theme that's current marks only itself, not its scheme, as Settings does
+            active: root.modelData?.theme ? Colours.isCustomThemeCurrent(root.modelData.theme) : !Colours.customThemes.some(t => Colours.isCustomThemeCurrent(t)) && `${root.modelData?.name} ${root.modelData?.flavour}` === Schemes.currentScheme
 
             sourceComponent: MaterialIcon {
                 text: "check"

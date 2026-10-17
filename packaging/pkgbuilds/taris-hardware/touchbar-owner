@@ -1,0 +1,47 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The Touch Bar's settings made an account's own. tiny-dfr reads one settings file for the whole
+# machine, /etc/tiny-dfr/config.toml (over its own defaults), and goes on reading it as the nobody
+# user, so the file can't be in a home folder, which is private: it's
+# /var/lib/taris/touchbar/config.toml, which /etc/tiny-dfr/config.toml links to (taris-hardware's
+# install script). This hands its folder and the file to the account, which then changes them
+# without sudo, and links the account's ~/.config/taris/touchbar.toml to the file, the place to
+# change it from. tiny-dfr starts again. Run as root by the setup screen for the account it creates
+# (setup-apply), and once by hand on a machine set up before this.
+# Usage: /usr/lib/taris/touchbar-owner <account>
+set -euo pipefail
+
+dir=/var/lib/taris/touchbar
+file=$dir/config.toml
+
+user=${1:-}
+if [[ -z $user || $user == -* ]] || ! entry=$(getent passwd "$user"); then
+	echo "Usage: /usr/lib/taris/touchbar-owner <account>" >&2
+	exit 2
+fi
+IFS=: read -r _ _ uid _ _ home _ <<<"$entry"
+if ((uid < 1000)) || [[ ! -d $home ]]; then
+	echo "touchbar-owner: $user isn't a person's account with a home folder" >&2
+	exit 1
+fi
+if [[ ! -f $file ]]; then
+	echo "touchbar-owner: $file is missing (reinstall taris-hardware)" >&2
+	exit 1
+fi
+
+chown "$user:" "$dir" "$file"
+
+# The place to change it from, in the account's settings; a file of its own already there is kept
+# next to it
+link=$home/.config/taris/touchbar.toml
+if [[ -e $link || -L $link ]] && [[ $(readlink "$link") != "$file" ]]; then
+	mv "$link" "$link.bak.$(date +%s)"
+	echo "Kept the account's earlier $link next to it (.bak)"
+fi
+runuser -u "$user" -- mkdir -p "${link%/*}"
+runuser -u "$user" -- ln -sfn "$file" "$link"
+
+systemctl try-restart tiny-dfr.service || true
+echo "The Touch Bar's settings: $link"

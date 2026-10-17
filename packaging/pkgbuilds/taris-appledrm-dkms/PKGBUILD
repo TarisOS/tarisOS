@@ -60,7 +60,9 @@ source=("$_tag-Makefile::$_raw/Makefile"
         "$_tag-epic-dpavservep.c::$_raw/epic/dpavservep.c"
         "$_tag-epic-dpavservep.h::$_raw/epic/dpavservep.h"
         '0001-drm-apple-a-late-clear-swap-at-power-off-is-not-a-DCP-crash.patch'
-        'dkms.conf')
+        'taris-notices.patch'
+        'dkms.conf'
+        'NOTICE')
 sha256sums=('2a222d361919694d7255d38184768fc453d9a380f4390798daa08a193c9d7bf3'
             'f7621b5a3abea4b18fb1c4db7fab59d58711161d903729bdb948b49f33cdbdc2'
             '0fb2178303a27bcf48f836e091dea11dd1608b5aa8ceb37373581a07b846cf68'
@@ -101,7 +103,9 @@ sha256sums=('2a222d361919694d7255d38184768fc453d9a380f4390798daa08a193c9d7bf3'
             '4befdad91d6ad90035f84c5ed78688c97210a1c8a8f0d8c85ffadab7cc747291'
             'cb3360528d7a08c693aa0e540f47d5d4c98af0b33f90f85f120105aa9f085d26'
             '850f2d91e29c8257ea0cfe1cfef42e1f995f133ec6d088cac981fbab1ae16575'
-            '6ab53f55d59154eca5c044b96aa0737bdb7806d1f549d1c188388e74000e99b2')
+            'fa592d6fe21a93d74634d1a2fb02c877ed0ab7a0dd83015aaf12a2e2ead994d3'
+            '6ab53f55d59154eca5c044b96aa0737bdb7806d1f549d1c188388e74000e99b2'
+            '47fa7f43a009de23d25a9a13fd26e39cf6a32c9162cce61e08c2e1f4fae60de4')
 
 prepare() {
     local f
@@ -112,6 +116,8 @@ prepare() {
     done
     # The commit is against the whole kernel tree (drivers/gpu/drm/apple/...)
     patch -d apple -Np5 <0001-drm-apple-a-late-clear-swap-at-power-off-is-not-a-DCP-crash.patch
+    # The changed file says so (GPL-2.0 section 2a)
+    patch -d apple -Np1 <taris-notices.patch
 }
 
 package() {
@@ -121,4 +127,7 @@ package() {
     }
     install -Dm644 apple/*.[ch] apple/Makefile dkms.conf -t "$pkgdir/usr/src/taris-appledrm-$pkgver"
     install -Dm644 apple/epic/* -t "$pkgdir/usr/src/taris-appledrm-$pkgver/epic"
+    # What TarisOS changed, with the source and on its own
+    install -Dm644 NOTICE -t "$pkgdir/usr/src/taris-appledrm-$pkgver"
+    install -Dm644 NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
 }

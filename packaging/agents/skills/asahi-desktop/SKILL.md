@@ -18,6 +18,9 @@ skill).
 
 This skill is for end-user customization. It is not for developing TarisOS.
 
+On a TarisOS development machine (`/etc/taris/dev-machine`), the development rules
+(`/usr/share/taris/agent-rules-dev.md`) take precedence over this skill wherever they disagree.
+
 ## When This Skill MUST Be Used
 
 - Editing ANY file in `~/.config/hypr/` (keybindings, monitors, window rules, animations...)
@@ -76,8 +79,8 @@ sudo included), and says so. Don't retry a failing password: tell the user.
 | **PipeWire / WirePlumber** | Audio (Asahi's speaker and microphone processing) | `~/.config/wireplumber/` |
 | **NetworkManager, BlueZ** | Network, Bluetooth (also in Taris's settings) | |
 | **snapper** | A snapshot of the system before every package change | `/etc/snapper/configs/root` |
-| **nftables** | Firewall: nothing gets in unless it answers this machine | `/usr/share/taris/firewall.nft` |
-| **tiny-dfr** | Touch Bar (MacBooks that have one) | `/etc/tiny-dfr/config.toml` |
+| **nftables** | Firewall: nothing gets in unless it answers this machine | `/etc/taris/firewall.d/` (own rules: network-and-privacy skill) |
+| **tiny-dfr** | Touch Bar (MacBooks that have one; TarisOS's build, `tiny-dfr-taris`) | `~/.config/taris/touchbar.toml` (the owner account's; see the taris skill) |
 
 Default apps: kitty, Nautilus, Chromium, GNOME Text Editor, Neovim, imv (images), mpv and VLC
 (video), Taris Music (music, the `taris-music` package), Evince (PDFs), swappy (screenshots),
@@ -102,7 +105,23 @@ NordVPN). The App Store (in the launcher) installs from all of them and from Fla
 an app from outdated package lists alone (`pacman -Sy <pkg>`): that's a partial upgrade.
 
 Snapshots: `sudo snapper list` shows them; a snapshot is taken before every package change, and the
-last 10 are kept. Factory reset (Settings > Security) brings back the system as installed.
+last 10 are kept. Whole-system backups and the factory reset are in Settings > Backup & restore.
+Choosing a source for an app, x86 programs and Steam: the apps-on-arm skill. A broken update,
+`.pacnew` files, snapshots and backups: the updates-and-recovery skill.
+
+## TarisOS's Helper Commands
+
+Use these rather than doing their work by hand:
+
+```bash
+/usr/lib/taris/update                          # Update everything (Settings > Updates)
+/usr/lib/taris/install-on-demand <app>         # An app installed on first use (apps-on-arm skill)
+/usr/lib/taris/input-method add|remove zh|ja|ko   # Chinese, Japanese, Korean typing
+/usr/lib/taris/tor on|off|status               # Everything through Tor (network-and-privacy skill)
+/usr/lib/taris/chromium-flags                  # TarisOS's Chromium settings again (also at login)
+/usr/lib/taris/build-hyprbars [--check|--force]  # The title bar plugin for this Hyprland
+notify-send -a TarisOS "<title>" "<text>"      # A notification from a script
+```
 
 ## Terminals
 
@@ -131,6 +150,22 @@ change that with a window rule in `user.lua`.
 | git | `~/.config/git/config` |
 | Apps started at login | `~/.config/autostart/*.desktop` (the dock's Open at Login sets them) |
 | Default apps | `~/.config/mimeapps.list` (TarisOS's are in `/etc/xdg/mimeapps.list`) |
+
+## The User's Own Scripts and Autostart
+
+- Scripts go in `~/.local/bin/` (`chmod +x`). It isn't on `PATH` by itself: call them by their full
+  path from Hyprland, or add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc` for the terminal.
+- Apps at login: the dock's Open at Login, or a `.desktop` file in `~/.config/autostart/`.
+- Commands when Hyprland starts, in `~/.config/hypr/user.lua`:
+
+  ```lua
+  hl.on("hyprland.start", function()
+    hl.exec_cmd("/home/<user>/.local/bin/my-script")
+  end)
+  ```
+
+- Services and timers of the user's own: systemd user units in `~/.config/systemd/user/`
+  (`systemctl --user enable --now <unit>`).
 
 ## Safe Customization Patterns
 
@@ -177,7 +212,8 @@ taris shell -l                        # The shell's log
 ## Decision Framework
 
 1. **Is it about the shell** (bar, dock, launcher, notifications, wallpaper, colours, lock, idle)?
-   Use the taris skill.
+   Use the taris skill. Displays, audio, the network and the firewall, hardware, apps, updates and
+   macOS each have a skill of their own (`/usr/share/taris/agent-rules.md` lists them).
 2. **Is it a Hyprland change?** Follow [`hyprland.md`](hyprland.md); put it in `~/.config/hypr/user.lua`.
 3. **Is it another config edit?** Edit in `~/.config/`, never in `/usr/`.
 4. **Is it a package install?** `sudo pacman -Syu --needed <pkgs...>` in a terminal, or the App Store.
@@ -196,12 +232,11 @@ Route a problem to where it belongs, and only once it is a verified bug:
 - **A package built by Arch Linux ARM:** https://archlinuxarm.org/
 - **A bug inside an application:** that application's own project
 
-Before filing anything: show the user the exact title and body and wait for a yes, search existing
-issues (open and closed) first, and only use `gh` when `gh auth status` succeeds. Never install or
-authenticate `gh` yourself; hand the user the text instead. Include what happened, what was
-expected, steps to reproduce, and the System Information above. `gh` cannot attach media: save a
-screenshot (`taris screenshot`) and give the user its path. End the report with a line naming
-the model and agent harness that wrote it ("Filed by <model> via <harness>.").
+Then follow the diagnose-crash skill's
+[`reporting.md`](/usr/share/taris/agent-skills/diagnose-crash/reporting.md), which applies to any
+bug, not only crashes: the user's yes on the exact text first, searching existing issues, `gh` only
+when it's already signed in, what to include (with the System Information above), and signing the
+report. `gh` cannot attach media: save a screenshot (`taris screenshot`) and give the user its path.
 
 ## Example Requests
 
@@ -209,11 +244,13 @@ the model and agent harness that wrote it ("Filed by <model> via <harness>.").
   `hl.bind` in `~/.config/hypr/user.lua`, and say what SUPER+E did before
 - "Make the window gaps smaller" -> Settings > Appearance > Window style (or `gapsin`/`gapsout` in
   `~/.config/taris/window-style.conf`, then `hyprctl reload`)
-- "Configure my external monitor" -> Settings > Displays, or `hl.monitor(...)` in `user.lua`
-- "Change my colours" -> `taris scheme set -n <scheme> -f <flavour>` (see the taris skill)
+- "Configure my external monitor" -> Settings > Displays (see the displays skill)
+- "Change my colours" -> Settings > Wallpaper & style > Colours, or `>scheme` in the launcher, which
+  also lists the saved themes such as Taris; `taris scheme set -n <scheme> -f <flavour>` for a plain
+  scheme (see the taris skill)
 - "Turn on night light" -> Settings > Displays > Night light
 - "Install <app>" -> the App Store, or `sudo pacman -Syu --needed <app>` in a terminal
-- "Update everything" -> `/usr/lib/taris/update` in a terminal (Settings > General > Updates)
+- "Update everything" -> `/usr/lib/taris/update` in a terminal (Settings > Updates)
 - "Record my screen" -> `taris record` (again to stop; `-r` for a region)
 - "Report this bug to TarisOS" -> Gather the System Information and a capture of the problem, then
   follow Reporting Bugs
@@ -222,3 +259,5 @@ the model and agent harness that wrote it ("Filed by <model> via <harness>.").
 
 - Changing TarisOS's code or packages (development: only when asked)
 - Editing package-owned files in `/usr/` or `/etc/xdg/quickshell/taris/`
+- Anything on macOS's side: its files, the startup disk, partitions, recoveryOS (the
+  mac-and-dual-boot skill gives the user instructions instead)

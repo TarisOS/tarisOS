@@ -1,11 +1,11 @@
-# Reporting a Crash Upstream
+# Reporting a Bug Upstream
 
-Read this only after concluding that a crash is genuinely a bug in this setup or in Apple
-Silicon support.
+Read this only after concluding that a crash, or any other problem, is genuinely a bug in this
+setup or in Apple Silicon support.
 
 ## Whose bug is it?
 
-Be strict here. A crash inside a third-party application — a file manager, a browser, a
+Be strict here. A crash or bug inside a third-party application — a file manager, a browser, a
 GNOME or Qt library — is almost always an upstream bug in **that** project.
 
 - **TarisOS** (https://github.com/TarisOS/tarisOS): the Taris shell, its
@@ -15,7 +15,7 @@ GNOME or Qt library — is almost always an upstream bug in **that** project.
   Silicon hardware support.
 - **Arch Linux ARM** (https://archlinuxarm.org/): how a repository package was built.
 
-A crash in a program this setup merely installs is **not** its bug unless the way it is
+A crash or bug in a program this setup merely installs is **not** its bug unless the way it is
 built or configured here is implicated.
 
 If it belongs to none of these, say so and stop. Suggesting the right upstream project is
@@ -39,9 +39,10 @@ gh search issues --repo <owner/repo> "<program> crash"
 gh issue list --repo <owner/repo> --state all --search "<signal> <program>"
 ```
 
-Search on the crashing program, the signal, and distinctive symbols from the backtrace.
+Search on the program, and for a crash the signal and distinctive symbols from the backtrace;
+for another bug, its error messages and what it does wrong.
 `gh search issues` accepts only `open` or `closed` for `--state`; leaving it off searches
-both. Include **closed** issues: a matching issue closed as fixed, when the crash still
+both. Include **closed** issues: a matching issue closed as fixed, when the problem still
 reproduces, is a regression worth reporting.
 
 ## Adding to an existing report
@@ -61,8 +62,8 @@ gh issue create --repo <owner/repo> --title "..." --body "..."
 
 Include what happened, what was expected, steps to reproduce, and system details:
 `uname -r`, `hyprctl version`, `pacman -Q hyprland taris-shell quickshell-taris taris-cli`,
-the Mac model, and the relevant `coredumpctl info` output. `gh` cannot attach media: save a
-screenshot and give the user the path to drag into the web form.
+the Mac model, and for a crash the relevant `coredumpctl info` output. `gh` cannot attach media:
+save a screenshot and give the user the path to drag into the web form.
 
 ## Signing
 

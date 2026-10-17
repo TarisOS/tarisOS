@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import Taris.Config
 import Taris.I18n
+import qs.services
 import qs.utils
 
 Searcher {
@@ -16,6 +17,8 @@ Searcher {
 
     property string currentScheme
     property string currentVariant
+    // The CLI's schemes (taris scheme list)
+    property var cliSchemes: []
 
     function transformSearch(search: string): string {
         return search.slice(`${GlobalConfig.launcher.actionPrefix}scheme `.length);
@@ -34,8 +37,17 @@ Searcher {
     keys: ["title", "name", "flavour"]
     weights: [0.5, 0.4, 0.1]
 
+    // The saved themes first (Taris among them), as Settings > Colours has them: their own colours
+    // over their scheme's
     Variants {
         id: schemes
+
+        model: Colours.customThemes.map(t => ({
+                    name: t.scheme,
+                    flavour: t.flavour,
+                    colours: Object.assign({}, root.cliSchemes.find(s => s.name === t.scheme && s.flavour === t.flavour)?.colours ?? {}, t.colours ?? {}),
+                    theme: t
+                })).concat(root.cliSchemes)
 
         Scheme {}
     }
@@ -60,7 +72,7 @@ Searcher {
                         flat.push(f);
 
                 // From wallpaper first, as Settings has it
-                schemes.model = flat.sort((a, b) => (b.name === "dynamic") - (a.name === "dynamic") || String(a.name + a.flavour).localeCompare((b.name + b.flavour)));
+                root.cliSchemes = flat.sort((a, b) => (b.name === "dynamic") - (a.name === "dynamic") || String(a.name + a.flavour).localeCompare((b.name + b.flavour)));
             }
         }
     }
@@ -84,13 +96,18 @@ Searcher {
         readonly property string name: modelData.name
         readonly property string flavour: modelData.flavour
         readonly property var colours: modelData.colours
+        // A saved theme (Settings > Colours), undefined for a scheme
+        readonly property var theme: modelData.theme
         // The dynamic scheme is the one Settings calls From wallpaper (its flavour under it)
-        readonly property string title: name === "dynamic" ? Tr.tr("From wallpaper") : flavour
+        readonly property string title: theme ? theme.name : name === "dynamic" ? Tr.tr("From wallpaper") : flavour
         readonly property string subtitle: name === "dynamic" ? flavour : name
 
         function onClicked(list: AppList): void {
             list.screenState.launcher = false;
-            Quickshell.execDetached(["taris", "scheme", "set", "-n", name, "-f", flavour]);
+            if (theme)
+                Colours.applyCustomTheme(theme);
+            else
+                Quickshell.execDetached(["taris", "scheme", "set", "-n", name, "-f", flavour]);
         }
     }
 }

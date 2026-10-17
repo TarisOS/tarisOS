@@ -13,6 +13,10 @@ verification to the user when you can do it yourself.
 This machine is the user's own desktop: keep checks short, close everything you
 open, and restore anything you change.
 
+On a TarisOS development machine (`/etc/taris/dev-machine`) the agent takes no screenshots or
+recordings and never moves the pointer: read the state as below, and hand what shows on screen to
+the maintainer to check ([`dev-machine.md`](dev-machine.md)).
+
 ## State first
 
 Most behaviour can be read directly, which beats looking at pixels:

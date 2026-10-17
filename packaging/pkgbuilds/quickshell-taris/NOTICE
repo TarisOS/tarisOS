@@ -1,0 +1,11 @@
+quickshell-taris
+
+Quickshell (https://git.outfoxxed.me/quickshell/quickshell), by outfoxxed and its contributors,
+licensed under the GNU Lesser General Public License version 3 (LICENSE, next to this file).
+Modified for TarisOS (https://github.com/TarisOS/tarisOS) since 2026:
+
+- taris-volume.patch (src/services/pipewire/node.cpp): audio nodes that report more channel
+  volumes than channels, such as Asahi Linux's microphone, have their volume and mute state read
+  and set instead of ignored.
+
+The changes are in TarisOS's source, packaging/pkgbuilds/quickshell-taris.

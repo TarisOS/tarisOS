@@ -1,0 +1,9 @@
+diff -ruN a/iomfb_template.c b/iomfb_template.c
+--- a/iomfb_template.c
++++ b/iomfb_template.c
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: GPL-2.0-only OR MIT
++/* Changed by TarisOS in 2026 (a fix for powering off after unplugging): https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/taris-appledrm-dkms */
+ /*
+  * Copyright 2021 Alyssa Rosenzweig
+  * Copyright The Asahi Linux Contributors

@@ -15,6 +15,9 @@ pacman_retry --noconfirm -S taris-keyring
 # providers (jack2, and Ardour)
 pacman_retry --noconfirm --needed -S pipewire-jack pipewire-audio
 pacman_retry --noconfirm --needed -S taris
+# TarisOS's own builds of packages Asahi's repository has too take their place (tiny-dfr-taris
+# replaces tiny-dfr): a full upgrade swaps them in, as an update does on installed machines
+pacman_retry --noconfirm -Syu
 
 apps=(
 	kitty                  # terminal

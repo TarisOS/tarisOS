@@ -7,14 +7,32 @@
 post_install() {
     /usr/lib/taris/usb-c-display
     /usr/bin/update-m1n1
+    touchbar_default
+}
+
+# The Touch Bar's settings: /var/lib/taris/touchbar/config.toml, made from TarisOS's
+# (/usr/share/taris/tiny-dfr) when there's none, and handed to the owner account by
+# touchbar-owner; /etc/tiny-dfr/config.toml links to it. Older versions installed that /etc file
+# themselves: pacman has removed it, keeping an edited one as config.toml.pacsave, which is taken
+# up instead.
+touchbar_default() {
+    local file=/var/lib/taris/touchbar/config.toml from=/usr/share/taris/tiny-dfr/config.toml
+    if [[ ! -e $file ]]; then
+        [[ -f /etc/tiny-dfr/config.toml.pacsave ]] && from=/etc/tiny-dfr/config.toml.pacsave
+        install -Dm644 "$from" "$file"
+    fi
+    [[ $(readlink /etc/tiny-dfr/config.toml) == "$file" ]] || ln -sfn "$file" /etc/tiny-dfr/config.toml
 }
 
 post_upgrade() {
     post_install
 }
 
-# The kernel's own device trees again
+# The kernel's own device trees again, and tiny-dfr's own settings (the machine's are kept in
+# /var/lib/taris/touchbar)
 post_remove() {
     rm -rf /var/lib/taris/dtbs
     /usr/bin/update-m1n1
+    [[ -L /etc/tiny-dfr/config.toml ]] && rm -f /etc/tiny-dfr/config.toml
+    true
 }

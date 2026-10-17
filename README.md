@@ -5,157 +5,165 @@
 <h1 align="center">TarisOS</h1>
 
 <p align="center">
-A minimal, fast, low-power desktop for Apple Silicon Macs.<br>
-Built on <a href="https://asahilinux.org/">Asahi Linux</a> and Arch Linux ARM, with
-<a href="https://hypr.land">Hyprland</a> and a custom desktop shell based on
-<a href="https://github.com/caelestia-dots/shell">Caelestia</a>.
+A minimal, fast, low-power desktop for Apple Silicon Macs.
 </p>
 
 <p align="center">
 <a href="#installation">Installation</a> ·
 <a href="#features">Features</a> ·
 <a href="#using-tarisos">Using TarisOS</a> ·
+<a href="#getting-help">Getting help</a> ·
 <a href="#building-tarisos">Building</a> ·
-<a href="#configuration">Configuration</a> ·
 <a href="#license">License</a>
 </p>
 
 ---
 
-TarisOS installs next to macOS with one command and starts straight into a finished desktop: the
-Taris shell (bar, dock, launcher, notifications, lock screen, settings, app store), the apps you
-need, and every fix Apple Silicon hardware needs on Linux. Nothing runs unless it's needed, so
-the machine stays quiet, cool and long-lasting on battery.
+TarisOS is a Linux desktop for M1 and M2 Macs. It's built on [Asahi Linux](https://asahilinux.org/)
+and Arch Linux ARM, uses [Hyprland](https://hypr.land) for windows, and comes with its own desktop
+shell, Taris.
+
+It installs next to macOS with one command and starts as a finished desktop, ready to use. Nothing
+runs unless it has to, so the Mac stays quiet and cool, and the battery lasts.
 
 > [!NOTE]
-> Back up anything important on your Mac before installing it.
+> Please back up anything important on your Mac before installing.
 
 ## Contents
 
+- [Installation](#installation)
 - [Features](#features)
 - [Supported Macs](#supported-macs)
-- [Installation](#installation)
 - [Using TarisOS](#using-tarisos)
-- [Building TarisOS](#building-tarisos)
-- [Working on the shell](#working-on-the-shell)
 - [Configuration](#configuration)
+- [Removing TarisOS](#removing-tarisos)
+- [Getting help](#getting-help)
+- [Building TarisOS](#building-tarisos)
+- [Contributing](#contributing)
 - [Repository layout](#repository-layout)
 - [Credits](#credits)
 - [License](#license)
 
-## Features
-
-**The desktop**
-
-- **The Taris shell**: a bar, a dock with pinned and running apps, an app launcher and app drawer,
-  notifications, a dashboard, a window overview, OSDs and a lock screen, all in one
-  [Quickshell](https://quickshell.outfoxxed.me) shell.
-- **Settings app** (<kbd>SUPER</kbd> + <kbd>,</kbd>): network, Bluetooth, audio, displays, power,
-  keyboard and trackpad, wallpaper and colours, window style, security, updates, and a search that
-  finds individual options.
-- **App Store**: apps from Arch Linux ARM, the TarisOS repository, Flathub and the AUR in one place.
-  Browse, search, install, remove and update.
-- **Colours and themes**: colour schemes, per-scheme colour changes, saved themes, icon packs
-  (Settings > Wallpaper & style), and a window border that follows the theme. TarisOS starts with
-  the Taris theme.
-- **Coding agent**: a terminal with your coding agent in the dashboard and on a workspace of its
-  own (<kbd>SUPER</kbd> + <kbd>A</kbd>), the same session in both, Claude Code by default (installed
-  the first time it's opened), with skills that teach agents about this system.
-- **Web apps**: Discord is ready to use. `>install` in the launcher adds any site as an app, or
-  installs a package; `>uninstall` removes either.
-
-**The system**
-
-- **One password, one prompt**: you log in on a screen that looks like the lock screen, and nothing
-  of yours starts before that. With disk encryption, the disk password is the only one you type.
-- **First-boot setup**: keyboard, Wi-Fi, time zone and your account, then straight into the
-  desktop.
-- **Disk encryption**: turn it on from Settings > Security at any time. The Mac restarts once and
-  encrypts the disk in place.
-- **Backups and factory reset**: Settings > Backup & restore backs up the whole system (apps,
-  settings and every account's files) now or on a schedule, restores any backup, and can bring the
-  system back to exactly how it was installed. A snapshot of the system is also taken before every
-  package change (the last 10 are kept).
-- **Updates in one place**: Settings > General > Updates updates the system, the TarisOS packages,
-  AUR apps and Flatpak apps together.
-- **Account protection**: an account locks for 10 minutes after 10 wrong passwords, and every
-  password prompt says so.
-- **Firewall**: nothing gets in unless it answers something your Mac started. It's a static
-  ruleset, so nothing keeps running.
-- **Low power**: no background services that aren't needed, compressed swap in RAM, hardware video
-  decoding, power profiles in the bar's battery menu, and an optional 80% charge limit (Settings >
-  Power).
-
-**Apple Silicon hardware**
-
-- Speakers and microphones with Asahi's sound processing, including a fix for apps that only heard
-  the microphone on one side
-- Wi-Fi that recovers after sleep, with the right Wi-Fi channels for your country
-- Trackpad and keyboard reliable from the first second
-- Hardware video decoding (H.264, HEVC and VP9)
-- Fan control in the bar
-- Touch Bar with media, brightness and screenshot keys (MacBook Pros that have one)
-
-**Default apps**
-
-| | |
-| --- | --- |
-| Browser | Chromium (with Google account sign-in and sync) |
-| Anonymous browsing | Tor Browser (the Tor Project's alpha: the only build for 64-bit ARM Linux; installed in the background after setup) |
-| Terminal | kitty |
-| Files | Nautilus, with Space-bar previews |
-| Text editor | GNOME Text Editor, Neovim |
-| Code editor | VSCodium (installed the first time it's opened) |
-| Music | Taris Music, based on Zuno (YouTube Music, without its ads) |
-| Images, video, PDFs | imv, mpv, VLC (installed in the background after setup), Evince |
-| Disks | GNOME Disks |
-| Phone | KDE Connect, in the shell's own window |
-| Torrents | qBittorrent |
-| Screenshots | The shell's screenshot tool, swappy for editing |
-| VPN | Tor for the whole system, from its icon in the taskbar or Settings > Network > Tor (new identity, bridges, a circuit for each site, a random hardware address); NordVPN (installed the first time it's opened) |
-| Apps | The App Store: Flathub, the AUR (yay) and the repositories |
-| GitHub | GitHub CLI (`gh`) |
-
-Chinese, Japanese and Korean input and fonts are installed when you turn them on in Settings >
-Keyboard & trackpad.
-
-## Supported Macs
-
-TarisOS is made for the Apple Silicon Macs Asahi Linux supports: the **M1** and **M2** families.
-It's developed and tested on an M1 MacBook Pro; M2 Macs haven't been tested yet. TarisOS is for
-Apple Silicon only: it carries no drivers or firmware for other hardware.
-
 ## Installation
 
-You need:
+Before you start, you'll need:
 
-- an M1 or M2 Mac running **macOS 13.5 or newer**;
-- free disk space for TarisOS (the installer asks how much to give it; 30 GB or more is
-  comfortable);
-- an internet connection while installing;
-- a backup of anything important on the Mac.
+- an M1 or M2 Mac with **macOS 13.5 or newer**
+- some free disk space (the installer asks how much; 30 GB or more is comfortable)
+- an internet connection
+- a backup of anything important
 
-**1. Run the installer in macOS.** Open Terminal and run:
+**1. Run the installer from macOS.** Open Terminal and paste:
 
 ```sh
 curl -fsSL https://github.com/TarisOS/tarisOS/releases/latest/download/install.sh | sh
 ```
 
-This starts the TarisOS installer (Asahi Linux's installer, set up for TarisOS). It asks for your
-macOS password, how much space to give TarisOS (macOS keeps the rest), and the name the Mac's
-startup screen shows. It then downloads TarisOS and installs it next to macOS. Nothing in macOS is
-changed apart from its partition shrinking.
+This starts Asahi Linux's installer, set up for TarisOS. It asks for your macOS password, how much
+space to give TarisOS, and what to call it on the Mac's startup screen. Then it downloads TarisOS
+and installs it alongside macOS. The only change to macOS is that its partition gets smaller.
 
-**2. Allow TarisOS to start.** Apple requires this step for every other operating system. When the
-installer says so, shut the Mac down, then press and hold the power button until "Loading startup
-options" appears. Choose TarisOS and follow the installer's instructions; it asks for your macOS
-password to confirm.
+**2. Let TarisOS start.** Apple requires this for any other operating system. When the installer
+tells you to, shut the Mac down, then press and hold the power button until you see "Loading
+startup options". Choose TarisOS and follow the instructions; you'll be asked for your macOS
+password one more time.
 
-**3. Set up TarisOS.** TarisOS starts with its setup screen: choose your keyboard, join a Wi-Fi
-network (you can skip it), pick your time zone and create your account. Then you're on your
-desktop.
+**3. Set up TarisOS.** The setup screen asks for your keyboard, a Wi-Fi network (optional), your
+time zone and your account. Once that's done, you're on your new desktop.
 
-To switch between macOS and TarisOS, hold the power button while the Mac starts and pick one.
+To choose between macOS and TarisOS, hold the power button when the Mac starts. You can change
+which one starts by default in macOS, under System Settings > General > Startup Disk.
+
+## Features
+
+### The desktop
+
+The Taris shell gives you a bar, a dock, an app launcher and drawer, notifications, a dashboard,
+a window overview and a lock screen, built with [Quickshell](https://quickshell.outfoxxed.me).
+
+The Settings app (<kbd>SUPER</kbd> + <kbd>,</kbd>) covers almost everything, from network and
+displays to colours, security, backups and updates, and its search finds individual options.
+
+The App Store brings Arch Linux ARM, Flathub, the AUR and TarisOS's own repository into one place.
+You can also install from the launcher by typing `>install`.
+
+Colours come from TarisOS's own theme, any of the bundled schemes, or your wallpaper, and you can
+tweak them and save your own themes.
+
+Coding agents get a terminal in the dashboard and a workspace of their own (<kbd>SUPER</kbd> +
+<kbd>A</kbd>). Claude Code is the default, installed the first time you open it, and agents get
+instructions about the system so they know where things live and what not to touch.
+
+### The system
+
+You log in once, on a screen that looks like the lock screen. With disk encryption on, your disk
+password is your login, so it's still the only password you type. Encryption can be turned on at
+any time from Settings > Security.
+
+Settings > Backup & restore backs up the whole system, everyone's files included, on demand or on
+a schedule, and can restore any backup or reset TarisOS to how it was installed. A snapshot is also
+taken before every package change.
+
+Settings > General > Updates updates everything at once, from the system to AUR and Flatpak apps.
+
+The firewall lets nothing in unless your Mac asked for it, and an account locks for ten minutes
+after ten wrong passwords.
+
+### Apple Silicon hardware
+
+On top of what Asahi Linux provides, TarisOS adds its own fixes and features:
+
+- Asahi's sound processing and speaker protection, with the microphone on both sides for stereo
+  apps
+- Spatial audio on MacBook speakers and headphones
+- External displays over HDMI, Silicon Motion USB adapters and, on M1 Macs, one USB-C port, with
+  each monitor remembering its settings
+- Wi-Fi that comes back reliably after sleep and uses the right channels for your country
+- A keyboard and trackpad that work from the moment the Mac starts
+- Hardware video decoding for H.264, HEVC and VP9
+- Fan control in the bar and a battery charge limit
+- A Touch Bar with media, brightness and screenshot keys, and a layout you can change
+
+### Apps
+
+| | |
+| --- | --- |
+| Browser | Chromium, with Google sign-in and sync, and streaming video |
+| Private browsing | Tor Browser |
+| Terminal | kitty |
+| Files | Nautilus |
+| Text | GNOME Text Editor, Neovim |
+| Code | VSCodium |
+| Music | Taris Music, a YouTube Music player without the ads |
+| Images, video, PDFs | imv, mpv, VLC, Evince |
+| Disks | GNOME Disks |
+| Phone | KDE Connect |
+| Torrents | qBittorrent |
+| Screenshots | The shell's own tool, with swappy for editing |
+| Privacy | Tor for the whole system, from the taskbar; NordVPN |
+| GitHub | GitHub CLI |
+
+VSCodium, Steam, OBS Studio, LibreOffice, Firefox and NordVPN are in the launcher and download the
+first time you open them. Chinese, Japanese and Korean input installs when you turn it on in
+Settings > Keyboard & trackpad.
+
+## Supported Macs
+
+TarisOS runs on the Apple Silicon Macs that Asahi Linux supports, which are the **M1** and **M2**
+families. It's developed and tested on an M1 MacBook Pro, and hasn't been tried on M2 Macs yet. It
+only targets Apple Silicon, so there are no drivers for other hardware.
+
+Hardware support comes from Asahi Linux, and their [website](https://asahilinux.org/) lists what
+works on each model. A few things are worth knowing before you install:
+
+- Touch ID doesn't work on Linux.
+- On M1 Macs, external displays work over one USB-C port only. That's the front port on the left of
+  a MacBook Air or MacBook Pro, the back port next to HDMI on a Mac mini, and on an iMac the back
+  left port (two ports) or the back middle-right port (four ports). Other M-series Macs can't drive
+  a display over USB-C yet. HDMI and Silicon Motion USB adapters work everywhere; DisplayLink
+  adapters don't.
+- Apps need to be built for 64-bit ARM. Steam runs its games through x86 emulation, but other
+  x86-only programs may not work.
 
 ## Using TarisOS
 
@@ -169,15 +177,16 @@ To switch between macOS and TarisOS, hold the power button while the Mac starts 
 | <kbd>SUPER</kbd> + <kbd>E</kbd> | Files |
 | <kbd>SUPER</kbd> + <kbd>,</kbd> | Settings |
 | <kbd>SUPER</kbd> + <kbd>TAB</kbd> or <kbd>SUPER</kbd> + <kbd>`</kbd> | Window overview |
-| <kbd>SUPER</kbd> + <kbd>N</kbd> | Notification sidebar |
-| <kbd>SUPER</kbd> + <kbd>A</kbd> | Show or hide the coding agent's workspace |
+| <kbd>SUPER</kbd> + <kbd>N</kbd> | Notifications |
+| <kbd>SUPER</kbd> + <kbd>A</kbd> | Show or hide the coding agent |
 | <kbd>SUPER</kbd> + <kbd>V</kbd> | Clipboard history |
-| <kbd>SUPER</kbd> + <kbd>K</kbd> | Every keyboard shortcut |
-| Hold <kbd>FN</kbd> | Emoji picker |
+| <kbd>SUPER</kbd> + <kbd>K</kbd> | All keyboard shortcuts |
+| Hold <kbd>fn</kbd> | Emoji picker |
+| <kbd>fn</kbd> twice | Switch keyboard layout |
 | <kbd>SUPER</kbd> + <kbd>L</kbd> | Lock |
-| <kbd>SUPER</kbd> + <kbd>ESC</kbd> | Power panel (log out, shut down, sleep, stash, restart) |
+| <kbd>SUPER</kbd> + <kbd>ESC</kbd> | Log out, sleep, restart or shut down |
 | <kbd>PRINT</kbd> | Screenshot |
-| <kbd>SUPER</kbd> + <kbd>SHIFT</kbd> + <kbd>R</kbd> | Record a part of the screen |
+| <kbd>SUPER</kbd> + <kbd>SHIFT</kbd> + <kbd>R</kbd> | Record part of the screen |
 | <kbd>CTRL</kbd> + <kbd>Q</kbd> or <kbd>SUPER</kbd> + <kbd>W</kbd> | Close the window |
 | <kbd>SUPER</kbd> + <kbd>F</kbd> | Fullscreen |
 | <kbd>SUPER</kbd> + <kbd>SHIFT</kbd> + <kbd>M</kbd> | Maximise |
@@ -187,134 +196,101 @@ To switch between macOS and TarisOS, hold the power button while the Mac starts 
 | <kbd>SUPER</kbd> + <kbd>1</kbd>–<kbd>9</kbd> | Go to a workspace |
 | <kbd>SUPER</kbd> + <kbd>SHIFT</kbd> + <kbd>1</kbd>–<kbd>9</kbd> | Move the window to a workspace |
 | <kbd>SUPER</kbd> + <kbd>S</kbd> | Show or hide the special workspace |
-| <kbd>SUPER</kbd> + <kbd>SHIFT</kbd> + <kbd>S</kbd> | Move the window to the special workspace |
-| <kbd>fn</kbd> twice | Switch input source |
-| 3-finger swipe left or right | Switch workspace |
-| 3-finger swipe up or down | Open or close the overview |
+| Three-finger swipe sideways | Switch workspace |
+| Three-finger swipe up or down | Open or close the overview |
 
-The left <kbd>CTRL</kbd> and <kbd>SUPER</kbd> keys are swapped, so <kbd>⌘</kbd> works as it does
-in macOS (<kbd>⌘</kbd> + <kbd>C</kbd> copies, <kbd>⌘</kbd> + <kbd>Q</kbd> closes) and the
-<kbd>SUPER</kbd> shortcuts are on the <kbd>control</kbd> key. Settings > Keyboard & trackpad
-changes this.
+TarisOS swaps the left <kbd>CTRL</kbd> and <kbd>SUPER</kbd> keys, so <kbd>⌘</kbd> behaves the way
+it does on macOS (<kbd>⌘</kbd> + <kbd>C</kbd> to copy, <kbd>⌘</kbd> + <kbd>Q</kbd> to quit) and the
+<kbd>SUPER</kbd> shortcuts above are on the <kbd>control</kbd> key. You can turn this off in
+Settings > Keyboard & trackpad.
 
-### Apps and updates
+### Installing and updating
 
-- **Install apps** from the App Store (in the launcher), or type `>install` in the launcher.
-- **Update** from Settings > General > Updates. TarisOS takes a snapshot first, then updates the
-  system, its own packages, AUR apps and Flatpak apps.
-- **Remove an app** with `>uninstall` in the launcher, or Remove… in the app drawer.
+Apps come from the App Store in the launcher, or you can type `>install` and a name. To remove one,
+type `>uninstall`, or right-click it in the app drawer.
 
-From a terminal, TarisOS is Arch Linux ARM: `pacman`, `yay` and `flatpak` work as usual. Install
-with `sudo pacman -Syu --needed <package>` (never `-Sy` alone), and update everything with
-`/usr/lib/taris/update`.
+Updates are in Settings > General > Updates. TarisOS takes a snapshot first, then updates the
+system, its own packages, AUR apps and Flatpak apps in one go.
 
-### Security, encryption, backups and factory reset
+Under the hood TarisOS is Arch Linux ARM, so `pacman`, `yay` and `flatpak` all work as you'd
+expect. Install with `sudo pacman -Syu --needed <package>` rather than `-Sy` on its own, which can
+leave the system half-updated.
 
-- **Disk encryption** (Settings > Security): choose *Encrypt the disk*, enter your password, and the
-  Mac restarts. On the way back up it asks for a new disk password twice, encrypts the disk (it
-  shows how far it has got), and starts. From then on the disk password is your login.
-- **Backups** (Settings > Backup & restore): *Back up now*, or turn on automatic backups (every
-  day, week or month). A backup holds the whole system: apps, packages, settings and every
-  account's files. Up to 20 are kept; the oldest go first. *Restore* (click twice) restarts into
-  it: everything goes back to how it was then, files included.
-- **Factory reset** (Settings > Backup & restore): *Erase everything*, confirmed, restarts and
-  brings TarisOS back to how it was installed. Every account, file and backup on it is erased, and
-  the setup screen starts again.
+### Encryption, backups and factory reset
 
-Snapshots of the system taken before package changes are listed with `snapper list`.
+To encrypt the disk, go to Settings > Security and choose *Encrypt the disk*. The Mac restarts,
+asks you for a new disk password, and encrypts the disk while showing its progress. After that,
+your disk password is also your login.
+
+Backups live in Settings > Backup & restore. Each one holds the whole system, everyone's files
+included, and up to 20 are kept. Restoring a backup restarts the Mac and puts everything back as
+it was. The same page has the factory reset, which erases every account, file and backup and
+starts the setup screen again.
+
+### Displays
+
+Settings > Displays is where you arrange your screens and set their resolution, scale, rotation and
+mirroring. It's also where you pick the main display, choose which displays show the taskbar, and
+turn on night light. Each monitor keeps its settings, whichever port or adapter you plug it into.
+
+### Touch Bar
+
+The Touch Bar shows media, brightness and screenshot keys, and switches to
+<kbd>F1</kbd>–<kbd>F12</kbd> while you hold <kbd>fn</kbd>. Its layout belongs to the Mac's first account and lives in
+`~/.config/taris/touchbar.toml`. You can change the keys there, or set `MediaLayerDefault = false`
+to show the F-keys by default. Changes take effect as soon as you save.
 
 ### Wallpapers
 
-Wallpapers are read from `~/Pictures/Wallpapers`, where `TarisOS` holds the ones TarisOS comes with.
-Pick one in Settings > Appearance > Wallpaper & style, or run `taris wallpaper -f <path>`.
+Your wallpapers live in `~/Pictures/Wallpapers`, and the ones TarisOS comes with are in its
+`TarisOS` folder. Pick one in Settings > Appearance > Wallpaper & style, or run
+`taris wallpaper -f <path>`.
 
-### Your own Hyprland settings
+### Hyprland
 
-Hyprland's settings come from `/usr/share/taris/hypr/` and update with the system. Put your own
-changes in `~/.config/hypr/user.lua`, which loads last, or use the Window style, Displays and
-Keyboard & trackpad pages in Settings.
+TarisOS's Hyprland configuration updates along with the system. Your own changes go in
+`~/.config/hypr/user.lua`, which loads last, so anything you set there wins. Window style,
+displays and keyboard are easier to change in Settings.
 
 ### The shell from a terminal
 
 ```sh
-taris shell -d       # start the shell (it starts with Hyprland)
-taris shell -l       # its log
-taris shell -s       # every IPC command, e.g.:
+taris shell -d    # start the shell (Hyprland normally does this)
+taris shell -l    # show its log
+taris shell -s    # list everything it can be asked to do, for example:
 taris shell mpris getActive trackTitle
 ```
 
-## Building TarisOS
-
-TarisOS is built on an Apple Silicon Mac running Arch Linux ARM (Asahi Linux): its own package
-repository first, then the installer image from it. Everything goes into `distro/out/`.
-
-```sh
-git clone https://github.com/TarisOS/tarisOS.git
-cd tarisOS
-
-distro/make-signing-key.sh      # once: the key packages are signed with (back it up)
-distro/build-repo.sh            # build and sign every package, and the package list
-sudo distro/build-image.sh      # the installer image, from that repository
-```
-
-- `distro/build-repo.sh` builds this repository's packages (`packaging/pkgbuilds/`) and VSCodium,
-  NordVPN and yay from the AUR (a changed AUR PKGBUILD is shown for review first). It installs the
-  build tools it needs, and keeps the source of every package built from source in
-  `distro/out/sources` (the GPL asks for it next to the binaries).
-- `distro/build-image.sh` makes `distro/out/images/tarisos.zip` in the format the Asahi Linux
-  installer installs, with `installer_data.json` and `install.sh` (the command that starts the
-  installer).
-
-Publishing (`distro/config.sh` sets where):
-
-- **Packages**: upload everything in `distro/out/repo` to the release `packages` of
-  [tarisOS-packages](https://github.com/TarisOS/tarisOS-packages), with
-  `taris.db`, `taris.files` and their `.sig` files as copies of the `.tar.gz` files of the same name
-  (release assets can't be links).
-- **Image**: publish a TarisOS release on this repository (e.g. `v1.0.0`, not marked as a
-  pre-release) with `tarisos.zip`, `installer_data.json` and `install.sh` from `distro/out/images`
-  (GitHub takes files under 2 GB). The install command always runs the latest release's
-  `install.sh`.
-
-## Working on the shell
-
-To work on the shell and the desktop on an existing Asahi Linux (Arch Linux ARM) install:
-
-```sh
-git clone https://github.com/TarisOS/tarisOS.git
-cd tarisOS
-./install.sh
-```
-
-`install.sh` builds the shell and the packages it needs from this checkout and installs them,
-together with TarisOS's desktop settings (`taris-desktop`, `taris-chromium`, `taris-wallpapers`).
-It then restarts the shell and checks that it loaded. Run it again after every change. The login
-screen, hardware fixes, snapshots and firewall come only with the TarisOS image.
-
 ## Configuration
 
-Most options are in the Settings app (<kbd>SUPER</kbd> + <kbd>,</kbd>). All of them, including the ones
-Settings doesn't show, live in `~/.config/taris/shell.json`. Options you leave out use their default values.
+Settings covers what most people want to change. Everything it saves, and everything you add
+yourself, lives in your home folder and sits on top of TarisOS's defaults, so updates never
+overwrite it.
 
-### Per-monitor configuration
+| File | Holds |
+| --- | --- |
+| `~/.config/taris/shell.json` | The shell's options: bar, dock, launcher, notifications, idle, appearance and more |
+| `~/.config/taris/monitors/<monitor>/shell.json` | Options for one display |
+| `~/.config/taris/window-style.conf` | Borders, gaps, corners, animations, blur and transparency |
+| `~/.config/taris/colour-overrides.json` | Your colour changes and saved themes |
+| `~/.config/taris/touchbar.toml` | The Touch Bar layout |
+| `~/.config/hypr/user.lua` | Your own Hyprland settings, shortcuts and window rules |
 
-You can configure per-monitor options in `~/.config/taris/monitors/<monitor>/shell.json`. Each
-monitor's folder is named after the monitor itself (its make, model and serial number), so its
-settings follow it to any port or adapter. List them by running:
+`shell.json` only needs the options you want to change; it reloads as soon as you save. Every
+option and its default is listed in the shell's source, in
+[`shell/plugin/src/Taris/Config/`](shell/plugin/src/Taris/Config/), with one file per section
+(`barconfig.hpp` for `bar`, and so on). Not every option can be set per display.
+
+Per-display folders are named after the monitor itself, so its settings follow it wherever it's
+plugged in. You can list the names with:
 
 ```sh
 hyprctl monitors -j | jq -r '.[].description'
 ```
 
-The built-in display has no description: its folder is named after its output (`eDP-1`). So are
-those of identical monitors without serial numbers, which nothing else tells apart. A `/` in a
-description becomes `-` in the folder's name.
-
-Options set in these files will **override** the respective options in the global config. Any options not present in
-per-monitor configs will inherit their values from the global config.
-
-
-For example, to automatically hide the bar on a monitor described as `Dell Inc. P2422H 7Q1KX`:
+The built-in display is just `eDP-1`, and so is any pair of identical monitors that have no serial
+number. Any `/` in a name becomes `-`. For example, this hides the bar on a Dell monitor until you
+move the pointer to it:
 
 **`~/.config/taris/monitors/Dell Inc. P2422H 7Q1KX/shell.json`**
 
@@ -326,772 +302,139 @@ For example, to automatically hide the bar on a monitor described as `Dell Inc. 
 }
 ```
 
-> [!NOTE]
-> Not all options respect per-monitor overrides. Most notably, the following options will only read
-> from the global config, and ignore the respective option in per-monitor config files.
->
-> <details><summary>Ignored options</summary>
->
-> - `appearance`: `anim.*`, `transparency.*`
-> - `bar.tray`: `hiddenIcons`, `iconSubs`
-> - `bar.workspaces`: `agentWorkspace`, `ignoredTags`, `specialWorkspaceIcons`, `windowIcons`, `workspaceIcons`
-> - `dashboard`: `mediaUpdateInterval`, `resourceUpdateInterval`
-> - `general`: `apps.*`, `battery.*`, `idle.*`, `logo`, `powerButton`
-> - `launcher`: `actionPrefix`, `actions`, `appOrder`, `enableDangerousActions`, `favouriteApps`, `hiddenApps`, `specialPrefix`, `useFuzzy.*`, `vimKeybinds`
-> - `lock`: `enableHowdy`, `maxHowdyTries`, `triggerHowdyOnWake`
-> - `nexus`: `networkRescanInterval`
-> - `notifs`: `actionOnClick`, `defaultExpireTimeout`, `expire`, `fullscreen`, `fullscreenExpireTimeout`
-> - `paths`: `lyricsDir`, `wallpaperDir`
-> - `services`: `audioIncrement`, `brightnessIncrement`, `clockFormat`, `dataUnits`, `defaultPlayer`, `gpuType`, `lyricsBackend`, `maxVolume`, `playerAliases`, `sensorUnits`, `smartScheme`, `visualiserBars`, `weatherLocation`, `weatherUnits`
-> - `utilities`: `toasts.*`, `vpn.*`
->
-> </details>
+Displays other than the main one only get the bar, dock and panels if you turn them on in
+Settings > Displays.
 
-### Example configuration
+For finer control, `~/.config/taris/shell-tokens.json` adjusts the shell's internal sizes,
+spacing, fonts and animation timings
+([`tokens.hpp`](shell/plugin/src/Taris/Config/tokens.hpp) lists them). These are internal, so they
+can change between versions.
 
-> [!WARNING]
-> The example configuration includes **ALL** configuration options in `shell.json`. It is
-> **not** recommended to copy and paste this entire configuration into `shell.json`,
-> as options or their default values may change across updates, resulting in a stale config.
->
-> This is meant to serve as a reference of all the available options, and you should
-> <ins>only add the ones you want to change</ins> to `shell.json`.
+## Removing TarisOS
 
-<details><summary>Example config</summary>
+TarisOS is removed from macOS. Make a backup first, then follow Asahi Linux's
+[partitioning guide](https://asahilinux.org/docs/sw/partitioning-cheatsheet/) to delete its
+partitions and give the space back to macOS. Take care to check each partition before you delete
+it, because picking the wrong one will erase macOS.
 
-```json
-{
-    "enabled": true,
-    "appearance": {
-        "deformScale": 1,
-        "rounding": {
-            "scale": 1
-        },
-        "spacing": {
-            "scale": 1
-        },
-        "padding": {
-            "scale": 1
-        },
-        "font": {
-            "scale": 1,
-            "clock": "Rubik",
-            "workspaces": "Rubik",
-            "headline": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 32, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 28, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 24, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "title": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 22, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 16, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 14, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "body": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 16, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 14, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 12, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "label": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 14, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 12, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 11, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "mono": {
-                "family": "CaskaydiaCove NF",
-                "large": { "size": 16, "weight": 400, "italic": false, "vaxes": {} },
-                "medium": { "size": 14, "weight": 400, "italic": false, "vaxes": {} },
-                "small": { "size": 12, "weight": 400, "italic": false, "vaxes": {} }
-            },
-            "icon": {
-                "family": "Material Symbols Rounded",
-                "extraLarge": { "size": 36, "weight": 400, "italic": false, "vaxes": {} },
-                "large": { "size": 24, "weight": 400, "italic": false, "vaxes": {} },
-                "medium": { "size": 18, "weight": 400, "italic": false, "vaxes": {} },
-                "small": { "size": 15, "weight": 400, "italic": false, "vaxes": {} }
-            }
-        },
-        "anim": {
-            "durations": {
-                "scale": 1
-            }
-        },
-        "transparency": {
-            "enabled": false,
-            "base": 0.85,
-            "layers": 0.4
-        }
-    },
-    "general": {
-        "logo": "",
-        "logoAction": "settings",
-        "powerButton": "lock",
-        "lidAction": "sleep",
-        "showOverFullscreen": false,
-        "mediaGifSpeedAdjustment": 300,
-        "apps": {
-            "terminal": ["kitty"],
-            "audio": ["pwvucontrol"],
-            "playback": ["mpv"],
-            "explorer": ["nautilus"],
-            "agent": "claude"
-        },
-        "idle": {
-            "lockBeforeSleep": true,
-            "inhibitWhenAudio": true,
-            "inhibitWhenCharging": false,
-            "timeouts": [
-                {
-                    "timeout": 180,
-                    "idleAction": "lock",
-                    "inhibitWhenAudio": false,
-                    "inhibitWhenCharging": false,
-                    "respectInhibitors": true
-                },
-                {
-                    "timeout": 300,
-                    "idleAction": "dpms off",
-                    "returnAction": "dpms on"
-                },
-                {
-                    "timeout": 600,
-                    "idleAction": ["suspendThenHibernate"]
-                }
-            ]
-        },
-        "battery": {
-            "warnLevels": [
-                {
-                    "level": 20,
-                    "title": "Low battery",
-                    "message": "You might want to plug in a charger",
-                    "icon": "battery_android_frame_2"
-                },
-                {
-                    "level": 10,
-                    "title": "Did you see the previous message?",
-                    "message": "You should probably plug in a charger <b>now</b>",
-                    "icon": "battery_android_frame_1"
-                },
-                {
-                    "level": 5,
-                    "title": "Critical battery level",
-                    "message": "PLUG THE CHARGER RIGHT NOW!!",
-                    "icon": "battery_android_alert",
-                    "critical": true
-                }
-            ],
-            "criticalLevel": 3
-        }
-    },
-    "background": {
-        "enabled": true,
-        "wallpaperEnabled": true,
-        "desktopClock": {
-            "enabled": false,
-            "scale": 1.0,
-            "position": "bottom-right",
-            "invertColors": false,
-            "background": {
-                "enabled": false,
-                "opacity": 0.7,
-                "blur": true
-            },
-            "shadow": {
-                "enabled": true,
-                "opacity": 0.7,
-                "blur": 0.4
-            }
-        },
-        "visualiser": {
-            "enabled": false,
-            "autoHide": true,
-            "blur": false,
-            "rounding": 1,
-            "spacing": 1
-        }
-    },
-    "bar": {
-        "persistent": true,
-        "showOnHover": true,
-        "dragThreshold": 20,
-        "scrollActions": {
-            "workspaces": true,
-            "volume": true,
-            "brightness": true
-        },
-        "popouts": {
-            "activeWindow": true,
-            "tray": true,
-            "statusIcons": true
-        },
-        "workspaces": {
-            "shown": 5,
-            "activeIndicator": true,
-            "occupiedBg": false,
-            "showUnoccupied": true,
-            "perMonitor": true,
-            "showWindows": false,
-            "showWindowsOnSpecialWorkspaces": false,
-            "agentWorkspace": true,
-            "maxWindowIcons": 5,
-            "activeTrail": false,
-            "displayType": "shapes",
-            "specialDisplayType": "icons",
-            "label": "  ",
-            "occupiedLabel": "󰮯",
-            "activeLabel": "󰮯",
-            "capitalisation": "preserve",
-            "workspaceIcons": [],
-            "specialWorkspaceIcons": [
-                {
-                    "name": "special",
-                    "icon": "star"
-                },
-                {
-                    "name": "communication",
-                    "icon": "forum"
-                },
-                {
-                    "name": "music",
-                    "icon": "music_cast"
-                },
-                {
-                    "name": "agent",
-                    "icon": "smart_toy"
-                },
-                {
-                    "name": "todo",
-                    "icon": "checklist"
-                },
-                {
-                    "name": "sysmon",
-                    "icon": "monitor_heart"
-                }
-            ],
-            "ignoredTags": [
-                "hide_in_bar",
-                "xwl_popup"
-            ],
-            "windowIcons": [
-                {
-                    "regex": "steam(_app_(default|[0-9]+))?",
-                    "icon": "sports_esports"
-                }
-            ]
-        },
-        "activeWindow": {
-            "compact": false,
-            "inverted": false,
-            "showOnHover": true
-        },
-        "tray": {
-            "background": false,
-            "recolour": false,
-            "compact": false,
-            "iconSubs": [],
-            "hiddenIcons": []
-        },
-        "clock": {
-            "background": false,
-            "showDate": true,
-            "showSeconds": true
-        },
-        "statusIcons": [
-            {
-                "id": "lockStatus",
-                "enabled": false
-            },
-            {
-                "id": "audio",
-                "enabled": false
-            },
-            {
-                "id": "microphone",
-                "enabled": false
-            },
-            {
-                "id": "kbLayout",
-                "enabled": false
-            },
-            {
-                "id": "network",
-                "enabled": true
-            },
-            {
-                "id": "bluetooth",
-                "enabled": true
-            },
-            {
-                "id": "battery",
-                "enabled": true
-            }
-        ],
-        "entries": [
-            {
-                "id": "logo",
-                "enabled": true
-            },
-            {
-                "id": "workspaces",
-                "enabled": true
-            },
-            {
-                "id": "spacer",
-                "enabled": true
-            },
-            {
-                "id": "activeWindow",
-                "enabled": true
-            },
-            {
-                "id": "spacer",
-                "enabled": true
-            },
-            {
-                "id": "tray",
-                "enabled": true
-            },
-            {
-                "id": "clock",
-                "enabled": true
-            },
-            {
-                "id": "statusIcons",
-                "enabled": true
-            },
-            {
-                "id": "power",
-                "enabled": true
-            }
-        ],
-        "excludedScreens": []
-    },
-    "border": {
-        "thickness": 10,
-        "rounding": 25,
-        "smoothing": 20
-    },
-    "dashboard": {
-        "enabled": true,
-        "showOnHover": true,
-        "showDashboard": true,
-        "showMedia": true,
-        "showPerformance": true,
-        "showWeather": true,
-        "showAgent": true,
-        "showClockSeconds": true,
-        "status": "",
-        "mediaUpdateInterval": 500,
-        "resourceUpdateInterval": 1000,
-        "dragThreshold": 50,
-        "performance": {
-            "showBattery": true,
-            "showGpu": true,
-            "showCpu": true,
-            "showMemory": true,
-            "showStorage": true,
-            "showNetwork": true
-        }
-    },
-    "launcher": {
-        "enabled": true,
-        "showOnHover": false,
-        "maxShown": 7,
-        "maxWallpapers": 9,
-        "specialPrefix": "@",
-        "actionPrefix": ">",
-        "enableDangerousActions": false,
-        "dragThreshold": 50,
-        "vimKeybinds": false,
-        "favouriteApps": [],
-        "hiddenApps": [
-            "avahi-discover",
-            "bssh",
-            "bvnc",
-            "cmake-gui",
-            "qv4l2",
-            "qvidcap",
-            "mpv",
-            "vim",
-            "lstopo",
-            "org.kde.kdeconnect.app",
-            "org.kde.kdeconnect.sms",
-            "org.kde.kdeconnect.nonplasma",
-            "org.gnome.Papers"
-        ],
-        "appOrder": [
-            "taris-settings",
-            "taris-store",
-            "org.gnome.DiskUtility",
-            "taris-kdeconnect",
-            "kitty",
-            "org.gnome.Nautilus",
-            "chromium",
-            "webapp-discord",
-            "taris-music",
-            "org.qbittorrent.qBittorrent",
-            "org.gnome.TextEditor",
-            "nvim",
-            "taris-install-code",
-            "codium",
-            "com.microsoft.VSCode",
-            "code",
-            "visual-studio-code",
-            "taris-install-steam",
-            "steam",
-            "taris-install-obs",
-            "com.obsproject.Studio",
-            "taris-install-writer",
-            "libreoffice-writer",
-            "taris-install-calc",
-            "libreoffice-calc",
-            "taris-install-impress",
-            "libreoffice-impress",
-            "org.gnome.Evince",
-            "taris-install-firefox",
-            "firefox",
-            "taris-install-nordvpn",
-            "taris-nordvpn"
-        ],
-        "useFuzzy": {
-            "apps": false,
-            "actions": false,
-            "schemes": false,
-            "variants": false,
-            "wallpapers": false
-        },
-        "actions": [
-            {
-                "name": "Calculator",
-                "icon": "calculate",
-                "description": "Do simple math equations (powered by Qalc)",
-                "command": ["autocomplete", "calc"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Install",
-                "icon": "download",
-                "description": "Add a web app or a package",
-                "command": ["autocomplete", "install"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Uninstall",
-                "icon": "delete",
-                "description": "Remove an app",
-                "command": ["autocomplete", "uninstall"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Scheme",
-                "icon": "palette",
-                "description": "Change the current colour scheme",
-                "command": ["autocomplete", "scheme"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Wallpaper",
-                "icon": "image",
-                "description": "Change the current wallpaper",
-                "command": ["autocomplete", "wallpaper"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Variant",
-                "icon": "colors",
-                "description": "Change the current scheme variant",
-                "command": ["autocomplete", "variant"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Random",
-                "icon": "casino",
-                "description": "Switch to a random wallpaper",
-                "command": ["taris", "wallpaper", "-r", "-n"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Light",
-                "icon": "light_mode",
-                "description": "Change the scheme to light mode",
-                "command": ["setMode", "light"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Dark",
-                "icon": "dark_mode",
-                "description": "Change the scheme to dark mode",
-                "command": ["setMode", "dark"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Shutdown",
-                "icon": "power_settings_new",
-                "description": "Shutdown the system",
-                "command": ["poweroff"],
-                "enabled": true,
-                "dangerous": true
-            },
-            {
-                "name": "Reboot",
-                "icon": "cached",
-                "description": "Reboot the system",
-                "command": ["reboot"],
-                "enabled": true,
-                "dangerous": true
-            },
-            {
-                "name": "Logout",
-                "icon": "exit_to_app",
-                "description": "Log out of the current session",
-                "command": ["logout"],
-                "enabled": true,
-                "dangerous": true
-            },
-            {
-                "name": "Lock",
-                "icon": "lock",
-                "description": "Lock the current session",
-                "command": ["loginctl", "lock-session"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Sleep",
-                "icon": "bedtime",
-                "description": "Suspend then hibernate",
-                "command": ["suspendThenHibernate"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Settings",
-                "icon": "settings",
-                "description": "Configure the shell",
-                "command": ["taris", "shell", "nexus", "open"],
-                "enabled": true,
-                "dangerous": false
-            }
-        ]
-    },
-    "lock": {
-        "enabled": true,
-        "useWallpaper": false,
-        "recolourLogo": true,
-        "enableHowdy": true,
-        "maxHowdyTries": 3,
-        "triggerHowdyOnWake": true,
-        "hideNotifs": false,
-        "enableSessionControls": true
-    },
-    "nexus": {
-        "wallpapersPerRow": 4,
-        "networkRescanInterval": 15000
-    },
-    "notifs": {
-        "expire": true,
-        "fullscreen": "On",
-        "defaultExpireTimeout": 5000,
-        "fullscreenExpireTimeout": 2000,
-        "clearThreshold": 0.3,
-        "expandThreshold": 20,
-        "actionOnClick": false,
-        "groupPreviewNum": 3,
-        "openExpanded": false
-    },
-    "osd": {
-        "enabled": true,
-        "hideDelay": 2000,
-        "enableBrightness": true,
-        "enableMicrophone": false
-    },
-    "services": {
-        "weatherLocation": "",
-        "weatherUnits": "Auto",
-        "sensorUnits": "Celsius",
-        "dataUnits": "Binary",
-        "clockFormat": "Auto",
-        "gpuType": "Auto",
-        "visualiserBars": 60,
-        "audioIncrement": 0.1,
-        "brightnessIncrement": 0.1,
-        "maxVolume": 1.0,
-        "smartScheme": true,
-        "defaultPlayer": "Music",
-        "playerAliases": [{ "from": "com.github.th_ch.youtube_music", "to": "YT Music" }, { "from": "Music", "to": "Taris Music" }],
-        "lyricsBackend": "Auto"
-    },
-    "session": {
-        "enabled": true,
-        "dragThreshold": 30,
-        "vimKeybinds": false,
-        "stashNotice": true,
-        "icons": {
-            "logout": "logout",
-            "shutdown": "power_settings_new",
-            "hibernate": "bedtime",
-            "stash": "move_to_inbox",
-            "reboot": "cached"
-        },
-        "commands": {
-            "logout": ["logout"],
-            "shutdown": ["poweroff"],
-            "hibernate": ["suspend"],
-            "stash": ["stash"],
-            "reboot": ["reboot"]
-        }
-    },
-    "sidebar": {
-        "enabled": true,
-        "showOnHover": false,
-        "minHoverThreshold": 200,
-        "dragThreshold": 80
-    },
-    "utilities": {
-        "enabled": true,
-        "maxToasts": 4,
-        "toasts": {
-            "fullscreen": "off",
-            "configLoaded": false,
-            "chargingChanged": true,
-            "gameModeChanged": true,
-            "dndChanged": true,
-            "audioOutputChanged": true,
-            "audioInputChanged": true,
-            "capsLockChanged": false,
-            "numLockChanged": false,
-            "kbLayoutChanged": true,
-            "kbLimit": true,
-            "vpnChanged": true,
-            "nowPlaying": false
-        },
-        "vpn": {
-            "enabled": false,
-            "provider": [
-                {
-                    "name": "wireguard",
-                    "interface": "your-connection-name",
-                    "displayName": "Wireguard (Your VPN)",
-                    "enabled": false
-                }
-            ]
-        },
-        "quickToggles": [
-            {
-                "id": "wifi",
-                "enabled": true
-            },
-            {
-                "id": "bluetooth",
-                "enabled": true
-            },
-            {
-                "id": "mic",
-                "enabled": true
-            },
-            {
-                "id": "camera",
-                "enabled": true
-            },
-            {
-                "id": "settings",
-                "enabled": true
-            },
-            {
-                "id": "gameMode",
-                "enabled": true
-            },
-            {
-                "id": "dnd",
-                "enabled": true
-            },
-            {
-                "id": "vpn",
-                "enabled": false
-            }
-        ]
-    },
-    "paths": {
-        "wallpaperDir": "~/Pictures/Wallpapers",
-        "lyricsDir": "~/Music/lyrics/",
-        "mediaGif": "root:/assets/bongocat.gif",
-        "noNotifsPic": "root:/assets/dino.png",
-        "lockNoNotifsPic": "root:/assets/dino.png"
-    }
-}
+## Getting help
+
+When something isn't working, the logs are a good place to start: `taris shell -l` for the shell,
+and `journalctl -b -p warning` for the rest of the system.
+
+If you've found a bug in TarisOS, please check the
+[existing issues](https://github.com/TarisOS/tarisOS/issues) and open a new one if it isn't there.
+Say what happened, what you expected and how to make it happen again, and include your Mac's model
+and the output of:
+
+```sh
+uname -r; hyprctl version | head -1
+pacman -Q taris taris-shell quickshell-taris taris-cli hyprland
 ```
 
-</details>
+Problems with the hardware, the kernel or its drivers belong to
+[Asahi Linux](https://github.com/AsahiLinux).
 
-### Advanced configuration
+## Building TarisOS
 
-> [!CAUTION]
-> Do NOT change any of these options unless you know what you are doing. These options control the
-> tokens used internally within the shell, and can cause visual issues if modified incorrectly.
-> The available options may change or be removed without notice across versions.
+TarisOS is built on an Apple Silicon Mac running Asahi Linux with Arch Linux ARM. You build the
+package repository first, then the installer image from it, and everything ends up in
+`distro/out/`.
 
-A separate `~/.config/taris/shell-tokens.json` file allows editing the internal tokens without
-touching the source code of the shell. These tokens affect the dimensions and appearance of visual elements,
-including individual rounding, spacing, padding, font size, animation durations and curves, and the sizes of
-certain components. The appearance scale values in `shell.json` are multiplied against these base
-token values to produce the final computed values.
+```sh
+git clone https://github.com/TarisOS/tarisOS.git
+cd tarisOS
 
-Per-monitor token overrides are also available at
-`~/.config/taris/monitors/<monitor>/shell-tokens.json` (the folder named as above).
+distro/make-signing-key.sh    # once, to create the signing key (back it up)
+distro/build-repo.sh          # build and sign every package
+sudo distro/build-image.sh    # build the installer image from that repository
+```
 
+`build-repo.sh` builds the packages in `packaging/pkgbuilds/` along with the AUR packages listed
+in `distro/config.sh`, showing you any AUR PKGBUILD that has changed before building it. It
+installs the tools it needs, and keeps the source of everything it builds in `distro/out/sources`,
+as the GPL requires.
+
+`build-image.sh` produces `distro/out/images/tarisos.zip` in the format Asahi Linux's installer
+expects, together with `installer_data.json` and `install.sh`.
+
+To publish a release:
+
+- Upload everything in `distro/out/repo` to the `packages` release of
+  [tarisOS-packages](https://github.com/TarisOS/tarisOS-packages). Because release assets can't be
+  links, upload `taris.db`, `taris.files` and their `.sig` files as copies of the `.tar.gz` files
+  with the same names.
+- Publish a release of this repository, such as `v1.0.0`, with `tarisos.zip`,
+  `installer_data.json` and `install.sh` from `distro/out/images`. Don't mark it as a pre-release:
+  the install command always uses the latest full release. GitHub accepts files up to 2 GB.
+
+## Contributing
+
+You can work on the shell and the desktop on any Asahi Linux install with Arch Linux ARM:
+
+```sh
+git clone https://github.com/TarisOS/tarisOS.git
+cd tarisOS
+./install.sh
+```
+
+`install.sh` builds the shell from your checkout and installs it with TarisOS's desktop packages,
+then restarts the shell and checks that it loaded. Run it again after each change. The login
+screen, hardware fixes, snapshots and firewall only come with the full TarisOS image.
+
+Conventions for code, packaging and documentation, and the checks to run before sending a change,
+are in [`AGENTS.md`](AGENTS.md) and [`agents/skills/`](agents/skills/). They're written for people
+and coding agents alike. If you develop TarisOS on a Mac running it, install the `taris-dev`
+package so coding agents treat the machine as a development one.
 
 ## Repository layout
 
-| Path | What's there |
+| Path | Contents |
 | --- | --- |
-| `shell/` | The Taris shell: QML (`modules/`, `components/`, `services/`, `utils/`), its C++ plugin (`plugin/`), the greeter (`greeter.qml`) and the setup screen (`setup.qml`) |
-| `packaging/pkgbuilds/` | Every TarisOS package: `taris` and its parts (`taris-hardware`, `taris-shell`, `taris-desktop`, `taris-login`, `taris-chromium`, `taris-snapshots`, `taris-firewall`, `taris-wallpapers`, `taris-keyring`) and the packages Arch Linux ARM doesn't have |
-| `packaging/hypr/` | The Hyprland config TarisOS ships |
-| `packaging/agents/` | Skills for coding agents |
-| `packaging/defaults/`, `packaging/wallpapers/` | The Taris theme, the preinstalled web apps, the logo's icon sizes, the wallpapers |
-| `packaging/titlebars/` | Builds the title bar plugin for the installed Hyprland |
+| `shell/` | The Taris shell, including the login screen and the first-boot setup |
+| `music/` | Taris Music |
+| `packaging/pkgbuilds/` | Every TarisOS package, TarisOS's patched builds of other packages, and packages Arch Linux ARM doesn't have |
+| `packaging/hypr/` | The Hyprland configuration |
+| `packaging/agents/` | Instructions for users' coding agents |
+| `packaging/defaults/`, `packaging/wallpapers/` | The Taris theme, the bundled web apps, the logo and the wallpapers |
+| `packaging/titlebars/` | The window title bar plugin |
+| `packaging/extras/`, `packaging/smidriver/` | Touch Bar and display adapter support for `install.sh` |
 | `distro/` | Builds the package repository and the installer image |
-| `install.sh`, `install-hypr.sh`, `install-agent-skills.sh` | Install the shell and the desktop on an existing Asahi Linux install, for working on them |
-| `AGENTS.md`, `CLAUDE.md`, `agents/skills/` | Instructions for coding agents working on TarisOS itself |
+| `install.sh`, `install-hypr.sh`, `install-agent-skills.sh` | Install the desktop on an existing Asahi Linux system |
+| `AGENTS.md`, `CLAUDE.md`, `agents/skills/` | How to work on TarisOS |
 
 ## Credits
 
-The Taris shell is a heavily modified version of the
-[Caelestia shell](https://github.com/caelestia-dots/shell) by
-[@soramanew](https://github.com/soramanew) and its contributors. Much of its code is Caelestia's,
-renamed and reworked for TarisOS. The `taris` command-line tool is built from
-[Caelestia's CLI](https://github.com/caelestia-dots/cli). Thank you to the Caelestia project;
-TarisOS isn't affiliated with it.
+The Taris shell started as the [Caelestia shell](https://github.com/caelestia-dots/shell) by
+[@soramanew](https://github.com/soramanew) and its contributors, and much of its code is still
+theirs, renamed and reworked for TarisOS. The `taris` command-line tool is built from
+[Caelestia's CLI](https://github.com/caelestia-dots/cli). Many thanks to the Caelestia project.
 
-TarisOS is built on [Asahi Linux](https://asahilinux.org/) and
-[Arch Linux ARM](https://archlinuxarm.org/), with [Quickshell](https://quickshell.outfoxxed.me) by
-[@outfoxxed](https://github.com/outfoxxed) and [Hyprland](https://hypr.land).
+TarisOS stands on [Asahi Linux](https://asahilinux.org/), whose installer and
+[tiny-dfr](https://github.com/AsahiLinux/tiny-dfr) Touch Bar daemon it uses, and on
+[Arch Linux ARM](https://archlinuxarm.org/), [Quickshell](https://quickshell.outfoxxed.me) by
+[@outfoxxed](https://github.com/outfoxxed), and [Hyprland](https://hypr.land).
 
-Thanks to Naeem and the [Omarchy-Mac](https://github.com/omarchy-mac/omarchy-mac) project, whose
-installer showed which fixes Apple Silicon Macs need and how to apply them safely.
+Thanks also to the [Omarchy-Mac](https://github.com/omarchy-mac/omarchy-mac) project,
+whose installer showed which fixes Apple Silicon Macs need and how to apply them safely.
 
-TarisOS's music player, Taris Music, is [Zuno](https://github.com/noFAYZ/zuno) by
-[@noFAYZ](https://github.com/noFAYZ) and its contributors (Apache-2.0), built from its source for
-64-bit ARM with TarisOS's changes (the `music` folder; its `NOTICE` says what changed). Thank you
-to the Zuno project; TarisOS isn't affiliated with it.
+The wallpapers come from [wallhaven](https://wallhaven.cc/) and
+[Omarchy](https://omarchy.org/). We couldn't find their original artists, but if you know who made
+one, please [let us know](https://github.com/TarisOS/tarisOS/issues) and we'll be happy to credit
+them. If you're the artist and would rather it weren't included, we'll remove it on request, given
+sufficient evidence that it's yours.
+
+Taris Music is [Zuno](https://github.com/noFAYZ/zuno) by [@noFAYZ](https://github.com/noFAYZ) and
+its contributors (Apache-2.0), built for 64-bit ARM with TarisOS's changes, which are described in
+`music/NOTICE`. Many thanks to the Zuno project.
+
+TarisOS is an independent project and isn't affiliated with Apple, Asahi Linux, Caelestia or Zuno.
+Apple, Mac, macOS and Touch ID are trademarks of Apple Inc.
 
 ## License
 
-TarisOS is free software under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only).
-See [`shell/NOTICE`](shell/NOTICE) for the shell's notices. A few bundled files keep their own
-licences: `shell/utils/scripts/fzf.js` (BSD-3-Clause), `shell/utils/scripts/fuzzysort.js` (MIT),
-the Google Sans Flex font (OFL) and SiliconMotion's driver in `packaging/smidriver/driver/`.
+TarisOS is free software, released under the [GNU General Public License v3.0](LICENSE). The
+shell's notices are in [`shell/NOTICE`](shell/NOTICE). A few bundled files keep their own licences:
+`shell/utils/scripts/fzf.js` (BSD-3-Clause), `shell/utils/scripts/fuzzysort.js` (MIT), the Google
+Sans Flex font (OFL), and SiliconMotion's driver in `packaging/smidriver/driver/`. The wallpapers
+aren't covered by TarisOS's licence: they remain their artists' (see [Credits](#credits)).

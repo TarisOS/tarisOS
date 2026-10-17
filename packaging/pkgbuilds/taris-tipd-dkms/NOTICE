@@ -1,0 +1,16 @@
+taris-tipd-dkms
+
+The USB-C controller driver (drivers/usb/typec/tipd) from Asahi Linux's kernel source, tag
+asahi-7.1.13-3 (https://github.com/AsahiLinux/linux), by its authors and the Asahi Linux
+contributors. Licensed under the GNU General Public License version 2 (some files version 2 or
+later, as their SPDX lines say).
+
+Changed by TarisOS (https://github.com/TarisOS/tarisOS) in 2026, by applying two commits by Janne
+Grunau from Asahi Linux's work-in-progress branches, so the display driver is told when a display
+on USB-C comes and goes:
+
+- 0001-usb-typec-tipd-Track-data_status-changes-for-CD321x.patch
+- 0002-usb-typec-tipd-HACK-Use-drm-oob-hotplug-event.patch
+
+core.c and tps6598x.h, the files they change, say so near their tops (taris-notices.patch). The
+patches are in TarisOS's source, packaging/pkgbuilds/taris-tipd-dkms.

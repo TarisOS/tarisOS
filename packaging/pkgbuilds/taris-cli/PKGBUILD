@@ -7,7 +7,7 @@
 
 pkgname='taris-cli'
 pkgver=1.1.3
-pkgrel=4
+pkgrel=5
 pkgdesc='The main cli for the Taris dotfiles'
 arch=('any')
 url='https://github.com/caelestia-dots/cli'
@@ -21,10 +21,12 @@ conflicts=('taris-cli-git')
 _archive="caelestia-$pkgver"
 source=("$url/releases/download/v$pkgver/$_archive.tar.gz"
         apple-silicon-recording.patch
-        keep-icon-theme.patch)
+        keep-icon-theme.patch
+        NOTICE)
 sha256sums=('f31447efdd94a18556e338bcf8a38236f34660a56b241657817e6cbe80b067e3'
             'aef8279b352b83a060b4ea56f46c7acf11a8fd002c27d4f53a8755414a33c481'
-            'b27bf55186d27cbff0fb1942e44760bba4fa1e4215095b240bc9c1902df2973c')
+            'b27bf55186d27cbff0fb1942e44760bba4fa1e4215095b240bc9c1902df2973c'
+            'aa909647616fc9b71a24e6ed17385cf6e24fb272b3df31d4743684ac5bf2909b')
 
 prepare() {
     cd "${srcdir}/${_archive}"
@@ -60,4 +62,6 @@ package() {
     cd "${srcdir}/${_archive}"
     python -m installer --destdir="$pkgdir" dist/*.whl
     install -Dm644 ./completions/taris.fish "$pkgdir"/usr/share/fish/vendor_completions.d/taris.fish
+    # The upstream licence, and what TarisOS changed (GPL-3.0 section 5a)
+    install -Dm644 LICENSE "$srcdir/NOTICE" -t "$pkgdir/usr/share/licenses/$pkgname"
 }

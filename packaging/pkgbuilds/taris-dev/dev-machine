@@ -1,0 +1,7 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# This machine is a TarisOS development machine (taris-dev): coding agents follow
+# /usr/share/taris/agent-rules-dev.md here, which takes precedence over the rules and skills for
+# users' agents. Write the path of the TarisOS checkout on a line of its own below (e.g.
+# /home/<you>/Projects/tarisOS); the agents ask for it while there is none.

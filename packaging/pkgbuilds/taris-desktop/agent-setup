@@ -1,0 +1,114 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Instructions for coding agents, for this account. Run as the account by user-defaults (a new
+# account) and by install-agent-skills.sh (an existing one); safe to re-run.
+# - TarisOS's skills (/usr/share/taris/agent-skills) linked where the agents look for them:
+#   ~/.agents, ~/.claude, ~/.codex, ~/.pi, and ~/.gemini, ~/.hermes when those agents are set up.
+# - TarisOS's rules (/usr/share/taris/agent-rules.md) in the file each agent reads at the start of
+#   every session: imported by Claude Code (~/.claude/CLAUDE.md) and Gemini CLI
+#   (~/.gemini/GEMINI.md), linked for Codex (~/.codex/AGENTS.md) and pi (~/.pi/agent/AGENTS.md)
+#   while they have none of their own, else named there to be read. Added to what the account has,
+#   never replacing it. Hermes reads no file of the account's own every session: skills only.
+# - For Claude Code, a session start hook (~/.claude/settings.json) that gives every session the
+#   development rules on a TarisOS development machine (/etc/taris/dev-machine, from taris-dev).
+# Usage: /usr/lib/taris/agent-setup
+set -euo pipefail
+
+share=/usr/share/taris/agent-skills
+rules=/usr/share/taris/agent-rules.md
+
+# Skills
+dirs=("$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.codex/skills" "$HOME/.pi/agent/skills")
+[[ -d $HOME/.gemini ]] && dirs+=("$HOME/.gemini/config/skills")
+if [[ -d $HOME/.hermes ]]; then
+	dirs+=("$HOME/.hermes/skills")
+	for profile in "$HOME"/.hermes/profiles/*/; do
+		[[ -d $profile ]] && dirs+=("${profile}skills")
+	done
+fi
+
+# The copies older versions of install-agent-skills.sh made
+old="${XDG_DATA_HOME:-$HOME/.local/share}/taris/agent-skills"
+
+for dir in "${dirs[@]}"; do
+	mkdir -p "$dir"
+	for link in "$dir"/*; do
+		[[ -L $link && $(readlink "$link") == "$old/"* ]] && rm -f "$link"
+		[[ -L $link && $(readlink "$link") == "$share/"* && ! -e $link ]] && rm -f "$link"
+	done
+	for skill in "$share"/*/; do
+		skill=${skill%/}
+		link="$dir/${skill##*/}"
+		if [[ -e $link && ! -L $link ]]; then
+			echo "Skipping $link: it exists and is not a link"
+			continue
+		fi
+		ln -sfn "$skill" "$link"
+	done
+done
+rm -rf "$old"
+
+# Rules: the line that brings them into an agent's instructions file, added once
+add_line() { # file line
+	local file=$1 line=$2
+	[[ $(readlink -f "$file") == "$rules" ]] && return 0
+	grep -qsF "$rules" "$file" && return 0
+	mkdir -p "$(dirname "$file")"
+	if [[ -s $file ]]; then
+		printf '\n%s\n' "$line" >>"$file"
+	else
+		printf '%s\n' "$line" >"$file"
+	fi
+}
+
+# Codex and pi have no imports: the rules themselves while they have no instructions of their own
+# (the link follows updates), else a line telling them to read the rules. An AGENTS.override.md
+# next to it is read instead of AGENTS.md, so the line goes there.
+link_or_name() { # dir
+	local file=$1/AGENTS.md
+	[[ -s $1/AGENTS.override.md ]] && file=$1/AGENTS.override.md
+	if [[ ! -e $file && ! -L $file ]]; then
+		mkdir -p "$1"
+		ln -s "$rules" "$file"
+	else
+		add_line "$file" "Before anything else, read and follow $rules (TarisOS's rules for coding agents)."
+	fi
+}
+
+add_line "$HOME/.claude/CLAUDE.md" "@$rules"
+[[ -d $HOME/.gemini ]] && add_line "$HOME/.gemini/GEMINI.md" "@$rules"
+link_or_name "$HOME/.codex"
+link_or_name "$HOME/.pi/agent"
+
+# Claude Code: the development rules at the start of every session (new, resumed, after /clear and
+# after compaction) on a development machine; nothing elsewhere
+hook='[ -e /etc/taris/dev-machine ] && cat /usr/share/taris/agent-rules-dev.md 2>/dev/null; true'
+python3 -I - "$HOME/.claude/settings.json" "$hook" <<'PY'
+import json, os, sys
+
+path, command = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+except ValueError:
+    print(f"Skipping {path}: it isn't valid JSON", file=sys.stderr)
+    sys.exit(0)
+hooks = data.setdefault("hooks", {}) if isinstance(data, dict) else None
+groups = hooks.setdefault("SessionStart", []) if isinstance(hooks, dict) else None
+if not isinstance(groups, list):
+    print(f"Skipping {path}: its hooks aren't laid out as Claude Code's are", file=sys.stderr)
+    sys.exit(0)
+if any(isinstance(h, dict) and h.get("command") == command
+       for g in groups if isinstance(g, dict) for h in g.get("hooks", [])):
+    sys.exit(0)
+groups.append({"hooks": [{"type": "command", "command": command}]})
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(path + ".new", "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+os.replace(path + ".new", path)
+PY

@@ -1,0 +1,29 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Marks a machine as a TarisOS development machine, for coding agents: /etc/taris/dev-machine (the
+# marker, naming the checkout) and the development rules it sends them to,
+# /usr/share/taris/agent-rules-dev.md (the repository's agents/skills/dev-machine.md), which take
+# precedence over the rules and skills for users' agents. Never part of the system (not in the
+# taris meta package or the image): installed by hand on a machine TarisOS is developed on, and
+# removing it makes the machine an ordinary one again.
+
+pkgname=taris-dev
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='TarisOS: marks this machine as one TarisOS is developed on, for coding agents'
+arch=('any')
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only')
+depends=('taris-desktop')
+backup=('etc/taris/dev-machine')
+source=('dev-machine')
+sha256sums=('1c329bbd6c201a85c36d24b3893ec6d9a29438b0acdd5d3e80f5d44d24fa9263')
+
+# This repository's agents folder (the development rules)
+_agents="${TARIS_AGENTS:-$startdir/../../../agents}"
+
+package() {
+    install -Dm644 dev-machine "$pkgdir/etc/taris/dev-machine"
+    install -Dm644 "$_agents/skills/dev-machine.md" "$pkgdir/usr/share/taris/agent-rules-dev.md"
+}

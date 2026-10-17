@@ -19,6 +19,9 @@ the asahi-desktop skill.
 Taris is a Quickshell shell (package `taris-shell`, from the TarisOS repository). The same shell
 is the login screen (the greeter, before anyone has logged in) and the first-boot setup screen.
 
+On a TarisOS development machine (`/etc/taris/dev-machine`), the development rules
+(`/usr/share/taris/agent-rules-dev.md`) take precedence over this skill wherever they disagree.
+
 ## Critical Safety Rules
 
 - **Never edit the installed shell** in `/etc/xdg/quickshell/taris/` (package
@@ -50,9 +53,16 @@ is the login screen (the greeter, before anyone has logged in) and the first-boo
 │                           #   `hyprctl reload` after. Chromium, web apps, mpv, imv, Evince, VSCodium and
 │                           #   kitty stay solid; kitty's background follows `opacity` instead
 ├── theme-border.conf       # Generated: the scheme's border colours (used while bordertheme=1)
-├── colour-overrides.json   # Colours page: per-scheme colour overrides {"name flavour mode": {colour: hex}}
-├── hypr-settings.json      # Displays and Keyboard pages (monitors, input options) ...
-└── hypr-settings.lua       #   ... and the Lua generated from it (don't edit)
+├── colour-overrides.json   # Colours page: per-scheme colour overrides ("overrides":
+│                           #   {"name flavour mode": {colour: hex}}) and the saved themes
+│                           #   ("themes": the Taris theme and the user's own)
+├── hypr-settings.json      # Displays and Keyboard pages (monitors kept by monitor: see the
+│                           #   displays skill) ...
+├── hypr-settings.lua       #   ... and the Lua generated from it (don't edit)
+├── display-numbers.json    # Each monitor's number in Settings > Displays and Identify
+└── monitors/<monitor>/     # A display's own shell.json and shell-tokens.json, over the global
+                            #   ones, in a folder named after the monitor's description (`eDP-1`
+                            #   for the built-in display); "enabled" there puts the shell on it
 
 ~/.local/state/taris/
 ├── scheme.json             # Current colour scheme, written by the `taris` CLI (don't edit)
@@ -68,7 +78,11 @@ wallpapers TarisOS comes with, `/usr/share/backgrounds/taris`).
 `SUPER + COMMA` (or `taris-qs -c taris ipc call nexus open`) opens Taris's settings as an
 overlay. Prefer pointing the user there for things it covers: wallpaper and colours, window style,
 network, Bluetooth, audio, displays, power and idle, lock screen, keyboard and trackpad, panels,
-dock, default apps, notifications.
+dock, default apps, notifications, updates, backups.
+
+The shell (bar, dock and panels) is on the main display, and on other displays only where it's
+turned on in Settings > Displays. The lock screen's clock and password field are on the main
+display; the others show their wallpaper, blurred. See the displays skill.
 
 ## Commands
 
@@ -107,6 +121,12 @@ taris wallpaper -f <image>                # Set the wallpaper
 
 Single colours of a scheme are changed on the Colours page (Settings > Wallpaper & style >
 Colours), which keeps them per scheme in `colour-overrides.json`.
+
+**Saved themes** are a scheme with its colours changed, under a name: the Taris theme (TarisOS's
+default look: gruvbox soft, dark, with its own colours) and any the user saves on the Colours page.
+They're listed first on that page and in the launcher's `>scheme`, which is how to apply them;
+`taris scheme set` only sets the plain scheme underneath. Saved themes are kept in
+`colour-overrides.json` (`themes`).
 
 The window border gradient follows the scheme while `bordertheme=1` in `window-style.conf`; picking
 border colours on the Window style page turns that off, picking a scheme turns it back on.
@@ -163,9 +183,27 @@ for an app's menu.
 
 ## Touch Bar
 
-On MacBooks with a Touch Bar, `tiny-dfr` draws it from `/etc/tiny-dfr/config.toml` (from the
-`taris-hardware` package: a pacman update keeps your edits and leaves its own next to them as
-`.pacnew`). Edit with sudo, then `sudo systemctl restart tiny-dfr`.
+On MacBooks that have one, `tiny-dfr` draws it (TarisOS's build, `tiny-dfr-taris`, which sends
+the modifiers held on the keyboard with the Touch Bar's keys). Its settings are the owner account's
+own (the account the setup screen made), changed as that account without sudo from
+`~/.config/taris/touchbar.toml`. That's a link to the file itself,
+`/var/lib/taris/touchbar/config.toml`, which `/etc/tiny-dfr/config.toml` links to as well: tiny-dfr
+reads it as the `nobody` user, which can't enter a home folder. Saved changes apply at once (if not:
+`sudo systemctl restart tiny-dfr`).
+
+- Edit through the link or the file itself; never replace the link in the home folder with a
+  copy (the Touch Bar wouldn't read it). Keep the file readable by everyone and a plain file:
+  tiny-dfr stops working if it can't read it.
+- `MediaLayerDefault = true` shows the media and brightness keys without fn, and F1–F12 with fn
+  held; `false` the other way round.
+- `PrimaryLayerKeys` (F-keys) and `MediaLayerKeys` are the two rows of keys; the file's comments
+  explain each setting. A setting left out takes tiny-dfr's own default.
+- TarisOS's settings, which the file starts from, are `/usr/share/taris/tiny-dfr/config.toml`
+  (read-only): copy from there to undo a change.
+- No owner yet (a machine set up before this), or another account takes it over:
+  `sudo /usr/lib/taris/touchbar-owner <account>` hands the settings to that account and links them
+  into its `~/.config/taris/`. One set of settings applies to the whole machine and the login
+  screen.
 
 ## Troubleshooting
 

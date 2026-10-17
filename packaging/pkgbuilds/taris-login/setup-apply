@@ -98,6 +98,11 @@ for helper in ("/usr/lib/taris/user-defaults", "/usr/lib/taris/greeter-sync"):
     if os.access(helper, os.X_OK):
         subprocess.run(["runuser", "-u", user, "--", helper], env=env, cwd=home)
 
+# The Touch Bar's settings, this account's own (taris-hardware's touchbar-owner): the first
+# account is the machine's owner
+if os.access("/usr/lib/taris/touchbar-owner", os.X_OK):
+    subprocess.run(["/usr/lib/taris/touchbar-owner", user], stdout=subprocess.DEVNULL)
+
 os.remove(FLAG)
 # The apps that aren't in the image, installed in the background from now on, as the account logs
 # in (a failure, offline say, is tried again by taris-first-apps.timer)

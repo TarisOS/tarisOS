@@ -29,7 +29,9 @@ source=("$_tag-Makefile::$_raw/Makefile"
         "$_tag-trace.h::$_raw/trace.h"
         '0001-usb-typec-tipd-Track-data_status-changes-for-CD321x.patch'
         '0002-usb-typec-tipd-HACK-Use-drm-oob-hotplug-event.patch'
-        'dkms.conf')
+        'taris-notices.patch'
+        'dkms.conf'
+        'NOTICE')
 sha256sums=('04f8a20002ce8b7e0eac327a56539bf79a97cdce63f3a964a70c86307bf02a35'
             '3f581b0837bf24c085fb08db0043329b6d3043fc1c9f6b25b005f7e7bdba0a72'
             '6051ba21184915fc3399599655ed3fc8c71a4b0b57d3c8b6ebe32b21025ce9e1'
@@ -39,7 +41,9 @@ sha256sums=('04f8a20002ce8b7e0eac327a56539bf79a97cdce63f3a964a70c86307bf02a35'
             '21a469e23cf48152c31f61c0eea8723d43b650facb730bbb352193c73e27e4e6'
             '5526af5e4116b80bfe9f31a2ef6bc3d65ff7e444febc9d69f89232a06d0c8060'
             '5d8f9f10e6d7cd309af76ce23856b37832b74fc83399d998e7563f26cee24db8'
-            'bab4c5c96538dd2934381c7d5c6750dcf4c499562dc4b5eb38b1e3e46c7ef830')
+            '308097104b77fff8a113fbf2e7e058c4e343128c2b360e7705eb78781941b03f'
+            'bab4c5c96538dd2934381c7d5c6750dcf4c499562dc4b5eb38b1e3e46c7ef830'
+            '60482ad7e06a66935ce51e544bd06f6d82af00c4f7a809a46be7395787afad54')
 
 prepare() {
     local f
@@ -51,6 +55,8 @@ prepare() {
     # The commits are against the whole kernel tree (drivers/usb/typec/tipd/...)
     patch -d tipd -Np5 <0001-usb-typec-tipd-Track-data_status-changes-for-CD321x.patch
     patch -d tipd -Np5 <0002-usb-typec-tipd-HACK-Use-drm-oob-hotplug-event.patch
+    # The changed files say so (GPL-2.0 section 2a)
+    patch -d tipd -Np1 <taris-notices.patch
 }
 
 package() {
@@ -59,4 +65,7 @@ package() {
         return 1
     }
     install -Dm644 tipd/* dkms.conf -t "$pkgdir/usr/src/taris-tipd-$pkgver"
+    # What TarisOS changed, with the source and on its own
+    install -Dm644 NOTICE -t "$pkgdir/usr/src/taris-tipd-$pkgver"
+    install -Dm644 NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
 }

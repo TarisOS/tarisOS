@@ -1,0 +1,56 @@
+diff -ruN a/lib/ColorScheme.cpp b/lib/ColorScheme.cpp
+--- a/lib/ColorScheme.cpp
++++ b/lib/ColorScheme.cpp
+@@ -1,3 +1,4 @@
++/* Changed by TarisOS in 2026: https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/qmltermwidget-taris */
+ /*
+     This source file is part of Konsole, a terminal emulator.
+ 
+diff -ruN a/lib/Emulation.cpp b/lib/Emulation.cpp
+--- a/lib/Emulation.cpp
++++ b/lib/Emulation.cpp
+@@ -1,3 +1,4 @@
++/* Changed by TarisOS in 2026: https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/qmltermwidget-taris */
+ /*
+     Copyright 2007-2008 Robert Knight <robertknight@gmail.com>
+     Copyright 1997,1998 by Lars Doelle <lars.doelle@on-line.de>
+diff -ruN a/lib/Emulation.h b/lib/Emulation.h
+--- a/lib/Emulation.h
++++ b/lib/Emulation.h
+@@ -1,3 +1,4 @@
++/* Changed by TarisOS in 2026: https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/qmltermwidget-taris */
+ /*
+     This file is part of Konsole, an X terminal.
+ 
+diff -ruN a/lib/TerminalDisplay.cpp b/lib/TerminalDisplay.cpp
+--- a/lib/TerminalDisplay.cpp
++++ b/lib/TerminalDisplay.cpp
+@@ -1,3 +1,4 @@
++/* Changed by TarisOS in 2026: https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/qmltermwidget-taris */
+ /*
+     This file is part of Konsole, a terminal emulator for KDE.
+ 
+diff -ruN a/lib/TerminalDisplay.h b/lib/TerminalDisplay.h
+--- a/lib/TerminalDisplay.h
++++ b/lib/TerminalDisplay.h
+@@ -1,3 +1,4 @@
++/* Changed by TarisOS in 2026: https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/qmltermwidget-taris */
+ /*
+     Copyright 2007-2008 by Robert Knight <robertknight@gmail.com>
+     Copyright 1997,1998 by Lars Doelle <lars.doelle@on-line.de>
+diff -ruN a/lib/Vt102Emulation.cpp b/lib/Vt102Emulation.cpp
+--- a/lib/Vt102Emulation.cpp
++++ b/lib/Vt102Emulation.cpp
+@@ -1,3 +1,4 @@
++/* Changed by TarisOS in 2026: https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/qmltermwidget-taris */
+ /*
+     This file is part of Konsole, an X terminal.
+ 
+diff -ruN a/src/qmltermwidget_plugin.cpp b/src/qmltermwidget_plugin.cpp
+--- a/src/qmltermwidget_plugin.cpp
++++ b/src/qmltermwidget_plugin.cpp
+@@ -1,3 +1,4 @@
++/* Changed by TarisOS in 2026: https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/qmltermwidget-taris */
+ #include "qmltermwidget_plugin.h"
+ 
+ #include "TerminalDisplay.h"

@@ -20,7 +20,10 @@ updates reach installed machines and removing the package undoes it. The image i
   `taris-chromium`, the firewall in `taris-firewall`, everything through Tor (its own Tor, the
   rules that send everything to it, the time through it) in `taris-tor`, thumbnails that never
   outlive their files' contents in `taris-thumbnails`. Packages built only because Arch Linux ARM
-  lacks them sit next to them; `distro/config.sh` lists every package in build order.
+  lacks them sit next to them, and so do TarisOS's patched builds of other packages:
+  `quickshell-taris` beside Quickshell (in `/opt`), `tiny-dfr-taris` in place of Asahi's `tiny-dfr`
+  (`replaces`, so a full upgrade swaps it in), which has to stay at Asahi's version with their
+  patches moved along. `distro/config.sh` lists every package in build order.
 - System-wide defaults go where programs read them for every account (`/etc/xdg/...`,
   `/usr/share/taris/...`), not into home folders. Only what can't work that way goes into
   `user-defaults` (see [`upgrades.md`](upgrades.md)).
@@ -50,6 +53,21 @@ updates reach installed machines and removing the package undoes it. The image i
   they don't expect.
 - Raw `pacman`, `command -v` and `pacman-key` are fine in package and build tooling, where direct
   package-manager behaviour is the point.
+
+## Drivers built for one kernel
+
+`taris-tipd-dkms` and `taris-appledrm-dkms` carry Asahi's own driver source with TarisOS's patches,
+and DKMS builds them only for the kernel made from that source (`BUILD_EXCLUSIVE_KERNEL` in each
+`dkms.conf`). When `linux-asahi` moves to newer source, they're skipped for the new kernel and the
+kernel's own drivers load: the system keeps working, but the M1's USB-C display stays dark and a
+USB-C display unplugged while on breaks modesetting again until a restart. To move them:
+
+- set `_tag` and `pkgver` to the new source's tag, `PACKAGE_VERSION` and `BUILD_EXCLUSIVE_KERNEL`
+  in `dkms.conf` to match (the `package()` check refuses a mismatch);
+- `updpkgsums`, then check the patches still apply (`makepkg -o`); drop one that the new source
+  already has;
+- check `usb-c-display` (taris-hardware) against the new device trees: it leaves a tree it doesn't
+  recognise as it is and says so in pacman's output.
 
 ## Checks before handing over
 

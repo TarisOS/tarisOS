@@ -8,7 +8,7 @@
 
 pkgname=taris-desktop
 pkgver=1.0.0
-pkgrel=17
+pkgrel=18
 pkgdesc='TarisOS: the Hyprland desktop, its defaults and the system name'
 arch=('any')
 url='https://github.com/TarisOS/tarisOS'
@@ -37,6 +37,10 @@ depends=(
     'curl'
     'bash'
 
+    # Apps that run in a terminal (Neovim, Vim...) open in kitty from Files and the launcher too:
+    # GLib only knows a few terminals by name, and asks xdg-terminal-exec first (xdg-terminals.list)
+    'xdg-terminal-exec'
+
     # The title bar plugin, built for each Hyprland installed
     'jq'
     'make'
@@ -49,7 +53,7 @@ optdepends=(
     'chromium: the browser, and the web apps'
 )
 install=taris-desktop.install
-backup=('etc/xdg/kitty/kitty.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/xdg-desktop-portal/hyprland-portals.conf' 'etc/default/grub.d/taris-name.cfg' 'etc/mpv/mpv.conf')
+backup=('etc/xdg/kitty/kitty.conf' 'etc/xdg/mimeapps.list' 'etc/xdg/xdg-terminals.list' 'etc/xdg/xdg-desktop-portal/hyprland-portals.conf' 'etc/default/grub.d/taris-name.cfg' 'etc/mpv/mpv.conf')
 source=(
     'user-defaults'
     'name-system'
@@ -62,6 +66,7 @@ source=(
     'skel-hyprland.lua'
     'bashrc'
     'mimeapps.list'
+    'xdg-terminals.list'
     'update'
     'install-on-demand'
     'taris-install-code.desktop'
@@ -93,8 +98,9 @@ source=(
     'taris-logind.hook'
     'fuse-sleep'
     'taris-fuse-resume.service'
+    'agent-setup'
 )
-sha256sums=('fc6a262fc78bb184a12a713142f0816e9bbe61e1e3829670a705df3c8968b6ed'
+sha256sums=('9a89963ad0aa6c66b24702f4d3610e3dbef48ae1fa97bea2c725aaec2d0dbe0a'
             '0c6982fcab9703ec3cc44de107f16c9ee37714c98099eb692760162317771196'
             'a4e539f03826bb696f5f91c468fc194bc5ff13943deb5f28d429dc5ed8dd0eb5'
             '6c921e5153cd6471d96e7214ef5cd56b2c555113ad786352feefe43080c818dd'
@@ -105,6 +111,7 @@ sha256sums=('fc6a262fc78bb184a12a713142f0816e9bbe61e1e3829670a705df3c8968b6ed'
             '1a7f147c8ac153ec944b5cbb47ef3eebdbb7150d3aaec192568ec5cf9d8c62f6'
             '5e544b3017a0141369f0ebe8f524a58909482c16d5c47045b1c10660811c9fda'
             'b838524eb391a1e2d39d2f65292f4afc301c24dcbde3ef69ee0e2473eea815c2'
+            'c03b77915598b512ee4a05b4f5fdebe5fdecede34fb001bee705aabd51ae03e0'
             'e2091234f748fae23b2667396ef52257fb6ac52af2e39dead8f1dede05f0862d'
             '2336dff308e2ed89556d95289e263039600d4676fdc0141e4d34d67c5c91f852'
             'bf5f4b47666951f19259d91d703538ab0c35e31fbfd9acacb8ad0cade8deb6af'
@@ -135,7 +142,8 @@ sha256sums=('fc6a262fc78bb184a12a713142f0816e9bbe61e1e3829670a705df3c8968b6ed'
             '5f8eae0f5e43d87e5c169afea72e159134126fa044be486542e2e402428d4c13'
             'a819e7b7e13d02682dca89cb1754cf7098ab0be2dfd5360cad9d90b33b125977'
             '888719e5366b8938c937268c40185977b1b0dcc2f4ca1cf7b066641b67089995'
-            '558851ddd3b3597a3027bff48818bc46888fd021dbd77ec83a1b59b87e467593')
+            '558851ddd3b3597a3027bff48818bc46888fd021dbd77ec83a1b59b87e467593'
+            '7fbd249280844dfaffce3b0894afc5781efea4e8620fb9ed1cf7faa784f1bf53')
 
 # This repository's packaging folder (the Hyprland config, defaults, agent skills, title bars)
 _packaging="${TARIS_PACKAGING:-$startdir/../..}"
@@ -148,7 +156,7 @@ package() {
     # A new account's picture until its owner picks one
     install -Dm644 "$_packaging/defaults/logo/face.png" "$pkgdir/etc/skel/.face"
 
-    install -Dm755 user-defaults name-system update install-on-demand input-method mirrors nordvpn-setup -t "$pkgdir/usr/lib/taris"
+    install -Dm755 user-defaults name-system update install-on-demand input-method mirrors nordvpn-setup agent-setup -t "$pkgdir/usr/lib/taris"
     # Apps installed the first time they're opened: VSCodium, Steam, OBS Studio, LibreOffice,
     # Firefox and NordVPN (whose service and group are set up when it's installed)
     install -Dm644 taris-install-*.desktop -t "$pkgdir/usr/share/applications"
@@ -206,6 +214,7 @@ package() {
 
     install -Dm644 hyprland-portals.conf "$pkgdir/etc/xdg/xdg-desktop-portal/hyprland-portals.conf"
     install -Dm644 mimeapps.list "$pkgdir/etc/xdg/mimeapps.list"
+    install -Dm644 xdg-terminals.list "$pkgdir/etc/xdg/xdg-terminals.list"
     install -Dm644 kitty.conf "$pkgdir/etc/xdg/kitty/kitty.conf"
     install -Dm644 mpv.conf "$pkgdir/etc/mpv/mpv.conf"
 
@@ -220,7 +229,9 @@ package() {
             "$pkgdir/usr/share/icons/hicolor/${size}x$size/apps/taris.png"
     done
 
-    # Instructions for coding agents, written for this system
+    # Instructions for coding agents, written for this system: the rules every session reads
+    # (agent-setup puts them in each agent's own file) and the skills
+    install -Dm644 "$_packaging/agents/rules.md" "$share/agent-rules.md"
     local skill file
     for skill in "$_packaging"/agents/skills/*/; do
         skill=$(basename "$skill")

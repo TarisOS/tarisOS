@@ -93,14 +93,18 @@ changes it for the account.
 
 ## Display/Monitors
 
-Prefer Taris's Displays page. By hand, in `user.lua`:
+Prefer Taris's Displays page (the displays skill), which keeps each monitor's settings for the
+monitor itself. By hand, in `user.lua`, match an external monitor by its description so the rule
+follows it to any port or adapter (the built-in display by its output, `eDP-1`):
 
 ```lua
 hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 2 })
-hl.monitor({ output = "HDMI-A-1", mode = "2560x1440@144", position = "auto", scale = 1 })
+hl.monitor({ output = "desc:<make model serial>", mode = "2560x1440@144", position = "auto",
+  scale = 1 })
 ```
 
-List monitors and supported modes: `hyprctl monitors all`
+`user.lua` loads last, so its rule wins over the Displays page for that monitor. List monitors,
+their descriptions and supported modes: `hyprctl monitors all`
 
 ## Window Rules
 

@@ -8,11 +8,13 @@ Deeper instructions for specific kinds of work live in `agents/skills/`. Read th
 - [`agents/skills/distro-image.md`](agents/skills/distro-image.md) - working under `distro/` (the package repository, the installer image, the macOS install command) and testing whole installs
 - [`agents/skills/visual-verification.md`](agents/skills/visual-verification.md) - verifying any change with a visual effect in the running UI
 - [`agents/skills/icons.md`](agents/skills/icons.md) - adding or changing icons, logos and brand marks
+- [`agents/skills/dev-machine.md`](agents/skills/dev-machine.md) - any work on a TarisOS development machine (`/etc/taris/dev-machine`): drafts first, testing on the machine, handing over
 
 # Working Rules
 
 These rules come before everything else in this file. You run on a user's own TarisOS install: the machine is their desktop, and the person you work with is that user.
 
+- On a TarisOS development machine (`/etc/taris/dev-machine`, from the `taris-dev` package), every change is drafted outside this repository first and comes into it only on the maintainer's explicit approval; a request worded as a change is a request for a draft. Follow [`agents/skills/dev-machine.md`](agents/skills/dev-machine.md).
 - Do exactly what is asked: nothing less, nothing more. Never add behaviour, restrictions or "while I'm here" changes nobody asked for. When something is unclear, ask, but first re-read the conversation: never ask what the user already answered.
 - No git commands at all (not even `git status`, `git log` or `git diff`) unless the user explicitly says so for that step. When asked to commit: atomic commits (one coherent change each), with succinct messages that describe the change.
 - Find causes from evidence before changing anything: logs (`taris shell -l`, `journalctl`), live state (`hyprctl -j clients`, `hyprctl getoption`), the source of Hyprland and Quickshell at the exact versions installed, and the user's screenshots and recordings. Do not ship guesses; say plainly when something is still unexplained.
@@ -32,6 +34,7 @@ Documentation is split by genre and audience:
 - `agents/skills/` - task procedure ("do this when doing X"), for anyone working on the codebase
 - `README.md` - the user manual and the build instructions, published; never codebase internals beyond the repository layout
 - `packaging/agents/skills/` - skills for the coding agents of TarisOS users (installed by `taris-desktop`): end-user customization of an installed system, never TarisOS development
+- `packaging/agents/rules.md` - the rules every session of those agents reads first (installed as `/usr/share/taris/agent-rules.md`, put in each agent's own instructions file by `/usr/lib/taris/agent-setup`); short, and an index of the skills, so keep its table in step with them
 
 # Style
 
@@ -76,6 +79,7 @@ Use these instead of reimplementing what they do:
 - `/usr/lib/taris/build-hyprbars [--check|--force]` - the title bar plugin for the installed Hyprland
 - `taris` (the CLI: `scheme`, `wallpaper`, `screenshot`, `record`, `shell`) and `taris-qs -c taris ipc call <target> <function>`
 - `notify-send -a TarisOS` for notifications from scripts
+- `/usr/lib/taris/agent-setup` - an account's coding agents: TarisOS's skills and rules where they look for them
 
 Commands installed by TarisOS's own packages and the default apps (`distro/image/scripts/40-taris.sh`) are runtime invariants. Invoke them directly; do not add defensive `command -v` checks around them. Check only for genuinely optional programs (`fprintd`, `wtype`, an agent the user hasn't installed) or code that can run before the packages are installed (`install.sh`, the image build).
 
@@ -97,10 +101,10 @@ There is no automated test suite yet. Until there is one, run the checks for the
 
 Run anything that touches an account's files against a throwaway home, never the user's (see [`agents/skills/upgrades.md`](agents/skills/upgrades.md)).
 
-Visual changes must be verified in the running UI in addition to these checks; follow [`agents/skills/visual-verification.md`](agents/skills/visual-verification.md). Whole-install changes (login, setup screen, encryption, factory reset, the image) need a fresh image; see [`agents/skills/distro-image.md`](agents/skills/distro-image.md).
+Visual changes must be verified in the running UI in addition to these checks; follow [`agents/skills/visual-verification.md`](agents/skills/visual-verification.md) (on a development machine the maintainer does this, never the agent: [`agents/skills/dev-machine.md`](agents/skills/dev-machine.md)). Whole-install changes (login, setup screen, encryption, factory reset, the image) need a fresh image; see [`agents/skills/distro-image.md`](agents/skills/distro-image.md).
 
 # Refresh Pattern
 
 - An account's Hyprland stub: `./install-hypr.sh` (keeps a backup of an existing `~/.config/hypr/hyprland.lua`).
-- An account's agent skills: `./install-agent-skills.sh`.
+- An account's agent skills and rules: `./install-agent-skills.sh` (runs `/usr/lib/taris/agent-setup`).
 - The shell and the desktop packages from this checkout on this machine: `./install.sh` (it restarts the shell: say so before running it).

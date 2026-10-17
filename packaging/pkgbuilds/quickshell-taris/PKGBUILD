@@ -11,7 +11,7 @@
 _pkgname=quickshell
 pkgname=quickshell-taris
 pkgver=0.3.2.r0.g4f508be
-pkgrel=3
+pkgrel=4
 pkgdesc='Quickshell (git) in /opt, used by the TarisOS shell'
 arch=(x86_64 aarch64)
 url='https://git.outfoxxed.me/quickshell/quickshell'
@@ -42,9 +42,11 @@ makedepends=(
   'git'
 )
 source=("$_pkgname::git+$url.git"
-        'taris-volume.patch')
+        'taris-volume.patch'
+        'NOTICE')
 sha256sums=('SKIP'
-            'b4c8b2d65aa6a98759a376e68e9e5c7884b3e96ceab18d3320effd5fe6792e91')
+            'b4c8b2d65aa6a98759a376e68e9e5c7884b3e96ceab18d3320effd5fe6792e91'
+            '29b7a3245bd5786a43b243522ebd7b0a90c6ddfd27c13c6d8b2ebd1673c7380a')
 
 _prefix=/opt/quickshell-taris
 
@@ -76,7 +78,7 @@ build() {
 package() {
   cd "$_pkgname"
   DESTDIR="$pkgdir" cmake --install build
-  install -Dm644 "LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"
+  install -Dm644 "LICENSE" "$srcdir/NOTICE" -t "$pkgdir/usr/share/licenses/$pkgname"
 
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/taris-qs" <<SH

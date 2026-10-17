@@ -1,0 +1,12 @@
+taris-appledrm-dkms
+
+The Apple display driver (drivers/gpu/drm/apple) from Asahi Linux's kernel source, tag
+asahi-7.1.13-3 (https://github.com/AsahiLinux/linux), by the Asahi Linux contributors. Licensed
+under the GNU General Public License version 2; most of its files may also be used under the MIT
+licence, as their SPDX lines say.
+
+Changed by TarisOS (https://github.com/TarisOS/tarisOS) in 2026, in
+0001-drm-apple-a-late-clear-swap-at-power-off-is-not-a-DCP-crash.patch (Christian Bartels's fix):
+a USB-C display unplugged while on no longer leaves the display processor marked as crashed.
+iomfb_template.c, the file it changes, says so near its top (taris-notices.patch). Both patches
+are in TarisOS's source, packaging/pkgbuilds/taris-appledrm-dkms.

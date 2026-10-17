@@ -58,7 +58,7 @@ PageBase {
 
     // A saved theme's swatches: its own colours, else its scheme's
     function themeSwatches(theme: var): list<color> {
-        const own = Launcher.Schemes.list.find(s => s.name === theme.scheme && s.flavour === theme.flavour)?.colours ?? {};
+        const own = Launcher.Schemes.list.find(s => !s.theme && s.name === theme.scheme && s.flavour === theme.flavour)?.colours ?? {};
         return ["primary", "secondary", "tertiary", "surface"].map(k => `#${theme.colours?.[k] ?? own[k] ?? "000000"}`);
     }
 
@@ -127,7 +127,8 @@ PageBase {
             }
 
             Repeater {
-                model: Launcher.Schemes.list.filter(s => s.name !== "dynamic")
+                // The schemes, without the saved themes the launcher lists with them
+                model: Launcher.Schemes.list.filter(s => !s.theme && s.name !== "dynamic")
 
                 SchemeCard {
                     required property var modelData

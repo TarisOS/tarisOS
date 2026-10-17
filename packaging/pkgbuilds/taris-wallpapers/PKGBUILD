@@ -3,18 +3,22 @@
 
 # TarisOS's wallpapers (this repository's packaging/wallpapers: numbered WebP files sized to cover
 # a 2560x1600 screen). Each account's wallpaper folder links to them (taris-desktop's
-# user-defaults).
+# user-defaults). They're other people's work, from wallhaven and Omarchy, whose artists couldn't
+# be found: not under TarisOS's licence (NOTICE).
 
 pkgname=taris-wallpapers
 pkgver=1.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc='TarisOS: wallpapers'
 arch=('any')
 url='https://github.com/TarisOS/tarisOS'
-license=('GPL-3.0-only')
+license=('LicenseRef-unknown-artists')
+source=('NOTICE')
+sha256sums=('72e3fa9527bb76d67162438ca877919dea510a32572ccd73ba2e4cf8d8022934')
 
 _packaging="${TARIS_PACKAGING:-$startdir/../..}"
 
 package() {
     install -Dm644 "$_packaging"/wallpapers/*.webp -t "$pkgdir/usr/share/backgrounds/taris"
+    install -Dm644 NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
 }

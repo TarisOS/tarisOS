@@ -1,0 +1,15 @@
+#!/usr/bin/nft -f
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The administrator's own firewall rules, added to the end of TarisOS's input chain (firewall.nft)
+# by taris-firewall.service, after it and apart from it: a mistake in them leaves only them out.
+# Each /etc/taris/firewall.d/*.nft holds rule lines of that chain, e.g. `tcp dport 22 accept`. An
+# empty folder adds nothing. Check them with `nft -c -f /usr/share/taris/firewall-user.nft`, apply
+# them with `systemctl reload taris-firewall`.
+
+table inet taris_firewall {
+	chain input {
+		include "/etc/taris/firewall.d/*.nft"
+	}
+}

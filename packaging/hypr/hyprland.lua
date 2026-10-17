@@ -89,7 +89,9 @@ hl.config({
     -- while typing. Settings > Keyboard & trackpad turns tapping back on.
     touchpad = { natural_scroll = true, tap_to_click = false, disable_while_typing = true, clickfinger_behavior = true },
   },
-  misc = { disable_hyprland_logo = true, disable_splash_rendering = true },
+  -- A window asking to come forward gets focus and its workspace shown: an app already open when a
+  -- file or link is opened with it (Files' Open with, a link in another app)
+  misc = { disable_hyprland_logo = true, disable_splash_rendering = true, focus_on_activate = true },
   -- X11 apps draw at the screen's full resolution, not at 1x enlarged (pixelated: Steam). They
   -- scale themselves: GTK by GDK_SCALE, Steam by its own Settings > Accessibility scale
   xwayland = { force_zero_scaling = true },

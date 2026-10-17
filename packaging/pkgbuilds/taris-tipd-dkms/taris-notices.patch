@@ -1,0 +1,18 @@
+diff -ruN a/core.c b/core.c
+--- a/core.c
++++ b/core.c
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: GPL-2.0
++/* Changed by TarisOS in 2026 (Janne Grunau's DisplayPort alt-mode commits from Asahi Linux): https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/taris-tipd-dkms */
+ /*
+  * Driver for TI TPS6598x USB Power Delivery controller family
+  *
+diff -ruN a/tps6598x.h b/tps6598x.h
+--- a/tps6598x.h
++++ b/tps6598x.h
+@@ -1,4 +1,5 @@
+ /* SPDX-License-Identifier: GPL-2.0+ */
++/* Changed by TarisOS in 2026 (Janne Grunau's DisplayPort alt-mode commits from Asahi Linux): https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/taris-tipd-dkms */
+ /*
+  * Driver for TI TPS6598x USB Power Delivery controller family
+  *

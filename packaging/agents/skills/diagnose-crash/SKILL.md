@@ -10,6 +10,9 @@ description: >
 
 # Diagnosing a Crash
 
+On a TarisOS development machine (`/etc/taris/dev-machine`), the development rules
+(`/usr/share/taris/agent-rules-dev.md`) take precedence over this skill wherever they disagree.
+
 Work from evidence. The goal is an honest account of what happened, not a
 plausible-sounding story.
 

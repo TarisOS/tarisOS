@@ -14,22 +14,28 @@ pkgname=qmltermwidget-taris
 _pkgname=qmltermwidget
 _commit=ce8e09ad4daeb9fe59b60d6b228b0f7cf4055e16
 pkgver=2.0.0.git1
-pkgrel=5
+pkgrel=6
 pkgdesc='QML port of qtermwidget, patched for the TarisOS shell'
 arch=('x86_64' 'aarch64')
 url='https://github.com/Swordfish90/qmltermwidget'
-license=('GPL-2.0-only')
+license=('GPL-2.0-or-later' 'LGPL-2.0-or-later' 'LGPL-2.1-or-later' 'BSD-3-Clause')
 depends=('qt6-declarative')
 provides=("$_pkgname=$pkgver")
 conflicts=("$_pkgname")
 source=("$_pkgname-$_commit.tar.gz::https://github.com/Swordfish90/qmltermwidget/archive/$_commit.tar.gz"
-        'taris.patch')
+        'taris.patch'
+        'taris-notices.patch'
+        'NOTICE')
 sha256sums=('928b7791269f275d953ef0a38d14d1b7196654812243e9cf7b03975b12022c76'
-            '74e9cdab99e1e0ab9ab41be259d070a78570987358a788c3d5950f9edd8068a7')
+            '74e9cdab99e1e0ab9ab41be259d070a78570987358a788c3d5950f9edd8068a7'
+            'e30c9fbcaaaa542ff84b1d2a6225dcedd3cd714f6833e3448b0bc2113fc0b030'
+            'bbec063ede5aecb86ec9890862e57938ba5dccb4d720b14b27517532c74f6a28')
 
 prepare() {
   cd "$_pkgname-$_commit"
   patch -Np1 -i ../taris.patch
+  # Each changed file says so (GPL-2.0 section 2a)
+  patch -Np1 -i ../taris-notices.patch
 }
 
 build() {
@@ -41,4 +47,7 @@ build() {
 package() {
   cd "$_pkgname-$_commit"
   make INSTALL_ROOT="$pkgdir" install -j1
+  # Its licences, and what TarisOS changed
+  install -Dm644 LICENSE LICENSE.LGPL2+ LICENSE.BSD-3-clause COPYING-CMAKE-SCRIPTS "$srcdir/NOTICE" \
+    -t "$pkgdir/usr/share/licenses/$pkgname"
 }
