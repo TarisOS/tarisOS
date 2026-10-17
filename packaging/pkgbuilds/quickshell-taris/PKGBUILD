@@ -10,8 +10,8 @@
 
 _pkgname=quickshell
 pkgname=quickshell-taris
-pkgver=0.3.2.r0.g4f508be
-pkgrel=4
+pkgver=0.3.2.r7.g2b4501a
+pkgrel=1
 pkgdesc='Quickshell (git) in /opt, used by the TarisOS shell'
 arch=(x86_64 aarch64)
 url='https://git.outfoxxed.me/quickshell/quickshell'
