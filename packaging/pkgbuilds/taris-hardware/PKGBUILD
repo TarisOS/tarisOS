@@ -7,7 +7,7 @@
 
 pkgname=taris-hardware
 pkgver=1.0.0
-pkgrel=7
+pkgrel=8
 pkgdesc='TarisOS: Apple Silicon hardware support and fixes'
 arch=('aarch64')
 url='https://github.com/TarisOS/tarisOS'
@@ -105,6 +105,8 @@ source=(
     'update-m1n1'
     'taris-usb-c-display.conf'
     'touchbar-owner'
+    '50-taris-power.conf'
+    '50-taris-audit.conf'
 )
 sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '73fdc58084b4892dcd508aa35ee60222220d035b2e87f511fbd93d90cf723534'
@@ -134,7 +136,9 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             'ad75d3f06a142c4ad40123b0feee3ef3b9acaf83f81ca9c678ec4ff0f2f5ee38'
             'b55a8b1dfce72363c87b65bc2fd8f8edb6825fd88c0c22a3ce333431018eaea3'
             '090a6517f6fd6c51f42b391fad5a94cd42d769db0be895fd412e860cc361c4bb'
-            '1a0a35641d5649cb100ec7bb58a754c865ea70f0373076f3bf313f7cee683dfe')
+            '1a0a35641d5649cb100ec7bb58a754c865ea70f0373076f3bf313f7cee683dfe'
+            'bc51bf0f148b7b9539540c5f79d7b3d99ffa69f4e2283472a974a762a5fe1523'
+            'eb89233a9f383fe1d62e4ea67e2355102ae80c673158c514193baacb8dbcdb48')
 
 package() {
     install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/50-taris.conf"
@@ -143,6 +147,11 @@ package() {
     install -Dm644 grub-background.png "$pkgdir/usr/share/taris/grub-background.png"
     install -Dm644 taris-initramfs.hook "$pkgdir/usr/share/libalpm/hooks/90-taris-initramfs.hook"
     install -Dm644 taris-grub.hook "$pkgdir/usr/share/libalpm/hooks/91-taris-grub.hook"
+
+    # Power: real-time threads without full boost and no proactive compaction (systemd's sysctl
+    # hook applies them as soon as they're installed); no kernel auditing (from the next boot)
+    install -Dm644 50-taris-power.conf -t "$pkgdir/usr/lib/sysctl.d"
+    install -Dm644 50-taris-audit.conf -t "$pkgdir/usr/lib/systemd/journald.conf.d"
 
     install -Dm755 wifi-resume "$pkgdir/usr/lib/taris/wifi-resume"
     install -Dm755 regdom "$pkgdir/usr/lib/taris/regdom"

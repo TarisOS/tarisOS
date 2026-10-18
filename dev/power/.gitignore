@@ -1,0 +1,10 @@
+# Measurements and builds made on the machine: never part of the repository
+results/
+smc-keys/*.ko
+smc-keys/*.o
+smc-keys/*.mod
+smc-keys/*.mod.c
+smc-keys/.*.cmd
+smc-keys/modules.order
+smc-keys/Module.symvers
+stage2/tools/syscall-bench
