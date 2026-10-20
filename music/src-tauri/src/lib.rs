@@ -3905,6 +3905,88 @@ fn discord_rpc_clear(
     Ok(())
 }
 
+/**
+ * The port the release build serves its interface on, the same on every launch.
+ *
+ * The page's origin is `http://localhost:<port>`, and WebKit keeps local storage per origin: a
+ * port picked at random on each launch gave every launch a new, empty store. What the app saved
+ * there (the session, play history, its own settings) never came back, and each launch left its
+ * database behind — hundreds of MB after a few weeks. If something else holds this port, the
+ * launch falls back to a random one, and to an empty store, rather than not starting.
+ */
+#[cfg(not(debug_assertions))]
+const LOCAL_PORT: u16 = 47821;
+
+#[cfg(not(debug_assertions))]
+fn local_port() -> u16 {
+    if portpicker::is_free(LOCAL_PORT) {
+        return LOCAL_PORT;
+    }
+    eprintln!("[internal][tauri][warn] localhost port {LOCAL_PORT} is in use, using a random one");
+    pick_unused_port().expect("failed to find an unused localhost port")
+}
+
+/**
+ * Moves the newest store of the random-port launches to `LOCAL_PORT`'s origin, once, before
+ * WebKit opens it: what the last launch saved carries over to the fixed origin. The older stores
+ * are left as they are.
+ *
+ * WebKit keeps an origin's local storage in `<app data>/localstorage/<scheme>_<host>_<port>
+ * .localstorage`, an SQLite database with `-wal` and `-shm` beside it; the newest data can be in
+ * the `-wal`, so the three move together and age is the newest of their times.
+ */
+#[cfg(not(debug_assertions))]
+fn adopt_newest_local_storage(identifier: &str) {
+    let Some(data_home) = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+    else {
+        return;
+    };
+    let dir = data_home.join(identifier).join("localstorage");
+    let target = dir.join(format!("http_localhost_{LOCAL_PORT}.localstorage"));
+    if target.exists() {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(&dir) else { return };
+
+    let modified = |path: &Path| fs::metadata(path).and_then(|meta| meta.modified()).ok();
+    let newest = entries
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .and_then(|name| name.strip_prefix("http_localhost_"))
+                .and_then(|rest| rest.strip_suffix(".localstorage"))
+                .is_some_and(|port| !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()))
+        })
+        .filter_map(|path| {
+            let wal = PathBuf::from(format!("{}-wal", path.display()));
+            let time = modified(&path).max(modified(&wal))?;
+            Some((time, path))
+        })
+        .max_by_key(|(time, _)| *time);
+    let Some((_, source)) = newest else { return };
+
+    for suffix in ["", "-wal", "-shm"] {
+        let from = PathBuf::from(format!("{}{suffix}", source.display()));
+        let to = PathBuf::from(format!("{}{suffix}", target.display()));
+        if from.exists() {
+            if let Err(error) = fs::rename(&from, &to) {
+                eprintln!(
+                    "[internal][tauri][warn] failed to move local storage from={} error={error}",
+                    from.display()
+                );
+                return;
+            }
+        }
+    }
+    eprintln!(
+        "[internal][tauri][info] local storage moved to the fixed origin from={}",
+        source.display()
+    );
+}
+
 pub fn run() {
     // Initialize Discord RPC manager
     let discord_manager =
@@ -3938,7 +4020,10 @@ pub fn run() {
 
     #[cfg(not(debug_assertions))]
     {
-        let port = pick_unused_port().expect("failed to find an unused localhost port");
+        let port = local_port();
+        if port == LOCAL_PORT {
+            adopt_newest_local_storage(&context.config().identifier);
+        }
         let url: url::Url = format!("http://localhost:{}", port)
             .parse()
             .expect("failed to parse localhost url");

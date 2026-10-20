@@ -18,11 +18,14 @@
  */
 
 use std::io::{self, Read, Seek, SeekFrom};
+use std::num::NonZero;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use rodio::stream::{DeviceSinkBuilder, MixerDeviceSink};
+use rodio::cpal::traits::StreamTrait;
+use rodio::cpal::{BufferSize, Sample as CpalSample, SampleFormat, StreamConfig};
+use rodio::mixer::{Mixer, MixerSource};
 use rodio::{DeviceTrait, Player, Source};
 use serde::Serialize;
 use symphonia::core::io::MediaSource;
@@ -39,6 +42,19 @@ const TICK: Duration = Duration::from_millis(250);
 /// Ramp granularity during a crossfade. 50 steps a second is well below what the ear resolves
 /// as stepping, and the thread is otherwise idle.
 const FADE_STEP: Duration = Duration::from_millis(20);
+
+/**
+ * How long the output keeps running after the last command with nothing playing, before it
+ * pauses (see `Output`).
+ *
+ * Not at once: rodio applies a deck's controls only while the output pulls samples, and some of
+ * its calls wait for that — `try_seek`, and `append` after a `stop` — so a pause right away
+ * would leave a stop unapplied for the next load to wait on. Every command wakes the output
+ * first for the same reason. By the end of this, the stream's buffer holds only the silence the
+ * idle mixer gave it, so whatever plays next does not start with a stale scrap of the last track.
+ * Between tracks and through a short pause nothing changes.
+ */
+const OUTPUT_IDLE_GRACE: Duration = Duration::from_secs(5);
 
 /// How long a decoder read waits for bytes that have not landed yet before giving up.
 const READ_TIMEOUT: Duration = Duration::from_secs(20);
@@ -546,6 +562,188 @@ fn our_sink_input_id() -> Option<u64> {
 }
 
 /**
+ * rodio's mixer behind a cpal stream this module holds, so the output can stop while nothing
+ * plays.
+ *
+ * rodio's own `MixerDeviceSink` keeps its stream private and never stops it: once opened, it
+ * pulls silence from an idle mixer until the app quits, and the sound server keeps the whole
+ * output path running for it. On a MacBook's speakers that is the DSP chain, the speaker
+ * protection daemon's sense stream and the amplifiers — paused, on the YouTube engine, or
+ * sitting on a finished track. Paused here, the server suspends the device after its idle
+ * timeout; played again, the decks carry on from where they were.
+ *
+ * Opening follows rodio's `DeviceSinkBuilder` (0.22) step for step, so which device and
+ * configuration a machine ends up with does not change.
+ */
+struct Output {
+    mixer: Mixer,
+    stream: rodio::cpal::Stream,
+    running: bool,
+}
+
+impl Output {
+    fn mixer(&self) -> &Mixer {
+        &self.mixer
+    }
+
+    /// Plays or pauses the stream; a no-op when it is already in that state.
+    fn set_running(&mut self, running: bool) {
+        if running == self.running {
+            return;
+        }
+        let result = if running {
+            self.stream.play().map_err(|error| error.to_string())
+        } else {
+            self.stream.pause().map_err(|error| error.to_string())
+        };
+        match result {
+            Ok(()) => self.running = running,
+            Err(error) => {
+                eprintln!(
+                    "[internal][tauri][warn] native audio output {} failed: {error}",
+                    if running { "play" } else { "pause" }
+                );
+                // A stream that will not pause just keeps running, as it always did; counting
+                // it as paused keeps the engine from retrying in a loop. A failed play is
+                // retried with the next command or tick.
+                if !running {
+                    self.running = false;
+                }
+            }
+        }
+    }
+
+    /// The default device; failing that, the first other device that opens in any of its
+    /// configurations (rodio's `open_default_sink`).
+    fn open_default() -> Result<Self, String> {
+        use rodio::cpal::traits::HostTrait;
+
+        let host = rodio::cpal::default_host();
+        let first = match host.default_output_device() {
+            Some(device) => match Self::open(&device) {
+                Ok(output) => return Ok(output),
+                Err(error) => error,
+            },
+            None => "no default output device".to_string(),
+        };
+        if let Ok(devices) = host.output_devices() {
+            for device in devices {
+                if let Ok(output) = Self::open_with_fallback(&device) {
+                    return Ok(output);
+                }
+            }
+        }
+        Err(format!("no audio output device: {first}"))
+    }
+
+    /// The device's default configuration with about 50 ms of buffer (rodio's `from_device`
+    /// and `open_stream`).
+    fn open(device: &rodio::Device) -> Result<Self, String> {
+        let config = device
+            .default_output_config()
+            .map_err(|error| format!("no default output configuration: {error}"))?;
+        let buffer = nearest_power_of_two(config.sample_rate() / 20);
+        Self::open_config(device, &config, BufferSize::Fixed(buffer))
+    }
+
+    /// `open`, then each configuration the device supports (rodio's `open_sink_or_fallback`).
+    fn open_with_fallback(device: &rodio::Device) -> Result<Self, String> {
+        Self::open(device).or_else(|error| {
+            let configs = rodio::stream::supported_output_configs(device)
+                .map_err(|error| error.to_string())?;
+            for config in configs {
+                if let Ok(output) = Self::open_config(device, &config, BufferSize::Default) {
+                    return Ok(output);
+                }
+            }
+            Err(error)
+        })
+    }
+
+    fn open_config(
+        device: &rodio::Device,
+        config: &rodio::SupportedStreamConfig,
+        buffer_size: BufferSize,
+    ) -> Result<Self, String> {
+        let channels = NonZero::new(config.channels()).ok_or("no output channels")?;
+        let sample_rate = NonZero::new(config.sample_rate()).ok_or("no output sample rate")?;
+        let stream_config = StreamConfig {
+            channels: channels.get(),
+            sample_rate: sample_rate.get(),
+            buffer_size,
+        };
+        let (mixer, source) = rodio::mixer::mixer(channels, sample_rate);
+        let stream = build_output_stream(device, &stream_config, config.sample_format(), source)?;
+        stream
+            .play()
+            .map_err(|error| format!("failed to start audio output: {error}"))?;
+        Ok(Self { mixer, stream, running: true })
+    }
+}
+
+/// The cpal stream that feeds `samples` to `device`, converted to its sample format, silence
+/// when the mixer has nothing (rodio's `init_stream`).
+fn build_output_stream(
+    device: &rodio::Device,
+    config: &StreamConfig,
+    format: SampleFormat,
+    mut samples: MixerSource,
+) -> Result<rodio::cpal::Stream, String> {
+    macro_rules! build {
+        ($($format:ident, $sample:ty);+) => {
+            match format {
+                $(
+                    SampleFormat::$format => device.build_output_stream::<$sample, _, _>(
+                        config,
+                        move |data, _| {
+                            data.iter_mut().for_each(|out| {
+                                *out = samples
+                                    .next()
+                                    .map(<$sample as CpalSample>::from_sample)
+                                    .unwrap_or(<$sample as CpalSample>::EQUILIBRIUM)
+                            })
+                        },
+                        |error| eprintln!("audio stream error: {error}"),
+                        None,
+                    ),
+                )+
+                _ => return Err(format!("unsupported output sample format {format}")),
+            }
+        };
+    }
+
+    build!(
+        F32, f32;
+        F64, f64;
+        I8, i8;
+        I16, i16;
+        I24, rodio::cpal::I24;
+        I32, i32;
+        I64, i64;
+        U8, u8;
+        U16, u16;
+        U24, rodio::cpal::U24;
+        U32, u32;
+        U64, u64
+    )
+    .map_err(|error| format!("failed to open audio output: {error}"))
+}
+
+/// The power of two nearest `n` (rodio's buffer rounding).
+fn nearest_power_of_two(n: u32) -> u32 {
+    if n <= 1 {
+        return 1;
+    }
+    let next = n.next_power_of_two();
+    let prev = next >> 1;
+    if n - prev <= next - n {
+        prev
+    } else {
+        next
+    }
+}
+
+/**
  * Opens the sink for `id`, or the OS default when `id` is `None`.
  *
  * A device id that no longer resolves — unplugged, a saved choice from a machine that changed
@@ -553,13 +751,12 @@ fn our_sink_input_id() -> Option<u64> {
  * stored preference from weeks ago turning into silence the user has to notice and go fix in
  * settings, which is a worse failure than picking a device for them.
  */
-fn open_device_sink(id: Option<&str>) -> Result<MixerDeviceSink, String> {
+fn open_device_sink(id: Option<&str>) -> Result<Output, String> {
     #[cfg(target_os = "linux")]
     if let Some(sink_name) = id.and_then(|id| id.strip_prefix(PIPEWIRE_SINK_ID_PREFIX)) {
-        let stream = DeviceSinkBuilder::open_default_sink()
-            .map_err(|error| format!("no audio output device: {error}"))?;
+        let output = Output::open_default()?;
         move_our_stream_to_pipewire_sink(sink_name);
-        return Ok(stream);
+        return Ok(output);
     }
 
     let device = id.and_then(|id| {
@@ -574,11 +771,9 @@ fn open_device_sink(id: Option<&str>) -> Result<MixerDeviceSink, String> {
     });
 
     match device {
-        Some(device) => DeviceSinkBuilder::from_device(device)
-            .and_then(DeviceSinkBuilder::open_stream)
+        Some(device) => Output::open(&device)
             .map_err(|error| format!("failed to open audio output device: {error}")),
-        None => DeviceSinkBuilder::open_default_sink()
-            .map_err(|error| format!("no audio output device: {error}")),
+        None => Output::open_default(),
     }
 }
 
@@ -608,8 +803,8 @@ fn run(
     ready: Sender<Result<(), String>>,
     initial_device: Option<String>,
 ) {
-    let stream = match open_device_sink(initial_device.as_deref()) {
-        Ok(stream) => stream,
+    let output = match open_device_sink(initial_device.as_deref()) {
+        Ok(output) => output,
         Err(error) => {
             let _ = ready.send(Err(error));
             return;
@@ -617,13 +812,13 @@ fn run(
     };
     let decks = [
         Deck {
-            sink: Player::connect_new(stream.mixer()),
+            sink: Player::connect_new(output.mixer()),
             track_id: None,
             duration_sec: 0.0,
             health: None,
         },
         Deck {
-            sink: Player::connect_new(stream.mixer()),
+            sink: Player::connect_new(output.mixer()),
             track_id: None,
             duration_sec: 0.0,
             health: None,
@@ -635,7 +830,7 @@ fn run(
 
     let mut engine = Engine {
         app,
-        _stream: stream,
+        output,
         decks,
         active: 0,
         volume: 1.0,
@@ -643,6 +838,7 @@ fn run(
         rate: 1.0,
         playing: false,
         fade: None,
+        last_activity: Instant::now(),
     };
 
     if ready.send(Ok(())).is_err() {
@@ -653,10 +849,24 @@ fn run(
     loop {
         let now = Instant::now();
         let until_tick = next_tick.saturating_duration_since(now);
-        // A fade needs finer steps than the position tick, so whichever is due first wins.
-        let timeout = if engine.fade.is_some() { until_tick.min(FADE_STEP) } else { until_tick };
-
-        match rx.recv_timeout(timeout) {
+        /*
+         * A fade needs finer steps than the position tick, so whichever is due first wins. With
+         * no deck playing or fading, neither the position nor a fade can move: the thread waits
+         * for the next command, or for the output's pause while that is still to come, instead
+         * of waking four times a second to find nothing to do.
+         */
+        let timeout = if engine.fade.is_some() {
+            Some(until_tick.min(FADE_STEP))
+        } else if engine.is_active() {
+            Some(until_tick)
+        } else {
+            engine.until_output_pause()
+        };
+        let received = match timeout {
+            Some(timeout) => rx.recv_timeout(timeout),
+            None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
+        };
+        match received {
             Ok(command) => {
                 if engine.handle(command) {
                     return;
@@ -672,13 +882,14 @@ fn run(
             engine.tick();
             next_tick = Instant::now() + TICK;
         }
+        engine.update_output();
     }
 }
 
 struct Engine {
     app: AppHandle,
     /// Dropping this closes the output device, so it outlives every deck connected to it.
-    _stream: MixerDeviceSink,
+    output: Output,
     decks: [Deck; 2],
     active: usize,
     volume: f32,
@@ -686,6 +897,9 @@ struct Engine {
     rate: f32,
     playing: bool,
     fade: Option<Fade>,
+    /// The last command, or the last moment a deck played or faded: the start of the output's
+    /// idle grace (`OUTPUT_IDLE_GRACE`).
+    last_activity: Instant,
 }
 
 impl Engine {
@@ -703,6 +917,8 @@ impl Engine {
 
     /// Returns true when the thread should stop.
     fn handle(&mut self, command: Command) -> bool {
+        // Before anything touches a deck: see `OUTPUT_IDLE_GRACE`.
+        self.wake_output();
         match command {
             Command::Load {
                 track_id,
@@ -853,16 +1069,16 @@ impl Engine {
                 self.playing = false;
             }
             Command::SetOutputDevice { id, reply } => match open_device_sink(id.as_deref()) {
-                Ok(stream) => {
+                Ok(output) => {
                     let decks = [
                         Deck {
-                            sink: Player::connect_new(stream.mixer()),
+                            sink: Player::connect_new(output.mixer()),
                             track_id: None,
                             duration_sec: 0.0,
                             health: None,
                         },
                         Deck {
-                            sink: Player::connect_new(stream.mixer()),
+                            sink: Player::connect_new(output.mixer()),
                             track_id: None,
                             duration_sec: 0.0,
                             health: None,
@@ -875,7 +1091,7 @@ impl Engine {
                     // be stale — dropped rather than settled through `cancel_fade`, which would
                     // write a volume to a deck this is about to discard anyway.
                     self.fade = None;
-                    self._stream = stream;
+                    self.output = output;
                     self.decks = decks;
                     self.active = 0;
                     self.playing = false;
@@ -887,6 +1103,35 @@ impl Engine {
             },
         }
         false
+    }
+
+    /// Whether a deck is playing or a crossfade is running: the states that need the position
+    /// tick and the fade steps.
+    fn is_active(&self) -> bool {
+        self.playing || self.fade.is_some()
+    }
+
+    /// Runs the output and restarts its idle grace.
+    fn wake_output(&mut self) {
+        self.output.set_running(true);
+        self.last_activity = Instant::now();
+    }
+
+    /// Keeps the output running while a deck plays or fades, and pauses it once the idle grace
+    /// has passed, so the sound server can suspend the device (see `Output`).
+    fn update_output(&mut self) {
+        if self.is_active() {
+            self.wake_output();
+        } else if self.last_activity.elapsed() >= OUTPUT_IDLE_GRACE {
+            self.output.set_running(false);
+        }
+    }
+
+    /// How long until the idle output pauses; `None` once it has.
+    fn until_output_pause(&self) -> Option<Duration> {
+        self.output
+            .running
+            .then(|| OUTPUT_IDLE_GRACE.saturating_sub(self.last_activity.elapsed()))
     }
 
     fn cancel_fade(&mut self) {

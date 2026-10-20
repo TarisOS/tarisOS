@@ -8,6 +8,13 @@ import {
 
 const STORAGE_KEY = "paper-pc-mode";
 const CHANGE_EVENT = "paper-pc-mode-change";
+/**
+ * On unless switched off (TarisOS). Every effect it turns off costs GPU and CPU time on every
+ * frame it is shown, for looks alone, on what is usually a laptop on battery. Only reaches an
+ * install that has never stored the setting: the first launch of any version stores whatever
+ * it read, so an existing install keeps the default it started with.
+ */
+const DEFAULT_ENABLED = true;
 
 /*
  * Cached for the same reason as the render-effects snapshot: `useReduceMotion` reads this, and
@@ -18,7 +25,7 @@ const CHANGE_EVENT = "paper-pc-mode-change";
 let cached: boolean | null = null;
 
 export function readPaperPcMode() {
-  if (cached === null) cached = readLocalBooleanSetting(STORAGE_KEY, false);
+  if (cached === null) cached = readLocalBooleanSetting(STORAGE_KEY, DEFAULT_ENABLED);
   return cached;
 }
 
@@ -58,7 +65,7 @@ export function applyPaperPcMode(enabled = readPaperPcMode()) {
 }
 
 export async function hydratePaperPcMode() {
-  await hydrateLocalBooleanSetting(STORAGE_KEY, false, CHANGE_EVENT, applyPaperPcMode);
+  await hydrateLocalBooleanSetting(STORAGE_KEY, DEFAULT_ENABLED, CHANGE_EVENT, applyPaperPcMode);
   invalidate();
 }
 
@@ -71,5 +78,5 @@ export function setPaperPcMode(enabled: boolean) {
 }
 
 export function usePaperPcMode() {
-  return useSyncExternalStore(subscribe, readPaperPcMode, () => false);
+  return useSyncExternalStore(subscribe, readPaperPcMode, () => DEFAULT_ENABLED);
 }

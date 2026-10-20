@@ -105,7 +105,16 @@ check(
   `a stored list survives the migration, got "${readDisabledEffects().join(" ")}"`,
 );
 
+// Potato PC is on by default: a fresh install gets the same migration as one switched on.
 store.clear();
+await hydrateRenderEffects();
+check(
+  readDisabledEffects().length === RENDER_EFFECTS.length,
+  "a fresh install is on Potato PC and gets every effect disabled",
+);
+
+store.clear();
+store.set("paper-pc-mode", "false");
 await hydrateRenderEffects();
 check(readDisabledEffects().length === 0, "an install not on Potato PC is left alone");
 

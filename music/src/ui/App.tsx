@@ -45,7 +45,12 @@ import {
   usePlayerSelector,
   shallowEqual,
 } from "../player/playerStore";
-import { clearAppSession, loadAppSession, saveAppSession } from "../player/appSession";
+import {
+  clearAppSession,
+  loadAppSession,
+  saveAppSession,
+  savePlaybackPosition,
+} from "../player/appSession";
 import { useMediaSession } from "../player/useMediaSession";
 import { LastFmService } from "../player/LastFm";
 import { playerUIStore, usePlayerUIState } from "./stores/playerUIStore";
@@ -68,7 +73,7 @@ const LOADING_SCREEN_MAX_MS = 4000;
 const LOADING_SCREEN_MIN_MS = 1000;
 const MOUSE_BACK_BUTTON = 3;
 const MOUSE_FORWARD_BUTTON = 4;
-/** How often the session is written purely to keep the restored playback position fresh. */
+/** How often the playback position is written while playing, for a restore after a crash. */
 const SESSION_HEARTBEAT_MS = 5000;
 const SLEEP_RECOVERY_TIMER_INTERVAL_MS = 15000;
 const SLEEP_RECOVERY_TIMER_DRIFT_MS = 60000;
@@ -230,6 +235,10 @@ export default function App() {
       page: { ...stripNavigationHistory(pageRef.current), searchLoading: false },
       player: player.exportSession(),
     });
+  }, []);
+  const persistPlaybackPosition = useCallback(() => {
+    if (sessionPersistenceDisabledRef.current) return;
+    savePlaybackPosition(player.getState().currentTrack?.id, player.getCurrentTime());
   }, []);
 
   const isQueuePanelOpen = page.isQueueOpen ?? false;
@@ -446,7 +455,9 @@ export default function App() {
    * history into a multi-megabyte object graph, stringifying it and writing it synchronously,
    * for a field that only has to be roughly right.
    *
-   * At five seconds a hard kill costs at most five seconds of playback position.
+   * At five seconds a hard kill costs at most five seconds of playback position. It writes the
+   * position alone (`savePlaybackPosition`), not the session: rebuilding and stringifying the
+   * queue and history every five seconds wrote tens of KB each time to say where playback was.
    */
   useEffect(() => {
     /*
@@ -457,7 +468,7 @@ export default function App() {
      * every real change, and the teardown here still writes on the way out.
      */
     const intervalId = playerState.status === "playing"
-      ? window.setInterval(persistAppSession, SESSION_HEARTBEAT_MS)
+      ? window.setInterval(persistPlaybackPosition, SESSION_HEARTBEAT_MS)
       : 0;
     window.addEventListener("beforeunload", persistAppSession);
     return () => {
@@ -465,7 +476,7 @@ export default function App() {
       window.removeEventListener("beforeunload", persistAppSession);
       persistAppSession();
     };
-  }, [persistAppSession, playerState.status]);
+  }, [persistAppSession, persistPlaybackPosition, playerState.status]);
 
   useEffect(() => {
     persistAppSession();

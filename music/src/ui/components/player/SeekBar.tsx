@@ -1,3 +1,4 @@
+// Modified for TarisOS (Taris Music) by George Dobreff ("Witcher") and contributors, 2026.
 import { useEffect, useRef, useState } from "react";
 import { shallowEqual, usePlayerSelector } from "../../../player/playerStore";
 import { playerController } from "../../../player/playerStore";
@@ -32,10 +33,29 @@ const SEEK_SLIDER = [
  * 0.2s caps the player bar at ~5 renders/second instead of 60.
  */
 const TIME_COMMIT_THRESHOLD_S = 0.2;
-/** Poll period when playback is not advancing — see the frame loop below. */
+/**
+ * Poll period while playing: the commit threshold, so the bar and the readout move exactly as
+ * they did when the engine was asked every display frame — about 5 wake-ups a second instead
+ * of 60 or more.
+ */
+const PLAYING_POLL_MS = TIME_COMMIT_THRESHOLD_S * 1000;
+/** Poll period when playback is not advancing — see the poll loop below. */
 const IDLE_POLL_MS = 250;
 
 const formatTime = formatMinutesSeconds;
+/** The thumb's width in px (`size-3`): the slider maps its value onto the track minus that. */
+const THUMB_WIDTH_PX = 12;
+
+/** The slider's value under the pointer, as the native slider would place its thumb there. */
+function valueAtPointer(event: React.PointerEvent<HTMLInputElement>): number {
+  const input = event.currentTarget;
+  const rect = input.getBoundingClientRect();
+  const span = rect.width - THUMB_WIDTH_PX;
+  const ratio = span > 0 ? (event.clientX - rect.left - THUMB_WIDTH_PX / 2) / span : 0;
+  const min = Number(input.min) || 0;
+  const max = Number(input.max) || 0;
+  return min + Math.min(1, Math.max(0, ratio)) * (max - min);
+}
 
 export function SeekBar() {
   const state = usePlayerSelector(
@@ -102,17 +122,15 @@ export function SeekBar() {
   useEffect(() => () => cancelSeekAnimation(), []);
 
   /*
-   * Poll the engine on a frame loop, but only commit to state when the value moved enough to
-   * be visible. This used to setState on every frame, re-rendering the whole player bar 60
-   * times a second for a readout that shows whole seconds and a bar where one pixel is
-   * roughly a quarter of a second — about 55 of those 60 renders painted an identical frame.
+   * Poll the engine, but only commit to state when the value moved enough to be visible. This
+   * used to setState on every frame, re-rendering the whole player bar 60 times a second for a
+   * readout that shows whole seconds and a bar where one pixel is roughly a quarter of a
+   * second — about 55 of those 60 renders painted an identical frame.
    *
-   * The loop itself stays at rAF so a seek still lands on the very next frame; it is the
-   * commit that is gated. Seeks and drags bypass this entirely — they call setDisplayedTime
-   * directly, so they remain frame-accurate.
+   * Seeks and drags bypass this entirely — they call setDisplayedTime directly, so they remain
+   * frame-accurate; the poll only reconciles them with what the engine reports.
    */
   useEffect(() => {
-    let animationFrameId = 0;
     const tick = () => {
       if (!uiState.isSeeking) {
         const engineTime = playerController.getCurrentTime();
@@ -140,33 +158,29 @@ export function SeekBar() {
     };
 
     /*
-     * Frame-rate only while the time is actually moving.
+     * While the time is moving, one poll every PLAYING_POLL_MS, on a plain timer.
+     *
+     * It used to poll on every display frame: 60 or more wake-ups a second for commits that the
+     * threshold above lets through about 5 times a second. A frame per poll is no better: with
+     * one requested every 200 ms, WebKitGTK's display clock kept ticking 62 times a second and
+     * woke the page on each tick — with the window hidden on its workspace too, which WebKit
+     * still draws for. A timer does not touch the display clock.
      *
      * The loop used to run for the life of the component: paused, idle, errored, on a track
      * that had ended — sixty wake-ups a second asking the engine for a number that could not
-     * have changed. Playback still gets rAF so a seek lands on the very next frame.
-     *
-     * Everything else drops to 250ms rather than stopping outright. Polling is what reconciles
-     * a seek the engine has not reported yet and a duration that arrives after the track does,
-     * and both of those happen while paused; a one-shot pass would have to re-implement that
-     * reconciliation, where a slower poll just keeps it, at 4 wake-ups a second instead of 60.
+     * have changed. Everything but playback drops to 250ms rather than stopping outright.
+     * Polling is what reconciles a seek the engine has not reported yet and a duration that
+     * arrives after the track does, and both of those happen while paused; a one-shot pass
+     * would have to re-implement that reconciliation, where a slower poll just keeps it, at 4
+     * wake-ups a second instead of 60.
      */
-    let intervalId = 0;
-    if (state.status === "playing") {
-      const loop = () => {
-        tick();
-        animationFrameId = requestAnimationFrame(loop);
-      };
-      animationFrameId = requestAnimationFrame(loop);
-    } else {
-      tick();
-      intervalId = window.setInterval(tick, IDLE_POLL_MS);
-    }
+    tick();
+    const intervalId = window.setInterval(
+      tick,
+      state.status === "playing" ? PLAYING_POLL_MS : IDLE_POLL_MS,
+    );
 
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.clearInterval(intervalId);
-    };
+    return () => window.clearInterval(intervalId);
   }, [uiState.isSeeking, state.status]);
 
   const handleSeekStart = (event: React.PointerEvent<HTMLInputElement>) => {
@@ -178,18 +192,26 @@ export function SeekBar() {
     playerUIStore.setSeeking(true);
   };
 
+  /*
+   * A drag follows the pointer's position itself. The native slider does not follow a drag in
+   * WebKitGTK with the pointer captured to the input (a click jumped, a drag never moved), and
+   * the capture is what lets a release anywhere end the seek.
+   */
   const handleSeekMove = (event: React.PointerEvent<HTMLInputElement>) => {
-    if (!isPointerDownRef.current || isDraggingRef.current) return;
+    if (!isPointerDownRef.current) return;
 
-    const distance = Math.hypot(
-      event.clientX - pointerStartRef.current.x,
-      event.clientY - pointerStartRef.current.y,
-    );
-    if (distance < 3) return;
+    if (!isDraggingRef.current) {
+      const distance = Math.hypot(
+        event.clientX - pointerStartRef.current.x,
+        event.clientY - pointerStartRef.current.y,
+      );
+      if (distance < 3) return;
 
-    isDraggingRef.current = true;
-    cancelSeekAnimation();
-    const target = Number(event.currentTarget.value);
+      isDraggingRef.current = true;
+      cancelSeekAnimation();
+    }
+
+    const target = valueAtPointer(event);
     seekTargetRef.current = target;
     setDisplayedTime(target);
   };

@@ -1,0 +1,17 @@
+--- a/src/host/alsa/mod.rs
++++ b/src/host/alsa/mod.rs
+@@ -937,6 +937,14 @@
+ 
+     let revents = stream.channel.revents(&descriptors[1..])?;
+     if revents.contains(alsa::poll::Flags::ERR) {
++        // TarisOS: POLLERR signals an xrun, which avail() reports as EPIPE: recover through the
++        // XRun flow (prepare()), as cpal 0.18 does. Returning an error here never recovered, and
++        // pipewire-alsa keeps POLLERR raised until prepare(), so the worker spun at 100% CPU.
++        if let Err(err) = stream.channel.avail() {
++            if err.errno() == libc::EPIPE {
++                return Ok(PollDescriptorsFlow::XRun);
++            }
++        }
+         let description = String::from("`alsa::poll()` returned POLLERR");
+         return Err(BackendSpecificError { description });
+     }
