@@ -98,7 +98,7 @@ The Mac starts m1n1 (Asahi's boot loader), then U-Boot, GRUB and the kernel (`li
 - **m1n1:** its options (`display=`, `chosen.*`) in `/etc/m1n1.conf`, then `sudo update-m1n1`.
   `/etc/default/update-m1n1` is TarisOS's (it gives m1n1 the device trees with the M1's USB-C
   display): keep its lines when editing it.
-- **TarisOS's own drivers** (`taris-tipd-dkms`, `taris-appledrm-dkms`, for USB-C displays) are
-  built by DKMS for one kernel only. After a kernel update they may be skipped until TarisOS
-  updates them: the Mac works as usual, only the M1's USB-C display stays dark. `dkms status`
-  shows it.
+- **TarisOS's own drivers** (`taris-tipd-dkms`, `taris-appledrm-dkms` for USB-C displays,
+  `taris-brcmfmac-dkms` for the Wi-Fi's power saving) are built by DKMS for one kernel only. After
+  a kernel update they may be skipped until TarisOS updates them: the Mac works as usual, only the
+  M1's USB-C display stays dark and Wi-Fi uses a little more power. `dkms status` shows it.

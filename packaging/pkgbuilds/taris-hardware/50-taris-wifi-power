@@ -1,0 +1,15 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# NetworkManager dispatcher script: when a Wi-Fi interface comes up, the radio's wake time after
+# traffic is set to TarisOS's value (wifi-power-timeout). The kernel keeps it for the interface,
+# but an interface made again (the driver reloaded, e.g. by wifi-resume after a wake) starts from
+# the driver's 2 s, so it's set at every connection. Nothing changes while power saving is off.
+# The helper's message goes to stderr: NetworkManager's dispatcher parses stdout and logs stderr.
+# Run as root by NetworkManager-dispatcher at each network event.
+# Usage (by NetworkManager): 50-taris-wifi-power INTERFACE ACTION
+
+if [[ $2 == "up" && -d /sys/class/net/$1/wireless ]]; then
+	/usr/lib/taris/wifi-power-timeout "$1" >&2
+fi

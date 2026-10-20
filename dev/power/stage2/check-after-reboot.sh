@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 # After installing taris-hardware 1.0.0-8 (built from packaging/pkgbuilds/taris-hardware) and a
-# reboot: checks that the Stage 2 files took effect from boot (S1 and
+# reboot: checks that the Stage 2 changes took effect from boot (S1 and
 # S2's values, PipeWire's audio threads without boost, kcompactd quiet, kernel auditing off, no
 # journald complaints) and repeats the system-call timing of results/syscall-before-reboot.txt to
 # measure S3. Read-only: it changes nothing. Writes results/after-reboot-<time>.txt.
@@ -72,6 +72,17 @@ check() {
   check "kernel auditing (auditctl -s)" "enabled 0" "$(auditctl -s | grep -o '^enabled [0-9]*')"
   check "audit records this boot" 0 "$(journalctl -b -q -o cat _TRANSPORT=audit | wc -l)"
   check "journald warnings this boot" 0 "$(journalctl -b -q -p warning -u systemd-journald | wc -l)"
+
+  echo "S4, the Wi-Fi's wake time after traffic (wifi-power-timeout at each connection):"
+  check "helper installed" yes \
+    "$([[ -x /usr/lib/taris/wifi-power-timeout ]] && echo yes || echo no)"
+  check "dispatcher script installed" yes \
+    "$([[ -x /usr/lib/NetworkManager/dispatcher.d/50-taris-wifi-power ]] && echo yes || echo no)"
+  # The helper's own line, which the dispatcher logs from stderr; only when Wi-Fi is connected
+  if [[ $(</sys/class/net/wld0/operstate) == "up" ]]; then
+    check "set at this boot's connection" yes "$(journalctl -b -q -u NetworkManager-dispatcher \
+      -o cat | grep -q 'wld0: power saving on, awake for 200 ms' && echo yes || echo no)"
+  fi
 
   echo "System-call cost (ns per getppid, 5 runs of 20 million):"
   for c in 0 4; do

@@ -1,0 +1,13 @@
+taris-brcmfmac-dkms
+
+The Broadcom FullMAC Wi-Fi driver (drivers/net/wireless/broadcom/brcm80211/brcmfmac, with the
+headers of brcm80211/include) from Asahi Linux's kernel source, tag asahi-7.1.13-3
+(https://github.com/AsahiLinux/linux), by Broadcom Corporation, its other authors and the Asahi
+Linux contributors. Licensed under the ISC licence, as its files' SPDX lines say.
+
+Changed by TarisOS (https://github.com/TarisOS/tarisOS) in 2026, in
+0001-wifi-brcmfmac-pcie-BCM4378-L1-substates-only-while-the-firmware-runs.patch: the BCM4378's
+PCIe link uses ASPM L1.1 and L1.2 while its firmware runs, and they're switched off before every
+chip reset, so the firmware always starts with L1 alone, as at boot. pcie.c, the file it changes,
+says so near its top (taris-notices.patch). Both patches are in TarisOS's source,
+packaging/pkgbuilds/taris-brcmfmac-dkms.

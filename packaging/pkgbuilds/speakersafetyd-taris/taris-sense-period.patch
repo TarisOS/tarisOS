@@ -1,0 +1,52 @@
+TarisOS: the V/ISENSE capture stream is opened with one ALSA period per block of 'period' frames
+(4096 on the J293), the block the main loop reads and the thermal model runs on. Without it
+ALSA takes its smallest period (48 frames), and the blocking read of a block wakes at every one:
+about 1,000 wakeups a second, and as many DMA interrupts, while sound plays. The model, its
+limits, the read size and the unlock ping (once per block) are unchanged.
+
+--- a/src/helpers.rs
++++ b/src/helpers.rs
+@@ -15,7 +15,7 @@
+     ctldev
+ }
+ 
+-pub fn open_pcm(dev: &str, chans: u32, mut sample_rate: u32) -> alsa::pcm::PCM {
++pub fn open_pcm(dev: &str, chans: u32, mut sample_rate: u32, period: usize) -> alsa::pcm::PCM {
+     let pcm = alsa::pcm::PCM::new(dev, alsa::Direction::Capture, false).unwrap();
+     {
+         let params = alsa::pcm::HwParams::any(&pcm).unwrap();
+@@ -34,6 +34,14 @@
+             .unwrap();
+         params.set_format(alsa::pcm::Format::s16()).unwrap();
+         params.set_access(alsa::pcm::Access::RWInterleaved).unwrap();
++        // TarisOS: one ALSA period per block of `period` frames, the block the loop reads and the
++        // model runs on. Left unset, ALSA takes its smallest (48 frames), and the blocking read of
++        // a block wakes at every one of them: a thousand times a second while sound plays. If it
++        // can't be set, ALSA's own choice stays, as before.
++        match params.set_period_size_near(period as alsa::pcm::Frames, alsa::ValueOr::Nearest) {
++            Ok(p) => println!("PCM period: {} frames", p),
++            Err(e) => println!("PCM period: ALSA's own ({})", e),
++        }
+         pcm.hw_params(&params).unwrap();
+     }
+ 
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -198,7 +198,7 @@
+         let pcm_name = format!("{},{}", device, globals.visense_pcm);
+         // Set up PCM to buffer in V/ISENSE
+         let mut pcm: Option<alsa::pcm::PCM> =
+-            Some(helpers::open_pcm(&pcm_name, globals.channels.try_into().unwrap(), 0));
++            Some(helpers::open_pcm(&pcm_name, globals.channels.try_into().unwrap(), 0, globals.period));
+         let mut io = Some(pcm.as_ref().unwrap().io_i16().unwrap());
+ 
+         let mut sample_rate_elem = types::Elem::new(
+@@ -268,7 +268,7 @@
+                         warn!("Reinitializing PCM to work around kernel bug...");
+                         io = None;
+                         pcm = None;
+-                        pcm = Some(helpers::open_pcm(&pcm_name, globals.channels.try_into().unwrap(), 0));
++                        pcm = Some(helpers::open_pcm(&pcm_name, globals.channels.try_into().unwrap(), 0, globals.period));
+                         io = Some(pcm.as_ref().unwrap().io_i16().unwrap());
+                         continue;
+                     }

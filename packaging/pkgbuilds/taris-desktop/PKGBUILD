@@ -8,7 +8,7 @@
 
 pkgname=taris-desktop
 pkgver=1.0.0
-pkgrel=18
+pkgrel=19
 pkgdesc='TarisOS: the Hyprland desktop, its defaults and the system name'
 arch=('any')
 url='https://github.com/TarisOS/tarisOS'

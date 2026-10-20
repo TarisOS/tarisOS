@@ -74,8 +74,10 @@ for frames in 2048 256 128; do
     player=$!
     sleep 3
     "${as_user[@]}" pw-dump > "$dir/dump-$frames-$setting.json" 2>/dev/null
-    "${as_user[@]}" timeout 20 pw-profiler -o "$dir/prof-$frames-$setting.log" \
-      >/dev/null 2>&1 || true
+    # In the results folder: pw-profiler also writes its plot files (Timing*.plot, Timings.html,
+    # generate_timings.sh) into the folder it runs in
+    (cd "$dir" && "${as_user[@]}" timeout 20 pw-profiler -o "$dir/prof-$frames-$setting.log" \
+      >/dev/null 2>&1) || true
     stop_player
     echo "  $frames frames, $setting"
   done

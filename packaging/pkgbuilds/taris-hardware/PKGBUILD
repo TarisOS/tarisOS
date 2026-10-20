@@ -22,7 +22,8 @@ depends=(
     # Sound: the speakers stay muted without speakersafetyd and asahi-audio's DSP; PipeWire's
     # PulseAudio, ALSA and JACK servers for the apps, and its LV2 host for the DSP's plugins (the
     # other providers of jack and lv2-host are whole audio workstations); rtkit, or the DSP crackles
-    # under load; libmysofa's head (HRTF) for spatial audio on headphones
+    # under load; libmysofa's head (HRTF) for spatial audio on headphones; LSP's compressor and
+    # limiter for the MacBook Pro 13" speakers (spatial-audio.lua)
     'asahi-audio'
     'speakersafetyd'
     'pipewire'
@@ -34,6 +35,7 @@ depends=(
     'rtkit'
     'libpulse'
     'libmysofa'
+    'lsp-plugins-lv2'
 
     # Hardware video decoding (VA-API)
     'libva-v4l2-request-avd'
@@ -48,6 +50,10 @@ depends=(
 
     # ...and the display driver that survives a USB-C display being unplugged while on
     'taris-appledrm-dkms'
+
+    # The Wi-Fi driver that puts the M1 Wi-Fi's PCIe link in its deeper sleep states while the
+    # firmware runs
+    'taris-brcmfmac-dkms'
 
     # Wi-Fi (NetworkManager alone; its regulatory domain) and Bluetooth
     'networkmanager'
@@ -107,6 +113,9 @@ source=(
     'touchbar-owner'
     '50-taris-power.conf'
     '50-taris-audit.conf'
+    'wifi-power-timeout'
+    '50-taris-wifi-power'
+    '80-taris.preset'
 )
 sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '73fdc58084b4892dcd508aa35ee60222220d035b2e87f511fbd93d90cf723534'
@@ -114,8 +123,8 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             '228598905776948cb49db87193277a372bbc0a549110f79165b4db5dbdb16d39'
             'cf7f9e2afb0852de19ab7960599ec13917f7cfbd6dba8199332f4f4afd49da78'
             'b8301b5f8ba21adc8b0abbcc9e358eeb6d3df73ffcabb8d4111820d30b306240'
-            '0218bb690162b51d38e44728aba1746ff460573f93fe7c196389b442f4916b7d'
-            '3e12d6a1afcdec710b96038a5e7efa31e90e96631f3bf708ab04bd64f00a1be3'
+            'e72d521b7381c874189fa74e61eaa41af26688b00baa921901596632478d26e0'
+            '57228614c082b200a68c7fd96d79e17330c6291c8b6b7c02740b9543b3323bad'
             '193db0b33ad5ee5e457d64834fbfe53332e7f47fc06909f315dfa6db18de8b6e'
             '55fa0dbb27b3307a63afbda34f262bce832ce756b9c0d113c372408061471bb4'
             '7d28c751e2187ed207505c94504052b240f76bdc8e38d7d5b754460477845125'
@@ -127,7 +136,7 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             'a0ed3e66481179c48131f26fe688d60282485030900011f41f5356ae7c243d31'
             'e0edaf8862535caf67876b03d8e59856d9596d476d32a65a04d853b193d7089f'
             '3049a09d109802e520415b259fd49b3332e615c5e733880b0685bb07755f1497'
-            '0cee075b4bf62fed0cbab2dee9b25bdf2b9ff5e41ae4c27fe9504a95a8e91d39'
+            '34aaeea425d185ab76065a088db4a53892e9f41a3e586d0c6089fe324f69c98c'
             'a28b4da184f1f9bf5c291bfa7b7bcc7e9c11d48d588c9bee5f081bd34665e6b2'
             '2fcc2999fedcbdd2ede31efb65868faf71b9d2ebcf9bb3acf8f1c9575e8f3c72'
             '096b4d8128de9713d99f6cf814871e3b57e96bdf2c605a74ecdffaf6cc98e859'
@@ -137,8 +146,11 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
             'b55a8b1dfce72363c87b65bc2fd8f8edb6825fd88c0c22a3ce333431018eaea3'
             '090a6517f6fd6c51f42b391fad5a94cd42d769db0be895fd412e860cc361c4bb'
             '1a0a35641d5649cb100ec7bb58a754c865ea70f0373076f3bf313f7cee683dfe'
-            'bc51bf0f148b7b9539540c5f79d7b3d99ffa69f4e2283472a974a762a5fe1523'
-            'eb89233a9f383fe1d62e4ea67e2355102ae80c673158c514193baacb8dbcdb48')
+            '89c90add10d90f9af95e5e11d066375addc33991e871efa9b373d2044fcd5e93'
+            'eb89233a9f383fe1d62e4ea67e2355102ae80c673158c514193baacb8dbcdb48'
+            'c40b6d2c7b8711ded7c74b5dcf7f5b408e9a20acc90e2eac459034f40a3f23bc'
+            '0df4b6db4c22d76c1b2861fde070c08666c549a24a14beeb8b0fc26d988c5b48'
+            'fe36577c0dc5a1f7556d78bba16c7ced051e5a7a2d9b721a2d2cdb98d2134c70')
 
 package() {
     install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/50-taris.conf"
@@ -154,12 +166,20 @@ package() {
     install -Dm644 50-taris-audit.conf -t "$pkgdir/usr/lib/systemd/journald.conf.d"
 
     install -Dm755 wifi-resume "$pkgdir/usr/lib/taris/wifi-resume"
+    # The Wi-Fi radio's wake time after traffic (TarisOS's 200 ms instead of the driver's 2 s), at
+    # every connection
+    install -Dm755 wifi-power-timeout "$pkgdir/usr/lib/taris/wifi-power-timeout"
+    install -Dm755 50-taris-wifi-power -t "$pkgdir/usr/lib/NetworkManager/dispatcher.d"
+    # NetworkManager alone: systemd-networkd stays off, also at a new install's first boot
+    install -Dm644 80-taris.preset -t "$pkgdir/usr/lib/systemd/system-preset"
     install -Dm755 regdom "$pkgdir/usr/lib/taris/regdom"
     install -Dm644 taris-wifi-resume.service taris-regdom.service -t "$pkgdir/usr/lib/systemd/system"
     # On whenever installed (no enabling step to forget, nothing left behind when removed)
-    install -d "$pkgdir/usr/lib/systemd/system/suspend.target.wants" "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
-    ln -s ../taris-wifi-resume.service "$pkgdir/usr/lib/systemd/system/suspend.target.wants/taris-wifi-resume.service"
+    install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
     ln -s ../taris-regdom.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/taris-regdom.service"
+    # Wi-Fi's recovery after waking, started by systemd-sleep (wifi-resume post) as a job of its own
+    install -d "$pkgdir/usr/lib/systemd/system-sleep"
+    ln -s ../../../lib/taris/wifi-resume "$pkgdir/usr/lib/systemd/system-sleep/taris-wifi-resume"
 
     # The built-in microphone on both channels, with the user's PulseAudio server
     install -Dm755 mic "$pkgdir/usr/lib/taris/mic"
@@ -174,7 +194,8 @@ package() {
     install -Dm755 camera "$pkgdir/usr/lib/taris/camera"
     install -Dm644 50-taris-camera.rules -t "$pkgdir/usr/share/polkit-1/rules.d"
 
-    # Spatial audio: crosstalk cancellation on the speakers, virtual speakers on headphones
+    # Spatial audio: crosstalk cancellation on the speakers, virtual speakers on headphones; the
+    # MacBook Pro 13" speakers' compressor and limiter against clipping at full volume
     install -Dm644 spatial-audio.lua "$pkgdir/usr/share/wireplumber/scripts/taris/spatial-audio.lua"
     install -Dm644 99-taris-spatial-audio.conf -t "$pkgdir/usr/share/wireplumber/wireplumber.conf.d"
 

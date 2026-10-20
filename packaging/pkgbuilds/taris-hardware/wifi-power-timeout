@@ -1,0 +1,81 @@
+#!/usr/bin/python3 -I
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# How long the Wi-Fi radio stays awake after traffic before it dozes again, while power saving is
+# on. Without it the kernel leaves the choice to the driver (cfg80211's ps_timeout of -1), and the
+# Broadcom driver turns that into its maximum, 2 s (brcmfmac's pm2_sleep_ret), so any packet kept
+# the radio fully awake for two seconds. The timeout is set through the wireless extensions'
+# power call (SIOCSIWPOWER), which cfg80211 keeps for the interface: NetworkManager switching
+# power saving on again at each connection passes it on. It only lasts until the interface is
+# made again (e.g. the driver reloaded after a wake from sleep), hence the dispatcher script that
+# runs this at each connection. Nothing is changed while power saving is off.
+# TarisOS's value is 200 ms: on a MacBook Pro M1 with the desktop's own traffic it took 0.26 W
+# less than 2 s (and 500 ms 0.14 W less), the same in three alternating rounds. Bulk transfers
+# don't change (every packet starts the time again); the first packet to arrive after 200 ms of
+# quiet waits for the next beacon, up to ~100 ms, as it already did after 2 s.
+# Run as root: by NetworkManager's dispatcher (50-taris-wifi-power) and taris-hardware's install
+# script with TarisOS's value, or by hand with another one to measure.
+# Usage: wifi-power-timeout INTERFACE                (TarisOS's value)
+#        wifi-power-timeout INTERFACE MILLISECONDS   (10 to 2000)
+#        wifi-power-timeout INTERFACE default        (back to the driver's choice)
+
+import fcntl
+import os
+import re
+import socket
+import struct
+import sys
+
+SIOCSIWPOWER = 0x8B2C
+SIOCGIWPOWER = 0x8B2D
+IW_POWER_TIMEOUT = 0x2000
+
+# struct iwreq: the interface name (IFNAMSIZ 16), then union iwreq_data (16 bytes) whose power
+# member is struct iw_param { __s32 value; __u8 fixed; __u8 disabled; __u16 flags; }
+IWREQ = "=16siBBH8x"
+
+TARIS_MS = 200
+
+
+def usage():
+    print("Usage: wifi-power-timeout INTERFACE [MILLISECONDS|default]", file=sys.stderr)
+    sys.exit(2)
+
+
+def main():
+    if len(sys.argv) not in (2, 3):
+        usage()
+    iface = sys.argv[1]
+    arg = sys.argv[2] if len(sys.argv) == 3 else str(TARIS_MS)
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", iface) or \
+            not os.path.isdir(f"/sys/class/net/{iface}/wireless"):
+        print(f"{iface} isn't a Wi-Fi interface.", file=sys.stderr)
+        sys.exit(1)
+    if arg == "default":
+        # -1, what cfg80211 starts with: the driver chooses (the value is in microseconds)
+        micro = -1000
+    elif re.fullmatch(r"[0-9]{2,4}", arg) and 10 <= int(arg) <= 2000:
+        micro = int(arg) * 1000
+    else:
+        usage()
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        req = struct.pack(IWREQ, iface.encode(), 0, 0, 0, 0)
+        _, _, _, disabled, _ = struct.unpack(IWREQ, fcntl.ioctl(s, SIOCGIWPOWER, req))
+        if disabled:
+            print(f"Power saving is off on {iface}: nothing changed.")
+            return
+        # Power saving on (IW_POWER_ON, mode bits 0) with the timeout
+        req = struct.pack(IWREQ, iface.encode(), micro, 0, 0, IW_POWER_TIMEOUT)
+        fcntl.ioctl(s, SIOCSIWPOWER, req)
+    awake = "the driver's default" if micro < 0 else f"{arg} ms"
+    print(f"{iface}: power saving on, awake for {awake} after traffic.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except OSError as e:
+        print(f"wifi-power-timeout: {e.strerror}", file=sys.stderr)
+        sys.exit(1)

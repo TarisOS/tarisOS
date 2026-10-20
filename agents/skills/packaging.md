@@ -56,11 +56,12 @@ updates reach installed machines and removing the package undoes it. The image i
 
 ## Drivers built for one kernel
 
-`taris-tipd-dkms` and `taris-appledrm-dkms` carry Asahi's own driver source with TarisOS's patches,
-and DKMS builds them only for the kernel made from that source (`BUILD_EXCLUSIVE_KERNEL` in each
-`dkms.conf`). When `linux-asahi` moves to newer source, they're skipped for the new kernel and the
-kernel's own drivers load: the system keeps working, but the M1's USB-C display stays dark and a
-USB-C display unplugged while on breaks modesetting again until a restart. To move them:
+`taris-tipd-dkms`, `taris-appledrm-dkms` and `taris-brcmfmac-dkms` carry Asahi's own driver source
+with TarisOS's patches, and DKMS builds them only for the kernel made from that source
+(`BUILD_EXCLUSIVE_KERNEL` in each `dkms.conf`). When `linux-asahi` moves to newer source, they're
+skipped for the new kernel and the kernel's own drivers load: the system keeps working, but the
+M1's USB-C display stays dark, a USB-C display unplugged while on breaks modesetting again until a
+restart, and the M1's Wi-Fi link stays out of its deeper sleep (about 0.2 W more). To move them:
 
 - set `_tag` and `pkgver` to the new source's tag, `PACKAGE_VERSION` and `BUILD_EXCLUSIVE_KERNEL`
   in `dkms.conf` to match (the `package()` check refuses a mismatch);

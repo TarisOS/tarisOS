@@ -5,8 +5,28 @@
 # Wi-Fi after waking from sleep (taris-wifi-resume.service, once per resume). The Broadcom BCM4378
 # and BCM4387 firmware of some Apple Silicon Macs can wake up wedged: scans fail and every network
 # rejects the connection (status 16), which NetworkManager reports as a wrong password. Only
-# reloading the driver (brcmfmac) clears it. Nothing is done when Wi-Fi comes back by itself, when
-# it's switched off, or on other Wi-Fi chips.
+# reloading the driver (brcmfmac) clears it. Only that signature gets a reload: on this Mac a reload
+# itself fails now and then ("FW failed to initialize", 6 of 10 in testing on 2026-10-19, with or
+# without the link's L1 substates), and then Wi-Fi is gone until a restart. Wi-Fi that is simply
+# not back (no saved network in range, a slow router) is left alone. Nothing is done when Wi-Fi
+# comes back by itself, when it's switched off, or on other Wi-Fi chips.
+# systemd-sleep runs this after every wake (/usr/lib/systemd/system-sleep/taris-wifi-resume), and it
+# only starts the service, as a job of its own, without waiting for it. Pulled in by suspend.target
+# instead, the service was part of the wake's transaction, which logind starts as irreversible:
+# while it waited for Wi-Fi (up to 45 s), a reboot or shutdown was refused ("Transaction for
+# reboot.target/start is destructive"). A job of its own is cancelled by them.
+# Usage: wifi-resume                        (taris-wifi-resume.service)
+#        wifi-resume pre|post <operation>   (systemd-sleep)
+
+case ${1:-} in
+pre)
+	exit 0
+	;;
+post)
+	systemctl start --no-block taris-wifi-resume.service
+	exit 0
+	;;
+esac
 
 wait_back=15   # seconds Wi-Fi gets to reconnect on its own
 wait_reload=30 # seconds it gets after a reload
@@ -38,11 +58,6 @@ wedged() {
 	((rejects >= 2))
 }
 
-# Saved Wi-Fi networks: without any there's nothing Wi-Fi could have reconnected to
-saved_wifi() {
-	nmcli -t -f TYPE connection show 2>/dev/null | grep -q '^802-11-wireless$'
-}
-
 for ((i = 0; i < wait_back; i++)); do
 	state=$(wifi_state)
 	[[ $state == connected ]] && exit 0
@@ -53,8 +68,8 @@ for ((i = 0; i < wait_back; i++)); do
 	sleep 1
 done
 if ((i == wait_back)); then
-	saved_wifi || exit 0
-	echo "Wi-Fi not back ${wait_back}s after resume (${state:-no device}): reloading brcmfmac"
+	echo "Wi-Fi not back ${wait_back}s after resume (${state:-no device}), not wedged: left as it is"
+	exit 0
 fi
 
 modprobe -r brcmfmac_wcc brcmfmac 2>/dev/null || modprobe -r brcmfmac || {

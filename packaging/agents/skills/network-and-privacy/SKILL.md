@@ -21,6 +21,8 @@ On a TarisOS development machine (`/etc/taris/dev-machine`), the development rul
 - The Wi-Fi channels and power allowed follow the country of the timezone, set by itself.
 - After sleep, Wi-Fi that comes back wedged on some Macs is reloaded by itself. Wi-Fi that still
   fails: `journalctl -b -u NetworkManager`, `nmcli device`.
+- Don't reload the Wi-Fi driver by hand (`modprobe -r brcmfmac`): on M1 Macs the chip sometimes
+  can't start again afterwards, and Wi-Fi is then gone until a restart.
 
 ## VPNs
 

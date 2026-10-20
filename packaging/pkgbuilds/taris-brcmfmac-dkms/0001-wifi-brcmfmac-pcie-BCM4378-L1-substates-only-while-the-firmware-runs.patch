@@ -1,0 +1,72 @@
+Subject: [PATCH] wifi: brcmfmac: pcie: BCM4378 L1 substates once the firmware
+ runs
+
+On Apple's M1 Macs the BCM4378's link supports ASPM L1.1 and L1.2 on both
+ends, which take about 0.2 W off the idle system, but the kernel leaves
+them off: its default policy keeps the link's boot-time L1. Enabled at
+runtime they held through a day of use with sleep and wake.
+
+Enable them once the firmware is up and attached, through
+pci_enable_link_state(), so the ASPM core keeps applying the policy and
+states blocked through sysfs. Switch them off again at the start of every
+chip reset (brcmf_pcie_reset_device(): probe, removal, the reset after a
+firmware crash, and a wake that finds the firmware gone), so the firmware
+always starts with L1 alone, as it does at boot and as every start that
+worked in testing did.
+Clock PM and the PCI-PM substates stay off.
+
+Reloading the driver fails now and then on this chip ("FW failed to
+initialize", only a restart brings the chip back) with or without these
+states; this doesn't change that.
+---
+ drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
+@@ -729,6 +729,27 @@
+ }
+ 
+ 
++/* The BCM4378's link may use the L1.1 and L1.2 substates of ASPM L1 once its
++ * firmware runs: about 0.2 W less at idle on a MacBook Pro M1. They are
++ * switched off again at the start of every reset of the chip (at probe,
++ * removal, a firmware crash and a wake that finds the firmware gone), so the
++ * firmware always starts as it does at boot, with L1 alone, as every start
++ * that worked in testing did. The ASPM core keeps applying the policy and any
++ * states blocked through sysfs; clock PM and the PCI-PM substates stay off.
++ */
++static void brcmf_pcie_l1ss(struct brcmf_pciedev_info *devinfo, bool enable)
++{
++	int state = PCIE_LINK_STATE_L1;
++
++	if (devinfo->pdev->device != BRCM_PCIE_4378_DEVICE_ID)
++		return;
++
++	if (enable)
++		state |= PCIE_LINK_STATE_L1_1 | PCIE_LINK_STATE_L1_2;
++	pci_enable_link_state(devinfo->pdev, state);
++}
++
++
+ static void brcmf_pcie_reset_device(struct brcmf_pciedev_info *devinfo)
+ {
+ 	struct brcmf_core *core;
+@@ -749,6 +770,8 @@
+ 	u32 val;
+ 	u32 lsc;
+ 
++	brcmf_pcie_l1ss(devinfo, false);
++
+ 	if (!devinfo->ci)
+ 		return;
+ 
+@@ -2587,6 +2610,8 @@
+ 	if (ret)
+ 		goto fail;
+ 
++	brcmf_pcie_l1ss(devinfo, true);
++
+ 	brcmf_pcie_bus_console_read(devinfo, false);
+ 
+ 	brcmf_pcie_fwcon_timer(devinfo, true);

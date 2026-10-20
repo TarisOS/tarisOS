@@ -1,0 +1,9 @@
+diff -ruN a/brcmfmac/pcie.c b/brcmfmac/pcie.c
+--- a/brcmfmac/pcie.c
++++ b/brcmfmac/pcie.c
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: ISC
++/* Changed by TarisOS in 2026 (the BCM4378's L1 substates only while its firmware runs): https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/taris-brcmfmac-dkms */
+ /*
+  * Copyright (c) 2014 Broadcom Corporation
+  */

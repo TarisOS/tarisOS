@@ -9,10 +9,10 @@
 # the idle desktop and then with audio playing (digital silence through the speakers: the whole
 # speaker DSP chain runs, nothing is heard). Each block settles 15 s, then measures 60 s: battery
 # power from its coulomb counter, the SMC rails (taris_smc_keys), time at each clock step,
-# kcompactd's wake-ups; with audio, PipeWire's errors (ERR) and how much of each cycle the DSP
-# takes (B/Q, 1.0 = the deadline), from pw-top; and that the audio threads got the new minimum.
+# kcompactd's wake-ups, and that the audio threads got the new minimum. Whether audio keeps its
+# deadlines with S1 is measure-s1-audio.sh's job (pw-top's batch mode reports no timings).
 # Results: results/s1-s2-<time>.csv (one line per block), results/s1-s2-<time>.txt (summary).
-# Needs taris_smc_keys loaded (smc-keys/test-install.sh), and the Mac on battery for the battery
+# Needs taris_smc_keys loaded (dev/power/smc-keys/test-install.sh), and the Mac on battery for the
 # figures. Takes about 17 minutes; leave the Mac alone meanwhile.
 # Run by the maintainer, as root:
 #   sudo dev/power/stage2/measure-s1-s2.sh
@@ -124,31 +124,17 @@ audio_rt_min() {
   echo "${min:--}"
 }
 
-# ERR and the highest B/Q of the speaker chain's nodes, from pw-top's last report
-pw_state() {
-  "${as_user[@]}" timeout 10 pw-top -b -n 3 2>/dev/null | awk '
-    /^S/ && /ID/ { err = 0; bq = 0; next }
-    / alsa_output\.platform-sound\.RawSpeakers$/ ||
-    / (audio_effect|effect_output)\.j293-convolver$/ {
-      err += $9; if ($8 != "---" && $8 + 0 > bq) bq = $8 + 0
-    }
-    END { printf "%d %.3f", err, bq }'
-}
-
 echo "workload,setting,round,ac,battery_w,PSTR,PMVR,PPMR,PP0b,PPbb,PP7b,tis_e,tis_p,$(
-  )kcompactd_per_s,audio_rt_min,pw_err,pw_bq_max" > "$out"
+  )kcompactd_per_s,audio_rt_min" > "$out"
 start_time=$(date '+%Y-%m-%d %H:%M:%S')
 
 block() {
   local workload=$1 setting=$2 round=$3 i line ac q0 q1 v0 v1 t0 t1 k0 k1 e0 e1 p0 p1
-  local rtmin err0=0 pwerr pwbq
+  local rtmin
   local -a smc=()
   apply "$setting"
   sleep 15
   rtmin=$(audio_rt_min)
-  if [[ $workload == "audio" ]]; then
-    read -r err0 _ <<< "$(pw_state)"
-  fi
   ac=$(<"/sys/class/power_supply/macsmc-ac/online")
   q0=$(<"$bat/charge_counter"); v0=$(<"$bat/voltage_now"); t0=${EPOCHREALTIME/./}
   k0=$(ctx_switches "$kcompactd")
@@ -164,10 +150,6 @@ block() {
   q1=$(<"$bat/charge_counter"); v1=$(<"$bat/voltage_now"); t1=${EPOCHREALTIME/./}
   k1=$(ctx_switches "$kcompactd")
   e1=$(tis policy0); p1=$(tis policy4)
-  local pw="0 0"
-  if [[ $workload == "audio" ]]; then
-    pw=$(pw_state)
-  fi
   # charge_counter is in mA*s (as macsmc-power passes SMC BAAC through): W = C x V / s
   local bw
   bw=$(awk -v q0="$q0" -v q1="$q1" -v v0="$v0" -v v1="$v1" -v t0="$t0" -v t1="$t1" -v ac="$ac" \
@@ -175,13 +157,12 @@ block() {
       printf "%.4f", (q0 - q1) / 1000 * (v0 + v1) / 2e6 / ((t1 - t0) / 1e6)}')
   read -ra smc <<< "$(awk -v a="$sums" \
     'BEGIN {split(a, x); for (j = 1; j <= 6; j++) printf "%.4f ", x[j] / 60}')"
-  read -r pwerr pwbq <<< "$pw"
-  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"%s","%s",%s,%s,%s,%s,%s\n' \
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"%s","%s",%s,%s\n' \
     "$workload" "$setting" "$round" "$ac" "$bw" "${smc[@]}" \
     "$(echo "$e0" "|" "$e1")" "$(echo "$p0" "|" "$p1")" \
     "$(awk -v a="$k0" -v b="$k1" -v t0="$t0" -v t1="$t1" \
       'BEGIN {printf "%.2f", (b - a) / ((t1 - t0) / 1e6)}')" \
-    "$rtmin" "$(( pwerr - err0 ))" "$pwbq" >> "$out"
+    "$rtmin" >> "$out"
   echo "  $workload $setting round $round: battery ${bw:-n/a} W, PSTR ${smc[0]} W"
 }
 
@@ -232,12 +213,12 @@ def share_top(spec, col):
 print("Mean of the two rounds per setting (battery W from the coulomb counter; SMC W; share of")
 print("time at each cluster's top two clock steps used, MHz: E %s, P %s; kcompactd wake-ups/s;" % (
     "/".join(str(f // 1000) for f in top["tis_e"]), "/".join(str(f // 1000) for f in top["tis_p"])))
-print("audio threads' minimum; pw-top ERR and B/Q, which pw-top's batch mode doesn't fill in):\n")
+print("audio threads' lowest minimum):\n")
 for wl in ("idle", "audio"):
     print(wl)
-    print("  %-6s %8s %7s %7s %7s %7s %7s %6s %6s %6s %5s %4s %6s" % (
+    print("  %-6s %8s %7s %7s %7s %7s %7s %6s %6s %6s %5s" % (
         "set", "battery", "PSTR", "PMVR", "PP0b", "PPbb", "PP7b", "Etop%", "Ptop%", "kcmp/s",
-        "rtmin", "err", "B/Q"))
+        "rtmin"))
     for s in ("found", "s1", "s1s2"):
         r = [x for x in rows if x["workload"] == wl and x["setting"] == s]
         if not r:
@@ -247,10 +228,9 @@ for wl in ("idle", "audio"):
             return st.mean(v) if v else float("nan")
         et = st.mean(share_top(x["tis_e"], "tis_e") for x in r)
         pt = st.mean(share_top(x["tis_p"], "tis_p") for x in r)
-        print("  %-6s %8.3f %7.3f %7.3f %7.3f %7.3f %7.3f %6.1f %6.1f %6.2f %5s %4d %6.3f" % (
+        print("  %-6s %8.3f %7.3f %7.3f %7.3f %7.3f %7.3f %6.1f %6.1f %6.2f %5s" % (
             s, m("battery_w"), m("PSTR"), m("PMVR"), m("PP0b"), m("PPbb"), m("PP7b"), et, pt,
-            m("kcompactd_per_s"), "/".join(sorted(set(x["audio_rt_min"] for x in r))),
-            sum(int(x["pw_err"]) for x in r), max(float(x["pw_bq_max"]) for x in r)))
+            m("kcompactd_per_s"), "/".join(sorted(set(x["audio_rt_min"] for x in r)))))
     print()
 print("Round to round (battery W), to judge the noise:")
 for wl in ("idle", "audio"):

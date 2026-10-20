@@ -1,7 +1,8 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# After each resume (ordered after suspend.target, so it never holds the resume up)
+# After each resume, started by wifi-resume's systemd-sleep hook as a job of its own, which a reboot
+# or shutdown can cancel (ordered after suspend.target, so it never holds the resume up)
 [Unit]
 Description=Recover Wi-Fi after resume
 After=suspend.target NetworkManager.service
@@ -10,6 +11,3 @@ After=suspend.target NetworkManager.service
 Type=oneshot
 ExecStart=/usr/lib/taris/wifi-resume
 TimeoutStartSec=120
-
-[Install]
-WantedBy=suspend.target

@@ -18,5 +18,6 @@ packaging/pkgbuilds/ttf-rubik-vf/*.txt
 packaging/pkgbuilds/libva-v4l2-request-avd/libva-v4l2_request/
 packaging/pkgbuilds/taris-tipd-dkms/asahi-*
 packaging/pkgbuilds/taris-appledrm-dkms/asahi-*
+packaging/pkgbuilds/taris-brcmfmac-dkms/asahi-*
 packaging/pkgbuilds/tiny-dfr-taris/*.crate
 distro/out/

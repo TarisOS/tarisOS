@@ -1,0 +1,17 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# NetworkManager alone manages the network: systemd-networkd stays off. The image disables it, but
+# every new install's first boot applies systemd's own presets (the image leaves /etc/machine-id
+# out, so each install has a first boot), and 90-systemd.preset turns networkd and its sockets back
+# on. Running alongside NetworkManager, its /etc/systemd/network/en.network and eth.network would
+# configure any Ethernet connection too. Preset files are read in name order and the first match
+# wins, so these lines come before 90-systemd.preset's. Every unit networkd's [Install] section
+# names (Also=) is listed, so none is left enabled on its own.
+disable systemd-networkd.service
+disable systemd-networkd.socket
+disable systemd-networkd-varlink.socket
+disable systemd-networkd-varlink-metrics.socket
+disable systemd-networkd-resolve-hook.socket
+disable systemd-networkd-wait-online.service
+disable systemd-network-generator.service

@@ -8,7 +8,9 @@
 -- the MIT KEMAR head libmysofa ships). Each graph runs in the output's own audioconvert, before
 -- the output's processing: Asahi's speaker DSP, its volume (which its loudness compensation
 -- follows) and the speakers' protection are left as they are, and no new output appears. The
--- speakers also always get a little more bass, whether spatial audio is on or off.
+-- speakers also always get a little more bass, whether spatial audio is on or off. On the
+-- MacBook Pro 13" (M1), a compressor and a limiter in the audioconvert of Asahi's DSP output, after
+-- all of its processing, keep the speakers from clipping at full volume.
 --
 -- Spatial audio on or off (the Audio page of Settings), saved across restarts:
 --   wpctl settings --save taris.spatial-audio true|false
@@ -84,16 +86,67 @@ local SPEAKER_GRAPH = [[
 }
 ]]
 
--- The speakers' bass: 3 dB more below 200 Hz, ahead of Asahi's bass enhancer and its limiters,
+-- The speakers' bass: 1 dB more below 200 Hz, ahead of Asahi's bass enhancer and its limiters,
 -- which keep the speakers within what they take
 local BASS_GRAPH = [[
 {
 	nodes = [
-		{ type = builtin label = bq_lowshelf name = bassL control = { "Freq" = 200 "Q" = 0.707 "Gain" = 3.0 } }
-		{ type = builtin label = bq_lowshelf name = bassR control = { "Freq" = 200 "Q" = 0.707 "Gain" = 3.0 } }
+		{ type = builtin label = bq_lowshelf name = bassL control = { "Freq" = 200 "Q" = 0.707 "Gain" = 1.0 } }
+		{ type = builtin label = bq_lowshelf name = bassR control = { "Freq" = 200 "Q" = 0.707 "Gain" = 1.0 } }
 	]
 	inputs = [ "bassL:In" "bassR:In" ]
 	outputs = [ "bassL:Out" "bassR:Out" ]
+}
+]]
+
+-- The MacBook Pro 13" (M1, J293) speaker DSP's output to the amplifiers: Asahi's graph.json sends
+-- the front pair, then the rear pair
+local SPEAKER_OUT = "effect_output.j293-convolver"
+local LIMIT_KEY = "audioconvert.filter-graph.51"
+
+-- On that output, per pair: a peak compressor, then a brickwall limiter at -4 dBFS. Asahi's last
+-- stage on each pair (fwoofer_lim, rwoofer_lim) is an LSP compressor left at its RMS detector, so
+-- at full volume short peaks reach the conversion to the amplifiers' 32-bit format past full scale
+-- (up to +4 dB measured) and are clipped there. The compressor (from -7 dBFS, 4:1, a 12 dB soft
+-- knee) starts turning a bass hit down 10 ms before it arrives, over 5 ms, and lets it back up over
+-- 300 ms, so it eases in and out; at 4:1 even a +4 dB peak comes out near -4 dBFS, so the limiter
+-- (its smooth "Herm Wide" curve, 10 ms lookahead) only stops what's left. No gain boost and no
+-- level regulation: well below -7 dBFS the sound is untouched. Together they delay the speakers by
+-- 20 ms.
+local LIMIT_GRAPH = [[
+{
+	nodes = [
+		{
+			type = lv2 plugin = "http://lsp-plug.in/plugins/lv2/compressor_stereo" name = compF
+			control = {
+				"scm" = 0 "scs" = 5 "sla" = 10.0 "al" = 0.447 "cr" = 4.0 "kn" = 0.251
+				"at" = 5.0 "rt" = 300.0 "mk" = 1.0
+			}
+		}
+		{
+			type = lv2 plugin = "http://lsp-plug.in/plugins/lv2/compressor_stereo" name = compR
+			control = {
+				"scm" = 0 "scs" = 5 "sla" = 10.0 "al" = 0.447 "cr" = 4.0 "kn" = 0.251
+				"at" = 5.0 "rt" = 300.0 "mk" = 1.0
+			}
+		}
+		{
+			type = lv2 plugin = "http://lsp-plug.in/plugins/lv2/limiter_stereo" name = limF
+			control = { "mode" = 1 "th" = 0.631 "boost" = 0 "alr" = 0 "lk" = 10.0 "at" = 10.0 "rt" = 20.0 }
+		}
+		{
+			type = lv2 plugin = "http://lsp-plug.in/plugins/lv2/limiter_stereo" name = limR
+			control = { "mode" = 1 "th" = 0.631 "boost" = 0 "alr" = 0 "lk" = 10.0 "at" = 10.0 "rt" = 20.0 }
+		}
+	]
+	links = [
+		{ output = "compF:out_l" input = "limF:in_l" }
+		{ output = "compF:out_r" input = "limF:in_r" }
+		{ output = "compR:out_l" input = "limR:in_l" }
+		{ output = "compR:out_r" input = "limR:in_r" }
+	]
+	inputs = [ "compF:in_l" "compF:in_r" "compR:in_l" "compR:in_r" ]
+	outputs = [ "limF:out_l" "limF:out_r" "limR:out_l" "limR:out_r" ]
 }
 ]]
 
@@ -219,6 +272,17 @@ nodes_om:connect ("object-added", function (_, node)
 	update (node)
 end)
 
+outputs_om = ObjectManager {
+	Interest {
+		type = "node",
+		Constraint { "node.name", "=", SPEAKER_OUT, type = "pw-global" },
+	},
+}
+
+outputs_om:connect ("object-added", function (_, node)
+	setGraph (node, LIMIT_KEY, LIMIT_GRAPH)
+end)
+
 -- A removed node's proxy is no longer bound: keyed by its object id, as software-dsp.lua does
 nodes_om:connect ("object-removed", function (_, node)
 	applied[node.id] = nil
@@ -232,3 +296,4 @@ Settings.subscribe (SETTING, updateAll)
 
 devices_om:activate ()
 nodes_om:activate ()
+outputs_om:activate ()
