@@ -8,6 +8,7 @@ import QtQuick.Layouts
 import Taris.Config
 import Taris.I18n
 import qs.components
+import qs.components.misc
 import qs.services
 
 Item {
@@ -70,6 +71,11 @@ Item {
                 text: Time.format("ss")
                 color: Colours.palette.m3secondary
                 font: Tokens.font.clock.size(28).weight(Font.DemiBold).build()
+
+                // The clock ticks every second only while something shows seconds (Time)
+                Ref {
+                    service: Time
+                }
             }
         }
 

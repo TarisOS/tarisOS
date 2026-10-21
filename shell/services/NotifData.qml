@@ -8,7 +8,6 @@ import Quickshell
 import Quickshell.Services.Notifications
 import Taris
 import Taris.Config
-import Taris.I18n
 import qs.services
 import qs.utils
 
@@ -20,27 +19,6 @@ QtObject {
     property var locks: new Set()
 
     property date time: new Date()
-    property int ageMins: 0
-    readonly property string timeStr: {
-        if (ageMins < 1)
-            return Tr.tr("now");
-
-        const h = Math.floor(ageMins / 60);
-        const d = Math.floor(h / 24);
-
-        if (d > 0)
-            return Tr.trCtx("%1d", "abbreviated notification age, days").arg(d);
-        if (h > 0)
-            return Tr.trCtx("%1h", "abbreviated notification age, hours").arg(h);
-        return Tr.trCtx("%1m", "abbreviated notification age, minutes").arg(ageMins);
-    }
-
-    readonly property Timer timeStrTimer: Timer {
-        running: !notif.closed
-        repeat: true
-        interval: 5000
-        onTriggered: notif.updateTimeStr()
-    }
 
     property Notification notification
     property string notificationId
@@ -191,26 +169,6 @@ QtObject {
         }
 
         target: notif.notification
-    }
-
-    function updateTimeStr(): void {
-        const diff = Date.now() - time.getTime();
-        const m = Math.floor(diff / 60000);
-        ageMins = m;
-
-        if (m < 1) {
-            timeStrTimer.interval = 5000;
-        } else {
-            const h = Math.floor(m / 60);
-            const d = Math.floor(h / 24);
-
-            if (d > 0)
-                timeStrTimer.interval = 3600000;
-            else if (h > 0)
-                timeStrTimer.interval = 300000;
-            else
-                timeStrTimer.interval = m < 10 ? 30000 : 60000;
-        }
     }
 
     function maybeTriggerDummyImageLoader(): void {

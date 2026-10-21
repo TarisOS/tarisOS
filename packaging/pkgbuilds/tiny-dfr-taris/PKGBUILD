@@ -1,8 +1,9 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# tiny-dfr, the Touch Bar's daemon, with TarisOS's patch (taris-*.patch): the modifiers held on the
-# keyboard go with the Touch Bar's keys, so Ctrl+Alt+F1-F12 switch text consoles. Based on Asahi
+# tiny-dfr, the Touch Bar's daemon, with TarisOS's patches (taris-*.patch, applied in name order):
+# the modifiers held on the keyboard go with the Touch Bar's keys, so Ctrl+Alt+F1-F12 switch text
+# consoles; and the keyboard's backlight goes off after a minute without a key press. Based on Asahi
 # ALARM's tiny-dfr PKGBUILD (asahi-alarm/PKGBUILDs), with its patch (81.patch); replaces that
 # package, which a full upgrade swaps for this one. Keep it at Asahi's version: when theirs moves
 # on, move this with it (pkgver, their patches, updpkgsums). A patch that no longer applies stops
@@ -11,7 +12,7 @@
 _pkgname=tiny-dfr
 pkgname=tiny-dfr-taris
 pkgver=0.3.7
-pkgrel=1
+pkgrel=2
 pkgdesc='Apple silicon touch bar input / display daemon, with TarisOS patches'
 arch=('aarch64')
 url=https://crates.io/crates/tiny-dfr
@@ -24,10 +25,12 @@ replaces=("$_pkgname")
 source=(
   "$_pkgname-$pkgver.crate::https://static.crates.io/crates/tiny-dfr/tiny-dfr-$pkgver.crate"
   '81.patch'
-  'taris-send-held-modifiers.patch')
+  'taris-send-held-modifiers.patch'
+  'taris-unlit-keyboard.patch')
 sha512sums=('af8ac6116c80cf7e87f06158c0917af4faad1804531666bd21d8382d729b969cc8902e0e1b9e78e628f4bda4f54ae942a36ce64d8388edb0db2b6ce167214cb7'
             '7ee49f123225757b57b89ae21b5ed53cc3249e51c5ed24caf55edf5b5f4a77c2c6bc2e34f4dc81a4db23e85b57c74b9d3f14f63c2700905fbf285a26943a2cfb'
-            '89b5834782ad0336f9d684f803149c14d10cf0dac6552a8aee033c39006630e1d4cafa24fa9b224f1ea4fb64ce7e6fcd564907c8de74cb113806a1f4df60a787')
+            '89b5834782ad0336f9d684f803149c14d10cf0dac6552a8aee033c39006630e1d4cafa24fa9b224f1ea4fb64ce7e6fcd564907c8de74cb113806a1f4df60a787'
+            '8ae0b6657cdbcb288ed9da78332cb21098c1e395731d0ada248ca673271e78dd325d4acf03e1cd82ec6dff464bf02ffd3adb0e35a0905cb4d586872d46655520')
 
 prepare() {
   tar -xf $_pkgname-$pkgver.crate

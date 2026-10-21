@@ -184,13 +184,6 @@ StyledRect {
                     elide: Text.ElideRight
                 }
 
-                StyledText {
-                    animate: true
-                    text: root.activeNotifs[0]?.timeStr ?? ""
-                    color: Colours.palette.m3outline
-                    font: Tokens.font.body.small
-                }
-
                 StyledRect {
                     implicitWidth: expandBtn.implicitWidth + Tokens.padding.large
                     implicitHeight: groupCount.implicitHeight + Tokens.padding.extraSmall

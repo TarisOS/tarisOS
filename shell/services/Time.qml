@@ -8,6 +8,11 @@ import Quickshell
 import Taris.I18n
 
 Singleton {
+    id: root
+
+    // Whatever shows seconds holds a Ref on this service while it's loaded (the bar's and the
+    // dashboard's clocks); otherwise the clock ticks once a minute
+    property int refCount: 0
     property alias enabled: clock.enabled
     readonly property date date: clock.date
     readonly property int hours: clock.hours
@@ -27,6 +32,6 @@ Singleton {
     SystemClock {
         id: clock
 
-        precision: SystemClock.Seconds
+        precision: root.refCount > 0 ? SystemClock.Seconds : SystemClock.Minutes
     }
 }

@@ -290,6 +290,10 @@ Singleton {
         id: agentWindow
 
         visible: root.windowShown
+        // Closed by Hyprland (SUPER + Q): Quickshell hides it for good while it's still wanted
+        // (proxywindow.cpp), so SUPER + A found no window to show. Not wanted now: the next SUPER + A
+        // asks for it again, the session going on meanwhile (in the tab)
+        onClosed: root.windowWanted = false
         title: Hypr.agentWindowTitle
         color: Colours.palette.m3surfaceContainerLowest
         implicitWidth: 1000

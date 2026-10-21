@@ -262,7 +262,7 @@ StyledRect {
                 text: root.modelData.appName
                 font: appName.font
                 elide: Text.ElideRight
-                elideWidth: expandBtn.x - time.width - timeSep.width - summary.x - root.Tokens.spacing.small * 3
+                elideWidth: expandBtn.x - summary.x - root.Tokens.spacing.small
             }
 
             StyledText {
@@ -316,47 +316,7 @@ StyledRect {
                 text: root.modelData.summary
                 font: summary.font
                 elide: Text.ElideRight
-                elideWidth: expandBtn.x - time.width - timeSep.width - summary.x - root.Tokens.spacing.small * 3
-            }
-
-            StyledText {
-                id: timeSep
-
-                anchors.top: parent.top
-                anchors.left: summary.right
-                anchors.leftMargin: Tokens.spacing.small
-
-                text: "•"
-                color: Colours.palette.m3onSurfaceVariant
-                font: Tokens.font.body.small
-
-                states: State {
-                    name: "expanded"
-                    when: root.expanded
-
-                    AnchorChanges {
-                        target: timeSep
-                        anchors.left: appName.right
-                    }
-                }
-
-                transitions: Transition {
-                    AnchorAnim {}
-                }
-            }
-
-            StyledText {
-                id: time
-
-                anchors.top: parent.top
-                anchors.left: timeSep.right
-                anchors.leftMargin: Tokens.spacing.small
-
-                animate: true
-                horizontalAlignment: Text.AlignLeft
-                text: root.modelData.timeStr
-                color: Colours.palette.m3onSurfaceVariant
-                font: Tokens.font.body.small
+                elideWidth: expandBtn.x - summary.x - root.Tokens.spacing.small
             }
 
             Item {

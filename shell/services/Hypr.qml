@@ -179,6 +179,10 @@ Singleton {
                 Hyprland.refreshMonitors();
             } else if (n.includes("workspace")) {
                 Hyprland.refreshWorkspaces();
+            } else if (n === "windowtitle") {
+                // Nothing: Quickshell sets the window's title from windowtitlev2 itself
+                // (connection.cpp), and a refresh asks Hyprland for every window, at every title a
+                // browser tab or a terminal sets
             } else if (n.includes("window") || n.includes("group") || ["pin", "fullscreen", "changefloatingmode", "minimize"].includes(n)) {
                 Hyprland.refreshToplevels();
             }

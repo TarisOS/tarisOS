@@ -94,6 +94,8 @@ def snapshot():
     hwmon = smc_hwmon()
     return json.dumps({
         "present": hwmon is not None,
+        # Where the fans' files are, for the shell to read their speeds itself between readings
+        "hwmon": hwmon or "",
         "control": read(PARAM) == "Y",
         "fans": fans(hwmon),
         "temps": temps(),

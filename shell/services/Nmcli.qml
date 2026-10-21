@@ -968,8 +968,11 @@ Singleton {
         return networks.find(n => n.ssid === ssid) ?? null;
     }
 
+    // The networks NetworkManager knows of, without a scan: nmcli's own default scans whenever its
+    // list is older than 30 s, and this runs at every line nmcli monitor prints. Scans run only when
+    // asked for (rescanWifi: Settings' network pages, the setup screen, the Rescan button)
     function getNetworks(callback: var): void {
-        executeCommand(["-g", root.networkDetailFields, "d", "w"], result => {
+        executeCommand(["-g", root.networkDetailFields, "d", "w", "list", "--rescan", "no"], result => {
             if (!result.success) {
                 if (callback)
                     callback([]);

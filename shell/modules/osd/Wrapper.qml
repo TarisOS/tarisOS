@@ -80,8 +80,12 @@ Item {
 
     Connections {
         function onBrightnessChanged(): void {
-            root.show();
             root.brightness = root.monitor?.brightness ?? 0;
+        }
+
+        // The user's own changes only: automatic brightness moves it without the OSD
+        function onAdjusted(): void {
+            root.show();
         }
 
         target: root.monitor

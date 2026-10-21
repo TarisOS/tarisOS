@@ -1,0 +1,203 @@
+TarisOS: the keyboard's backlight goes off after a minute without a key press, and back to its level
+at the next key (/sys/class/leds/kbd_backlight; nothing else turns it off, and it stayed lit the
+whole session). tiny-dfr already reads every keyboard on seat0 and runs as root until it drops
+privileges, so it opens the backlight then, as it does the Touch Bar's. Set off with the brightness
+keys, it stays off; set by the keys while idle-off, the new level is kept. Stopped (SIGTERM, at
+shutdown too) or crashed, it puts the level back first: systemd-backlight saves the keyboard's level
+after tiny-dfr stops, and an idle off saved there would start the next session dark.
+
+diff -ruN a/src/kbd_backlight.rs b/src/kbd_backlight.rs
+--- a/src/kbd_backlight.rs	1970-01-01 01:00:00.000000000 +0100
++++ b/src/kbd_backlight.rs	2026-10-21 18:30:37.703371515 +0100
+@@ -0,0 +1,81 @@
++use std::{
++    cmp::min,
++    fs::{self, File, OpenOptions},
++    io::Write,
++    path::PathBuf,
++    time::Instant,
++};
++
++// The keyboard's backlight goes off after a minute without a key press, and back to its level at
++// the next one
++const KBD_BACKLIGHT_PATH: &str = "/sys/class/leds/kbd_backlight";
++const KBD_OFF_TIMEOUT_MS: u64 = 60 * 1000;
++
++pub struct KbdBacklight {
++    path: PathBuf,
++    file: File,
++    last_key: Instant,
++    // The level it had when this turned it off
++    saved: Option<u32>,
++}
++
++impl KbdBacklight {
++    // Opened before privileges are dropped (the file is root's); none on Macs without one
++    pub fn new() -> Option<KbdBacklight> {
++        let path = PathBuf::from(KBD_BACKLIGHT_PATH).join("brightness");
++        let file = OpenOptions::new().write(true).open(&path).ok()?;
++        Some(KbdBacklight {
++            path,
++            file,
++            last_key: Instant::now(),
++            saved: None,
++        })
++    }
++    fn level(&self) -> u32 {
++        fs::read_to_string(&self.path)
++            .ok()
++            .and_then(|s| s.trim().parse::<u32>().ok())
++            .unwrap_or(0)
++    }
++    fn set_level(&mut self, value: u32) {
++        let _ = self.file.write_all(format!("{}\n", value).as_bytes());
++    }
++    pub fn key_pressed(&mut self) {
++        self.last_key = Instant::now();
++        self.restore();
++    }
++    // Back to the level it had, unless something else has set one since
++    pub fn restore(&mut self) {
++        if let Some(level) = self.saved.take() {
++            if self.level() == 0 {
++                self.set_level(level);
++            }
++        }
++    }
++    pub fn update(&mut self) {
++        if self.saved.is_some() {
++            // Turned on by something else (the brightness keys' brightnessctl): it counts as a key
++            if self.level() > 0 {
++                self.saved = None;
++                self.last_key = Instant::now();
++            }
++            return;
++        }
++        if self.last_key.elapsed().as_millis() as u64 >= KBD_OFF_TIMEOUT_MS {
++            let level = self.level();
++            // Already off (turned off with the keys): nothing to bring back
++            if level > 0 {
++                self.set_level(0);
++                self.saved = Some(level);
++            }
++        }
++    }
++    // Until it goes off, for the main loop's timeout; none while it's off
++    pub fn ms_until_off(&self) -> Option<i32> {
++        if self.saved.is_some() {
++            return None;
++        }
++        let elapsed = self.last_key.elapsed().as_millis() as u64;
++        Some(min(KBD_OFF_TIMEOUT_MS.saturating_sub(elapsed), i32::MAX as u64) as i32)
++    }
++}
+diff -ruN a/src/main.rs b/src/main.rs
+--- a/src/main.rs	2026-10-21 18:28:31.697515661 +0100
++++ b/src/main.rs	2026-10-21 18:31:13.622281089 +0100
+@@ -21,6 +21,7 @@
+     sys::{
+         epoll::{Epoll, EpollCreateFlags, EpollEvent, EpollFlags},
+         signal::{SigSet, Signal},
++        signalfd::{SfdFlags, SignalFd},
+     },
+ };
+ use privdrop::PrivDrop;
+@@ -41,12 +42,14 @@
+ mod config;
+ mod display;
+ mod fonts;
++mod kbd_backlight;
+ mod pixel_shift;
+ 
+ use crate::config::ConfigManager;
+ use backlight::BacklightManager;
+ use config::{ButtonConfig, Config};
+ use display::DrmBackend;
++use kbd_backlight::KbdBacklight;
+ use pixel_shift::{PixelShiftManager, PIXEL_SHIFT_WIDTH_PX};
+ 
+ const BUTTON_SPACING_PX: i32 = 16;
+@@ -795,7 +798,12 @@
+ fn main() {
+     let mut drm = DrmBackend::open_card().unwrap();
+     let (height, width) = drm.mode().size();
+-    let _ = panic::catch_unwind(AssertUnwindSafe(|| real_main(&mut drm)));
++    let mut kbd = KbdBacklight::new();
++    let _ = panic::catch_unwind(AssertUnwindSafe(|| real_main(&mut drm, &mut kbd)));
++    // The keyboard isn't left dark: nothing turns it back on from here
++    if let Some(k) = kbd.as_mut() {
++        k.restore();
++    }
+     let crash_bitmap = include_bytes!("crash_bitmap.raw");
+     let mut map = drm.map().unwrap();
+     let data = map.as_mut();
+@@ -818,7 +826,7 @@
+     sigset.wait().unwrap();
+ }
+ 
+-fn real_main(drm: &mut DrmBackend) {
++fn real_main(drm: &mut DrmBackend, kbd: &mut Option<KbdBacklight>) {
+     let (height, width) = drm.mode().size();
+     let (db_width, db_height) = drm.fb_info().unwrap().size();
+     let mut uinput = UInputHandle::new(OpenOptions::new().write(true).open("/dev/uinput").unwrap());
+@@ -864,6 +872,15 @@
+     epoll
+         .add(&udev_monitor, EpollEvent::new(EpollFlags::EPOLLIN, 3))
+         .unwrap();
++    // Stopped (SIGTERM, at shutdown too): the keyboard's backlight goes back on first, so the level
++    // systemd-backlight saves next (it stops after this) isn't the idle off
++    let mut sigterm = SigSet::empty();
++    sigterm.add(Signal::SIGTERM);
++    sigterm.thread_block().unwrap();
++    let signal_fd = SignalFd::with_flags(&sigterm, SfdFlags::SFD_NONBLOCK).unwrap();
++    epoll
++        .add(&signal_fd, EpollEvent::new(EpollFlags::EPOLLIN, 4))
++        .unwrap();
+     uinput.set_evbit(EventKind::Key).unwrap();
+     for k in MODIFIERS {
+         uinput.set_keybit(k).unwrap();
+@@ -920,6 +937,9 @@
+             }
+             next_timeout_ms = min(next_timeout_ms, pixel_shift_next_timeout_ms);
+         }
++        if let Some(ms) = kbd.as_ref().and_then(|k| k.ms_until_off()) {
++            next_timeout_ms = min(next_timeout_ms, ms);
++        }
+ 
+         let current_ts = if layers[active_layer].faster_refresh {
+             Local::now().second()
+@@ -968,6 +988,13 @@
+ 
+         _ = udev_monitor.iter().last();
+ 
++        if let Ok(Some(_)) = signal_fd.read_signal() {
++            if let Some(k) = kbd.as_mut() {
++                k.restore();
++            }
++            std::process::exit(0);
++        }
++
+         input_tb.dispatch().unwrap();
+         input_main.dispatch().unwrap();
+         for event in &mut input_tb.clone().chain(input_main.clone()) {
+@@ -980,6 +1007,11 @@
+                     }
+                 }
+                 Event::Keyboard(KeyboardEvent::Key(key)) => {
++                    if key.key_state() == KeyState::Pressed {
++                        if let Some(k) = kbd.as_mut() {
++                            k.key_pressed();
++                        }
++                    }
+                     // This device's own keys come back here too: only the other keyboards count
+                     if let Some(m) = MODIFIERS.iter().find(|m| **m as u32 == key.key()) {
+                         if key.device().name() != DEVICE_NAME {
+@@ -1046,5 +1078,8 @@
+             }
+         }
+         backlight.update_backlight(&cfg);
++        if let Some(k) = kbd.as_mut() {
++            k.update();
++        }
+     }
+ }

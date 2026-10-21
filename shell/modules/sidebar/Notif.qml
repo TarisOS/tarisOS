@@ -38,9 +38,8 @@ StyledRect {
             summary.anchors.margins: root.Tokens.padding.medium
             dummySummary.anchors.margins: root.Tokens.padding.medium
             compactBody.anchors.margins: root.Tokens.padding.medium
-            timeStr.anchors.margins: root.Tokens.padding.medium
             expandedContent.anchors.margins: root.Tokens.padding.medium
-            summary.width: root.width - root.Tokens.padding.medium * 2 - timeStr.implicitWidth - root.Tokens.spacing.small
+            summary.width: root.width - root.Tokens.padding.medium * 2
             summary.maximumLineCount: Number.MAX_SAFE_INTEGER
         }
     }
@@ -95,21 +94,6 @@ StyledRect {
             text: String(root.modelData?.body ?? "").replace(/\n/g, " ")
             color: root.modelData?.urgency === "critical" ? Colours.palette.m3secondary : Colours.palette.m3outline
             elide: Text.ElideRight
-        }
-    }
-
-    WrappedLoader {
-        id: timeStr
-
-        shouldBeActive: root.expanded
-        anchors.top: parent.top
-        anchors.right: parent.right
-
-        sourceComponent: StyledText {
-            animate: true
-            text: root.modelData?.timeStr ?? ""
-            color: Colours.palette.m3outline
-            font: Tokens.font.body.small
         }
     }
 

@@ -38,6 +38,8 @@ class ServiceConfig : public settings::ObjectNode {
     CONFIG_GLOBAL_PROPERTY(int, visualiserBars, 60)
     CONFIG_GLOBAL_PROPERTY(qreal, audioIncrement, 0.1)
     CONFIG_GLOBAL_PROPERTY(qreal, brightnessIncrement, 0.1)
+    // The laptop's panel follows the room's light (its light sensor)
+    CONFIG_GLOBAL_PROPERTY(bool, autoBrightness, true)
     CONFIG_GLOBAL_PROPERTY(qreal, maxVolume, 1.0)
     CONFIG_GLOBAL_PROPERTY(bool, smartScheme, true)
     // Taris Music, TarisOS's music player (its MPRIS identity)
