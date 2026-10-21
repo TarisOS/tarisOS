@@ -12,7 +12,7 @@ import qs.utils
 // Window style (Settings > Window style): window-style.conf, key=value lines read by
 // taris.lua; saving reloads Hyprland. With bordertheme on, the border takes its colours
 // from the colour scheme (theme-border.conf, which Colours writes) instead of colors/inactive.
-// With gradient off the border is one colour: solid (empty: the first of colors). opacity is the
+// The border is one colour: solid (empty: the first of colors). opacity is the
 // windows' (percent), blur the blur behind windows, blursize and blurpasses the blur's strength
 // for everything blurred, shellblur the blur behind the shell's panels (Colours applies it).
 Singleton {
@@ -20,7 +20,6 @@ Singleton {
 
     // A fresh install: one border colour, the scheme's accent, following scheme changes
     readonly property var defaults: ({
-            gradient: "0",
             bordertheme: "1",
             colors: "c4b5fd a855f7 da70d6",
             solid: "",

@@ -12,7 +12,9 @@
 #   while they have none of their own, else named there to be read. Added to what the account has,
 #   never replacing it. Hermes reads no file of the account's own every session: skills only.
 # - For Claude Code, a session start hook (~/.claude/settings.json) that gives every session the
-#   development rules on a TarisOS development machine (/etc/taris/dev-machine, from taris-dev).
+#   development rules on a TarisOS development machine (/etc/taris/dev-machine, from taris-dev),
+#   and reduced motion (prefersReducedMotion): its spinner's shimmer and flashes redraw the terminal
+#   all the time an agent works. An account's own setting stays.
 # Usage: /usr/lib/taris/agent-setup
 set -euo pipefail
 
@@ -83,7 +85,7 @@ link_or_name "$HOME/.codex"
 link_or_name "$HOME/.pi/agent"
 
 # Claude Code: the development rules at the start of every session (new, resumed, after /clear and
-# after compaction) on a development machine; nothing elsewhere
+# after compaction) on a development machine, nothing elsewhere; and reduced motion
 hook='[ -e /etc/taris/dev-machine ] && cat /usr/share/taris/agent-rules-dev.md 2>/dev/null; true'
 python3 -I - "$HOME/.claude/settings.json" "$hook" <<'PY'
 import json, os, sys
@@ -97,15 +99,21 @@ except FileNotFoundError:
 except ValueError:
     print(f"Skipping {path}: it isn't valid JSON", file=sys.stderr)
     sys.exit(0)
-hooks = data.setdefault("hooks", {}) if isinstance(data, dict) else None
+if not isinstance(data, dict):
+    print(f"Skipping {path}: it isn't laid out as Claude Code's settings are", file=sys.stderr)
+    sys.exit(0)
+changed = "prefersReducedMotion" not in data
+data.setdefault("prefersReducedMotion", True)
+hooks = data.setdefault("hooks", {})
 groups = hooks.setdefault("SessionStart", []) if isinstance(hooks, dict) else None
 if not isinstance(groups, list):
-    print(f"Skipping {path}: its hooks aren't laid out as Claude Code's are", file=sys.stderr)
+    print(f"Skipping the hook in {path}: its hooks aren't laid out as Claude Code's are", file=sys.stderr)
+elif not any(isinstance(h, dict) and h.get("command") == command
+             for g in groups if isinstance(g, dict) for h in g.get("hooks", [])):
+    groups.append({"hooks": [{"type": "command", "command": command}]})
+    changed = True
+if not changed:
     sys.exit(0)
-if any(isinstance(h, dict) and h.get("command") == command
-       for g in groups if isinstance(g, dict) for h in g.get("hooks", [])):
-    sys.exit(0)
-groups.append({"hooks": [{"type": "command", "command": command}]})
 os.makedirs(os.path.dirname(path), exist_ok=True)
 with open(path + ".new", "w") as f:
     json.dump(data, f, indent=2)

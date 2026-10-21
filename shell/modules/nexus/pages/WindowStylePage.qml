@@ -21,10 +21,10 @@ PageBase {
     readonly property var style: WindowStyle.style
     readonly property bool themeBorder: style.bordertheme !== "0"
     // The border's colours as they are: the scheme's while it follows the scheme
-    readonly property list<string> gradientColours: themeBorder ? [Colours.palette.m3primary, Colours.palette.m3secondary, Colours.palette.m3tertiary].map(c => String(c)) : style.colors.split(/\s+/).filter(c => /^[0-9a-fA-F]{6}$/.test(c)).map(c => `#${c}`)
+    readonly property list<string> borderColours: themeBorder ? [Colours.palette.m3primary, Colours.palette.m3secondary, Colours.palette.m3tertiary].map(c => String(c)) : style.colors.split(/\s+/).filter(c => /^[0-9a-fA-F]{6}$/.test(c)).map(c => `#${c}`)
     readonly property string inactiveColour: themeBorder ? String(Colours.palette.m3outlineVariant) : `#${style.inactive}`
-    // The border's one colour while the gradient is off
-    readonly property string solidColour: !themeBorder && /^[0-9a-fA-F]{6}$/.test(style.solid) ? `#${style.solid}` : gradientColours[0] ?? ""
+    // The border's one colour
+    readonly property string solidColour: !themeBorder && /^[0-9a-fA-F]{6}$/.test(style.solid) ? `#${style.solid}` : borderColours[0] ?? ""
 
     function save(changes: var): void {
         WindowStyle.save(changes);
@@ -38,12 +38,6 @@ PageBase {
             inactive: inactive.slice(1, 7),
             bordertheme: "0"
         });
-    }
-
-    function setGradient(i: int, c: color): void {
-        const cols = [...gradientColours];
-        cols[i] = String(c);
-        setBorder(cols, inactiveColour, solidColour);
     }
 
     title: Tr.tr("Window style")
@@ -233,14 +227,6 @@ PageBase {
 
         ToggleRow {
             first: true
-            text: Tr.tr("Animated gradient border")
-            checked: root.style.gradient === "1"
-            onToggled: root.save({
-                    gradient: checked ? "1" : "0"
-                })
-        }
-
-        ToggleRow {
             text: Tr.tr("Match the theme colours")
             checked: root.themeBorder
             onToggled: root.save({
@@ -249,29 +235,11 @@ PageBase {
         }
 
         ColourRow {
-            visible: root.style.gradient === "1"
-            label: Tr.tr("Gradient colors")
-
-            Repeater {
-                model: root.gradientColours
-
-                ColorWell {
-                    required property string modelData
-                    required property int index
-
-                    color: modelData
-                    onPicked: c => root.setGradient(index, c)
-                }
-            }
-        }
-
-        ColourRow {
-            visible: root.style.gradient !== "1"
             label: Tr.tr("Border colour")
 
             ColorWell {
                 color: root.solidColour
-                onPicked: c => root.setBorder(root.gradientColours, root.inactiveColour, String(c))
+                onPicked: c => root.setBorder(root.borderColours, root.inactiveColour, String(c))
             }
         }
 
@@ -280,7 +248,7 @@ PageBase {
 
             ColorWell {
                 color: root.inactiveColour
-                onPicked: c => root.setBorder(root.gradientColours, String(c), root.solidColour)
+                onPicked: c => root.setBorder(root.borderColours, String(c), root.solidColour)
             }
         }
 
@@ -288,7 +256,7 @@ PageBase {
             last: true
             icon: "restart_alt"
             text: Tr.tr("Default colors")
-            // Back to the scheme's colours (the accent, or the gradient from them)
+            // Back to the scheme's colours (its accent)
             onClicked: root.save({
                     colors: WindowStyle.defaults.colors,
                     solid: WindowStyle.defaults.solid,

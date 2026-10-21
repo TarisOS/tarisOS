@@ -91,7 +91,7 @@ QtObject {
         },
         {
             id: "windowstyle",
-            keywords: "window windows border gradient gaps gap rounding corners animation workspace swipe gesture floating float tiled titlebar title bar resize columns",
+            keywords: "window windows border gaps gap rounding corners animation workspace swipe gesture floating float tiled titlebar title bar resize columns",
             label: Tr.tr("Window style"),
             icon: "border_style",
             description: Tr.tr("Borders, gaps, corners, workspace animation, swipes"),

@@ -143,7 +143,7 @@ sha256sums=('9a89963ad0aa6c66b24702f4d3610e3dbef48ae1fa97bea2c725aaec2d0dbe0a'
             'a819e7b7e13d02682dca89cb1754cf7098ab0be2dfd5360cad9d90b33b125977'
             '888719e5366b8938c937268c40185977b1b0dcc2f4ca1cf7b066641b67089995'
             '558851ddd3b3597a3027bff48818bc46888fd021dbd77ec83a1b59b87e467593'
-            '7fbd249280844dfaffce3b0894afc5781efea4e8620fb9ed1cf7faa784f1bf53')
+            'eb00ffb994ef91d67b30335b78be65c941568c7848c3ee04124d7533cebef079')
 
 # This repository's packaging folder (the Hyprland config, defaults, agent skills, title bars)
 _packaging="${TARIS_PACKAGING:-$startdir/../..}"

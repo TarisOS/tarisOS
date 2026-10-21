@@ -4,7 +4,7 @@ description: >
   REQUIRED for anything about the desktop shell on this machine: Taris, TarisOS's shell.
   Use for the taskbar/bar, dock, app launcher and app drawer, notifications and toasts, OSD
   sliders, sidebar, dashboard, overview, lock screen, idle/sleep, wallpaper, colour schemes and
-  themes, the window border gradient, gaps, corners and other window style, the Taris
+  themes, the window border, gaps, corners and other window style, the Taris
   settings app, the shell's keybindings and gestures, screenshots and screen recording, and
   the Touch Bar layout. Triggers: taris, shell, bar, dock, launcher, notifications, wallpaper,
   scheme, colours, theme, border, gaps, lock, idle, settings app, ~/.config/taris/.
@@ -46,7 +46,7 @@ On a TarisOS development machine (`/etc/taris/dev-machine`), the development rul
 ~/.config/taris/
 ├── shell.json              # Shell config: bar, dock entry, launcher, notifications, idle, appearance...
 │                           #   Reloads on save.
-├── window-style.conf       # Window style page: key=value (gradient, bordertheme, colors, inactive,
+├── window-style.conf       # Window style page: key=value (bordertheme, colors, inactive,
 │                           #   bordersize, gapsin, gapsout, roundingon, rounding, fade, swipe,
 │                           #   titlebars, borderresize, columns, floatnew, opacity (windows', percent),
 │                           #   blur, blursize, blurpasses, shellblur (the panels')); run
@@ -128,7 +128,7 @@ They're listed first on that page and in the launcher's `>scheme`, which is how 
 `taris scheme set` only sets the plain scheme underneath. Saved themes are kept in
 `colour-overrides.json` (`themes`).
 
-The window border gradient follows the scheme while `bordertheme=1` in `window-style.conf`; picking
+The window border's colour follows the scheme while `bordertheme=1` in `window-style.conf`; picking
 border colours on the Window style page turns that off, picking a scheme turns it back on.
 
 ## Hyprland Integration
