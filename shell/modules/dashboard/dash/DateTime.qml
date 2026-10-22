@@ -75,6 +75,7 @@ Item {
                 // The clock ticks every second only while something shows seconds (Time)
                 Ref {
                     service: Time
+                    active: root.visible
                 }
             }
         }

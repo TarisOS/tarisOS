@@ -25,8 +25,11 @@ StyledRect {
     radius: Tokens.rounding.large
     color: Colours.tPalette.m3surfaceContainer
 
+    // The recorder is checked (pidof every second) only while this card shows: the utilities drawer
+    // keeps it loaded when closed
     Ref {
         service: Recorder
+        active: root.visible
     }
 
     ColumnLayout {

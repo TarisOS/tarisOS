@@ -20,7 +20,7 @@ StyledRect {
     implicitHeight: Tokens.sizes.dashboard.perfNetworkCardHeight
 
     ServiceRef {
-        service: NetworkUsage
+        service: root.visible ? NetworkUsage : null
     }
 
     ColumnLayout {
@@ -53,11 +53,11 @@ StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
+            // Drawn on the CPU (a painted item) and redrawn whole on every change: it changes once
+            // per sample, with its newest point at the right edge, instead of sliding and rescaling
+            // over every frame (which kept the screen redrawing at 60 frames a second)
             SparklineItem {
                 id: sparkline
-
-                property real targetMax: 1024
-                property real smoothMax: targetMax
 
                 anchors.fill: parent
                 line1: NetworkUsage.uploadBuffer // qmllint disable missing-type
@@ -66,32 +66,9 @@ StyledRect {
                 line2: NetworkUsage.downloadBuffer // qmllint disable missing-type
                 line2Color: Colours.palette.m3tertiary
                 line2FillAlpha: 0.2
-                maxValue: smoothMax
+                maxValue: Math.max(NetworkUsage.downloadBuffer.maximum, NetworkUsage.uploadBuffer.maximum, 1024)
                 historyLength: NetworkUsage.historyLength
-
-                Connections {
-                    function onValuesChanged(): void {
-                        sparkline.targetMax = Math.max(NetworkUsage.downloadBuffer.maximum, NetworkUsage.uploadBuffer.maximum, 1024);
-                        slideAnim.restart();
-                    }
-
-                    target: NetworkUsage.downloadBuffer
-                }
-
-                NumberAnimation {
-                    id: slideAnim
-
-                    target: sparkline
-                    property: "slideProgress"
-                    from: 0
-                    to: 1
-                    easing.type: Easing.Linear
-                    duration: GlobalConfig.dashboard.resourceUpdateInterval
-                }
-
-                Behavior on smoothMax {
-                    Anim {}
-                }
+                slideProgress: 1
             }
 
             // "Collecting data" placeholder

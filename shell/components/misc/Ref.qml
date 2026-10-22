@@ -3,9 +3,31 @@
 
 import QtQuick
 
+// Holds a service on (its refCount) while it exists and is active: a part that's kept while hidden
+// (a panel kept loaded) lets go of it while it isn't shown
 QtObject {
-    required property var service
+    id: root
 
-    Component.onCompleted: service.refCount++
-    Component.onDestruction: service.refCount--
+    required property var service
+    property bool active: true
+    property bool counted
+
+    function sync(): void {
+        if (!service)
+            return;
+        if (active && !counted) {
+            service.refCount++;
+            counted = true;
+        } else if (!active && counted) {
+            service.refCount--;
+            counted = false;
+        }
+    }
+
+    onActiveChanged: sync()
+    Component.onCompleted: sync()
+    Component.onDestruction: {
+        if (counted)
+            service.refCount--;
+    }
 }

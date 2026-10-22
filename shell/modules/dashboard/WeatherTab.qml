@@ -13,10 +13,22 @@ Item {
     id: root
 
     readonly property var today: Weather.forecast && Weather.forecast.length > 0 ? Weather.forecast[0] : null
+    // Reloaded each time it's shown (the dashboard is kept, not built on each opening), not again
+    // within a minute (switching tabs back and forth)
+    property double reloadedAt
 
     implicitWidth: layout.implicitWidth > 800 ? layout.implicitWidth : 840
     implicitHeight: layout.implicitHeight
-    Component.onCompleted: Weather.reload()
+    onVisibleChanged: {
+        if (visible && Date.now() - reloadedAt > 60000) {
+            reloadedAt = Date.now();
+            Weather.reload();
+        }
+    }
+    Component.onCompleted: {
+        reloadedAt = Date.now();
+        Weather.reload();
+    }
 
     ColumnLayout {
         id: layout

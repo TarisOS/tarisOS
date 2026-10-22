@@ -159,8 +159,11 @@ Item {
         Component.onCompleted: forceActiveFocus()
 
         Connections {
+            // The search is kept between openings (Wrapper): typed in again at each one, empty after
             function onLauncherChanged(): void {
-                if (!root.screenState.launcher)
+                if (root.screenState.launcher)
+                    search.forceActiveFocus();
+                else
                     search.text = "";
             }
 

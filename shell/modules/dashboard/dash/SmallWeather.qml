@@ -9,12 +9,25 @@ import qs.services
 Item {
     id: root
 
+    // Reloaded each time it's shown (the dashboard is kept, not built on each opening), not again
+    // within a minute (switching tabs back and forth)
+    property double reloadedAt
+
     anchors.centerIn: parent
 
     implicitWidth: icon.implicitWidth + info.implicitWidth + info.anchors.leftMargin
     implicitHeight: Math.max(icon.implicitHeight, info.implicitHeight) + Tokens.padding.largeIncreased * 2
 
-    Component.onCompleted: Weather.reload()
+    onVisibleChanged: {
+        if (visible && Date.now() - reloadedAt > 60000) {
+            reloadedAt = Date.now();
+            Weather.reload();
+        }
+    }
+    Component.onCompleted: {
+        reloadedAt = Date.now();
+        Weather.reload();
+    }
 
     MaterialIcon {
         id: icon

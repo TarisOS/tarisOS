@@ -45,8 +45,9 @@ Singleton {
     // window-style.conf has been read (or isn't there): style is the account's from now on
     property bool styleRead
     // kitty's background opacity, the windows' (taris.lua keeps kitty solid as a window, so only its
-    // background is see-through and its text stays sharp: /etc/xdg/kitty/kitty.conf includes this)
-    readonly property string kittyConf: `background_opacity ${Math.max(0.3, Math.min(1, (Number(style.opacity) || 80) / 100))}\n`
+    // background is see-through and its text stays sharp: /etc/xdg/kitty/kitty.conf includes this);
+    // solid in Power saver, as every window is then (PowerSaver)
+    readonly property string kittyConf: `background_opacity ${PowerSaver.active ? 1 : Math.max(0.3, Math.min(1, (Number(style.opacity) || 80) / 100))}\n`
 
     function save(changes: var): void {
         style = Object.assign({}, style, changes);

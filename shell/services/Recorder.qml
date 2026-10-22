@@ -6,6 +6,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.components.misc
 
 Singleton {
     id: root
@@ -112,6 +113,13 @@ Singleton {
         triggeredOnStart: true
 
         onTriggered: checkProc.running = true
+    }
+
+    // The clock ticks every second only while something holds it (Time): a recording does, for its
+    // elapsed time
+    Ref {
+        service: Time
+        active: props.running && !props.paused
     }
 
     Connections {

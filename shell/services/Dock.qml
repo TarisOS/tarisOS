@@ -38,6 +38,12 @@ Singleton {
     // dock as running: a click shows its window again, Quit shuts it down (and the VM with it).
     readonly property string steamId: "steam"
     property bool steamRunning
+    readonly property bool steamInstalled: {
+        DesktopEntries.applications.values; // Again when apps are installed or removed
+        return !!DesktopEntries.byId(steamId);
+    }
+    // Docks shown (Ref in the dock's Wrapper): what's running only shows there
+    property int refCount: 0
     // Bumped when the icon theme changes (Settings > Wallpaper & style), so the dock's icons, made
     // once and kept, are read again from the new pack
     property int iconRevision
@@ -347,6 +353,11 @@ Singleton {
         }
     }
 
+    onSteamInstalledChanged: {
+        if (!steamInstalled)
+            steamRunning = false;
+    }
+
     Process {
         id: autostartGet
 
@@ -357,7 +368,9 @@ Singleton {
         }
     }
 
-    // Steam's VM, looked for every few seconds while Steam is installed
+    // Steam's VM, looked for every few seconds while Steam is installed and a dock is shown (pgrep
+    // reads every process's command line: about 6 ms each time, every 3 s all day otherwise). Hidden,
+    // the last answer stays; a dock appearing asks again at once
     Process {
         id: steamCheck
 
@@ -369,15 +382,8 @@ Singleton {
         interval: 3000
         repeat: true
         triggeredOnStart: true
-        running: {
-            DesktopEntries.applications.values; // Again when apps are installed or removed
-            return !!DesktopEntries.byId(root.steamId);
-        }
+        running: root.steamInstalled && root.refCount > 0
         onTriggered: steamCheck.running = true
-        onRunningChanged: {
-            if (!running)
-                root.steamRunning = false;
-        }
     }
 
     // Qt doesn't follow the theme by itself: it's set in Qt, then the icons are read again

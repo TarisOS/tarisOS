@@ -26,18 +26,24 @@ Item {
     }
 
     property real offsetScale: shouldBeActive ? 0 : 1
+    // Built at the first opening and kept: building it (its apps) on every opening took about 200 ms
+    // of the main thread as it opened. While closed it's hidden, its search empty
+    property bool built
 
     onShouldBeActiveChanged: {
-        if (shouldBeActive)
+        if (shouldBeActive) {
+            built = true;
             implicitHeight = Qt.binding(() => content.implicitHeight);
-        else
+        } else {
             implicitHeight = implicitHeight; // Break binding during close anim
+        }
     }
 
     visible: offsetScale < 1
     anchors.bottomMargin: (-implicitHeight - 5) * offsetScale
     implicitHeight: content.implicitHeight
-    implicitWidth: content.implicitWidth || 630 // Hard coded fallback for first open
+    // Closed, the width it had when its content went with it (the frame's shapes follow it)
+    implicitWidth: (shouldBeActive || visible ? content.implicitWidth : 0) || 630 // Hard coded fallback for first open
     opacity: 1 - offsetScale
 
     Component.onCompleted: Qt.callLater(() => Apps) // Load apps on init
@@ -61,7 +67,7 @@ Item {
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
 
-            active: root.shouldBeActive || root.visible
+            active: root.built
 
             sourceComponent: Content {
                 screenState: root.screenState

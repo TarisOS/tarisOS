@@ -8,8 +8,11 @@
 local home = os.getenv("HOME")
 local qs = "taris-qs -c taris"
 
--- Panels animate themselves
-hl.layer_rule({ match = { namespace = "taris-(border-exclusion|area-picker|overview|agent)" }, no_anim = true })
+-- Panels animate themselves. The floating windows' button surfaces (titlebars) too: the shell takes
+-- them away while a panel is open and brings them back after, and Hyprland's fade of those
+-- (transparent until hovered) was about half of its work and frames at every panel opening and
+-- closing
+hl.layer_rule({ match = { namespace = "taris-(border-exclusion|area-picker|overview|agent|titlebars)" }, no_anim = true })
 hl.layer_rule({ match = { namespace = "taris-(drawers|background)" }, animation = "fade" })
 
 -- Shell shortcuts

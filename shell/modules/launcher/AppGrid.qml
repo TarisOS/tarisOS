@@ -259,6 +259,22 @@ GridView {
         active: null
     }
 
+    // Kept between openings (the launcher is): each opens at the top with the first app picked, as
+    // a new one did, and a menu left open closes with the launcher
+    Connections {
+        function onLauncherChanged(): void {
+            if (root.screenState.launcher) {
+                root.currentIndex = 0;
+                root.keyboardPicked = false;
+                root.positionViewAtBeginning();
+            } else {
+                appMenu.expanded = false;
+            }
+        }
+
+        target: root.screenState
+    }
+
     // Momentum scrolling for wheels and touchpads
     Glide {
         flickable: root

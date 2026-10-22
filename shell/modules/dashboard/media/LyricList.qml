@@ -240,6 +240,11 @@ Item {
             positionViewAtIndex(currentIndex, ListView.Center);
         }
         onModelChanged: Qt.callLater(() => positionViewAtIndex(currentIndex, ListView.Center))
+        // Back on the line being sung when shown again (the dashboard is kept while closed)
+        onVisibleChanged: {
+            if (visible)
+                positionViewAtIndex(currentIndex, ListView.Center);
+        }
 
         highlightRangeMode: ListView.ApplyRange
         highlightMoveDuration: Tokens.anim.durations.large

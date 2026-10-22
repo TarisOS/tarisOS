@@ -33,6 +33,7 @@ Scope {
         AgentTerminal; // Writes the shell's terminal colours (its terminal only starts when used)
         Stash.restore(); // The apps open again after a Stash
         Tor; // Follows Tor being switched on and off, whatever switches it
+        PowerSaver; // Applies Power saver (no blur, solid windows) whenever the profile is on
 
         if (GlobalConfig.utilities.vpn.enabled)
             VPN;

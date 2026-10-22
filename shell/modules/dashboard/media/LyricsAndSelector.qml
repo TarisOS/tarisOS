@@ -12,6 +12,8 @@ import qs.services
 import qs.utils
 
 Item {
+    id: root
+
     ColumnLayout {
         id: layout
 
@@ -57,6 +59,6 @@ Item {
     }
 
     ServiceRef {
-        service: Audio.beatTracker
+        service: root.visible ? Audio.beatTracker : null
     }
 }

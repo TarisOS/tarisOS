@@ -8,6 +8,7 @@ import Quickshell
 import Taris
 import Taris.Config
 import qs.components
+import qs.components.misc
 import qs.services
 
 // The dock, at the bottom of the screen: hidden until the pointer touches the bottom edge under it
@@ -44,6 +45,12 @@ Item {
 
     Behavior on implicitWidth {
         Anim {}
+    }
+
+    // The Dock's checks of what's running, while this dock is shown (Dock)
+    Ref {
+        service: Dock
+        active: root.visible
     }
 
     DockContent {
