@@ -1,0 +1,53 @@
+diff --git a/src/wayland/idle_notify/monitor.cpp b/src/wayland/idle_notify/monitor.cpp
+index 3f496e4..05f9cbe 100644
+--- a/src/wayland/idle_notify/monitor.cpp
++++ b/src/wayland/idle_notify/monitor.cpp
+@@ -19,11 +19,6 @@ void IdleMonitor::onPostReload() {
+ 		    .respectInhibitors = this->bRespectInhibitors.value()
+ 		};
+ 	});
+-
+-	this->bIsIdle.setBinding([this] {
+-		auto* notification = this->bNotification.value();
+-		return notification ? notification->bIsIdle.value() : false;
+-	});
+ }
+ 
+ void IdleMonitor::updateNotification() {
+@@ -31,7 +26,18 @@ void IdleMonitor::updateNotification() {
+ 	delete notification;
+ 	notification = nullptr;
+ 
+-	auto guard = qScopeGuard([&, this] { this->bNotification = notification; });
++	// Taris: isIdle follows the current notification through its signal. As a binding through
++	// bNotification it stayed with a deleted notification now and then, and the monitor never
++	// reported idle again once its timeout, enabled state or inhibitor setting had changed.
++	auto guard = qScopeGuard([&, this] {
++		this->bNotification = notification;
++		this->bIsIdle = notification ? notification->bIsIdle.value() : false;
++		if (notification) {
++			QObject::connect(notification, &impl::IdleNotification::isIdleChanged, this, [this, notification] {
++				this->bIsIdle = notification->bIsIdle.value();
++			});
++		}
++	});
+ 
+ 	auto params = this->bParams.value();
+ 
+diff --git a/src/wayland/idle_notify/proto.hpp b/src/wayland/idle_notify/proto.hpp
+index 11dbf29..391d098 100644
+--- a/src/wayland/idle_notify/proto.hpp
++++ b/src/wayland/idle_notify/proto.hpp
+@@ -41,7 +41,11 @@ public:
+ 	~IdleNotification() override;
+ 	Q_DISABLE_COPY_MOVE(IdleNotification);
+ 
+-	Q_OBJECT_BINDABLE_PROPERTY(IdleNotification, bool, bIsIdle);
++signals:
++	void isIdleChanged();
++
++public:
++	Q_OBJECT_BINDABLE_PROPERTY(IdleNotification, bool, bIsIdle, &IdleNotification::isIdleChanged);
+ 
+ protected:
+ 	void ext_idle_notification_v1_idled() override;
