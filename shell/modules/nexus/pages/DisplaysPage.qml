@@ -777,7 +777,6 @@ PageBase {
         ToggleRow {
             visible: Brightness.sensorPath !== "" && Brightness.panel !== null
             text: Tr.tr("Automatic brightness")
-            subtext: Tr.tr("Follows the room's light, from where you set it")
             checked: GlobalConfig.services.autoBrightness
             onToggled: GlobalConfig.services.autoBrightness = checked
         }

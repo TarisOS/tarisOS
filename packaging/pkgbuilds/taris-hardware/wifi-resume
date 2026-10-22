@@ -2,14 +2,15 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# Wi-Fi after waking from sleep (taris-wifi-resume.service, once per resume). The Broadcom BCM4378
-# and BCM4387 firmware of some Apple Silicon Macs can wake up wedged: scans fail and every network
-# rejects the connection (status 16), which NetworkManager reports as a wrong password. Only
-# reloading the driver (brcmfmac) clears it. Only that signature gets a reload: on this Mac a reload
-# itself fails now and then ("FW failed to initialize", 6 of 10 in testing on 2026-10-19, with or
-# without the link's L1 substates), and then Wi-Fi is gone until a restart. Wi-Fi that is simply
-# not back (no saved network in range, a slow router) is left alone. Nothing is done when Wi-Fi
-# comes back by itself, when it's switched off, or on other Wi-Fi chips.
+# Wi-Fi after waking from sleep (taris-wifi-resume.service, once per resume): a rescan and a
+# reconnect as soon as NetworkManager has the device back. The Broadcom BCM4378 and BCM4387 firmware
+# of some Apple Silicon Macs can wake up wedged: scans fail and every network rejects the connection
+# (status 16), which NetworkManager reports as a wrong password. Only reloading the driver
+# (brcmfmac) clears it. Only that signature gets a reload: on this Mac a reload itself fails now and
+# then ("FW failed to initialize", 6 of 10 in testing on 2026-10-19, with or without the link's L1
+# substates), and then Wi-Fi is gone until a restart. Wi-Fi that is simply not back (no saved
+# network in range, a slow router) is left alone. Nothing is done when Wi-Fi comes back by itself,
+# when it's switched off, or on other Wi-Fi chips.
 # systemd-sleep runs this after every wake (/usr/lib/systemd/system-sleep/taris-wifi-resume), and it
 # only starts the service, as a job of its own, without waiting for it. Pulled in by suspend.target
 # instead, the service was part of the wake's transaction, which logind starts as irreversible:
@@ -57,6 +58,17 @@ wedged() {
 		grep -cE 'CTRL-EVENT-ASSOC-REJECT.*status_code=16( |$)')
 	((rejects >= 2))
 }
+
+# Right after the wake: once NetworkManager has the device back (at most 5 s), rescan and reconnect
+for ((i = 0; i < 10; i++)); do
+	[[ $(wifi_state) == disconnected ]] && break
+	sleep 0.5
+done
+if [[ $(wifi_state) == disconnected ]]; then
+	iface=$(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2 == "wifi" { print $1; exit }')
+	nmcli device wifi list ifname "$iface" --rescan yes >/dev/null 2>&1
+	nmcli device connect "$iface" >/dev/null 2>&1
+fi
 
 for ((i = 0; i < wait_back; i++)); do
 	state=$(wifi_state)

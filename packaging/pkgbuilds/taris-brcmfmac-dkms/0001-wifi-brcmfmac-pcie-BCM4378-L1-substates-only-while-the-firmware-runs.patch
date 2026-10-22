@@ -15,13 +15,15 @@ always starts with L1 alone, as it does at boot and as every start that
 worked in testing did.
 Clock PM and the PCI-PM substates stay off.
 
+Switch them off again when the system wakes (brcmf_pcie_pm_leave_D3()):
+with them on, the firmware stopped answering a few seconds after some
+wakes (scans and every command timing out until a restart); with them
+blocked, every wake in testing recovered.
+
 Reloading the driver fails now and then on this chip ("FW failed to
 initialize", only a restart brings the chip back) with or without these
 states; this doesn't change that.
 ---
- drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
 --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
 +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
 @@ -729,6 +729,27 @@
@@ -70,3 +72,13 @@ states; this doesn't change that.
  	brcmf_pcie_bus_console_read(devinfo, false);
  
  	brcmf_pcie_fwcon_timer(devinfo, true);
+@@ -3045,6 +3070,9 @@
+ 	devinfo = bus->bus_priv.pcie->devinfo;
+ 	brcmf_dbg(PCIE, "Enter, dev=%p, bus=%p\n", dev, bus);
+ 
++	/* The machine woke: the link out of L1.1/L1.2 */
++	brcmf_pcie_l1ss(devinfo, false);
++
+ 	/* Check if device is still up and running, if so we are ready */
+ 	if (brcmf_pcie_read_pcie32(devinfo, devinfo->reginfo->intmask) != 0) {
+ 		brcmf_dbg(PCIE, "Try to wakeup device....\n");

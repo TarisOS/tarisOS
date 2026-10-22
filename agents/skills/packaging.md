@@ -54,21 +54,28 @@ updates reach installed machines and removing the package undoes it. The image i
 - Raw `pacman`, `command -v` and `pacman-key` are fine in package and build tooling, where direct
   package-manager behaviour is the point.
 
-## Drivers built for one kernel
+## Drivers patched for every kernel
 
-`taris-tipd-dkms`, `taris-appledrm-dkms` and `taris-brcmfmac-dkms` carry Asahi's own driver source
-with TarisOS's patches, and DKMS builds them only for the kernel made from that source
-(`BUILD_EXCLUSIVE_KERNEL` in each `dkms.conf`). When `linux-asahi` moves to newer source, they're
-skipped for the new kernel and the kernel's own drivers load: the system keeps working, but the
-M1's USB-C display stays dark, a USB-C display unplugged while on breaks modesetting again until a
-restart, and the M1's Wi-Fi link stays out of its deeper sleep (about 0.2 W more). To move them:
+`taris-tipd-dkms`, `taris-appledrm-dkms` and `taris-brcmfmac-dkms` patch drivers of Asahi's kernel
+without carrying its source: each holds only TarisOS's patches, `asahi-source.sh` (the same script
+in all three) and `asahi-source.conf` (which source folders, which patches). DKMS builds them for
+every kernel installed (its pacman hook), and before each build `asahi-source.sh` takes Asahi's tag
+from the kernel release (`7.2.12-1-1-ARCH`: `asahi-7.2.12-1`), fetches just those folders (a
+shallow, sparse clone, cached in `/var/cache/taris-dkms`), and applies the patches. A patch the
+source already has is skipped. One that no longer applies stops that build, and the kernel's own
+driver loads instead: the M1's USB-C display stays dark, a USB-C display unplugged while on breaks
+modesetting until a restart, or the Wi-Fi link stays in L1 (about 0.2 W more). Nothing needs doing
+per Asahi release, except when a patch stops applying:
 
-- set `_tag` and `pkgver` to the new source's tag, `PACKAGE_VERSION` and `BUILD_EXCLUSIVE_KERNEL`
-  in `dkms.conf` to match (the `package()` check refuses a mismatch);
-- `updpkgsums`, then check the patches still apply (`makepkg -o`); drop one that the new source
-  already has;
-- check `usb-c-display` (taris-hardware) against the new device trees: it leaves a tree it doesn't
-  recognise as it is and says so in pacman's output.
+- bring the patch up to date against the new source (DKMS's `make.log` for that kernel says which
+  one stopped), and test it as the build does: `asahi-source.sh <kernel release>` in a copy of the
+  package's folder, then `make -C /usr/lib/modules/<release>/build M=$PWD modules`;
+- without a network at the kernel update the build stops too: `sudo dkms autoinstall` builds it
+  later.
+
+`usb-c-display` (taris-hardware) patches the device trees of each kernel the same way, by their
+structure: it leaves a tree it doesn't recognise as it is and says so in pacman's output (Asahi
+moved the display DARTs from one cell to five in 7.2: it follows the cells the tree has).
 
 ## Checks before handing over
 

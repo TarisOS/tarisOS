@@ -1,7 +1,8 @@
 taris-appledrm-dkms
 
-The Apple display driver (drivers/gpu/drm/apple) from Asahi Linux's kernel source, tag
-asahi-7.1.13-3 (https://github.com/AsahiLinux/linux), by the Asahi Linux contributors. Licensed
+The Apple display driver (drivers/gpu/drm/apple) from Asahi Linux's kernel source
+(https://github.com/AsahiLinux/linux), by the Asahi Linux contributors. The package holds no
+kernel source: asahi-source.sh fetches the driver's source for each kernel it's built for. Licensed
 under the GNU General Public License version 2; most of its files may also be used under the MIT
 licence, as their SPDX lines say.
 

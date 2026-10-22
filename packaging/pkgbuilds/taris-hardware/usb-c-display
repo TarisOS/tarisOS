@@ -153,6 +153,7 @@ def is_(node, suffix):
 M1 = {
     "dcpext": "/soc/dcp@271c00000",
     "dcpext_dart": "/soc/iommu@27130c000",
+    "disp0_dart": "/soc/iommu@231304000",
     "dispext0_dart": "/soc/iommu@271304000",
     "dcpext_mbox": "/soc/mbox@271c08000",
     "dpaudio1": "/soc/audio-controller@238334000",
@@ -174,6 +175,10 @@ def patch_m1(tree):
     phy_endpoint = tree.node(M1["atcphy1"] + "/ports/port@0/endpoint")
     typec1_endpoint = tree.node(M1["typec1"] + "/ports/port@1/endpoint")
     piodma = n["dcpext"].child("piodma")
+    # The display DARTs take one cell in older trees, five in newer ones (the stream and its
+    # address range); the display's own entry is on disp0's DART
+    iommu_cells = cells(n["disp0_dart"].props.get("#iommu-cells", b""))
+    display_iommus = cells(n["display"].props.get("iommus", b""))
 
     def points_to(node, prop, target):
         value = cells(node.props.get(prop, b"")) if node else ()
@@ -187,7 +192,8 @@ def patch_m1(tree):
             strings(n["ps_atc1_common"], "label") == ["atc1_common"] and
             # dcpext still off and not routed anywhere (a kernel that does it some other way keeps
             # its own), with its own DART, mailbox and piodma DART; the connector on this PHY; the
-            # display on disp0's DART alone
+            # display on disp0's DART alone, as many cells as that DART takes, and dispext0's DART
+            # taking as many
             strings(n["dcpext"], "status") == ["disabled"] and
             not any(p in n["dcpext"].props for p in ("phys", "mux-controls", "apple,dptx-phy")) and
             points_to(n["dcpext"], "iommus", n["dcpext_dart"]) and
@@ -195,12 +201,16 @@ def patch_m1(tree):
             points_to(piodma, "iommus", n["dispext0_dart"]) and
             points_to(typec1_endpoint, "remote-endpoint", phy_endpoint) and
             "displayport" not in n["typec1"].props and
-            len(n["display"].props.get("iommus", b"")) == 8):
+            len(iommu_cells) == 1 and
+            cells(n["dispext0_dart"].props.get("#iommu-cells", b"")) == iommu_cells and
+            len(display_iommus) == 1 + iommu_cells[0] and
+            display_iommus[0] == tree.handle(n["disp0_dart"])):
         return False
 
     aliases.props["dcpext"] = string(M1["dcpext"])
     n["typec1"].props["displayport"] = u32(tree.phandle(n["dcpext"]))
-    n["display"].props["iommus"] += u32(tree.phandle(n["dispext0_dart"]), 0)
+    # dispext0's DART beside it, with the same arguments (as Asahi's hack has it, either way)
+    n["display"].props["iommus"] += u32(tree.phandle(n["dispext0_dart"]), *display_iommus[1:])
     for label in ("dispext0_dart", "dcpext_dart", "dcpext_mbox", "dcpext", "dpaudio1"):
         n[label].props["status"] = string("okay")
     n["dcpext"].props.update({

@@ -1,8 +1,9 @@
 taris-tipd-dkms
 
-The USB-C controller driver (drivers/usb/typec/tipd) from Asahi Linux's kernel source, tag
-asahi-7.1.13-3 (https://github.com/AsahiLinux/linux), by its authors and the Asahi Linux
-contributors. Licensed under the GNU General Public License version 2 (some files version 2 or
+The USB-C controller driver (drivers/usb/typec/tipd) from Asahi Linux's kernel source
+(https://github.com/AsahiLinux/linux), by its authors and the Asahi Linux contributors. The
+package holds no kernel source: asahi-source.sh fetches the driver's source for each kernel it's
+built for. Licensed under the GNU General Public License version 2 (some files version 2 or
 later, as their SPDX lines say).
 
 Changed by TarisOS (https://github.com/TarisOS/tarisOS) in 2026, by applying two commits by Janne

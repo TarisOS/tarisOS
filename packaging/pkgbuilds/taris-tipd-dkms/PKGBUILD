@@ -2,70 +2,44 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 # A display on the M1 Macs' USB-C (with taris-hardware's usb-c-display): the USB-C controller's
-# driver (tipd), from the source of the kernel TarisOS runs (Asahi Linux's asahi-7.1.13-3, as
-# asahi-alarm's linux-asahi builds it), with Janne Grunau's two DP alt-mode commits from Asahi's
-# work-in-progress branches. They tell the display driver when a display on USB-C comes and goes,
-# which the kernel's own driver never does. DKMS builds it for that kernel only (dkms.conf): a kernel
-# from newer source keeps its own driver, and the USB-C display stays dark until this package moves
-# to that source (pkgver is the source's tag; dkms.conf names the same version and kernel).
+# driver (tipd) with Janne Grunau's two DP alt-mode commits from Asahi Linux's work-in-progress
+# branches. They tell the display driver when a display on USB-C comes and goes, which the kernel's
+# own driver never does. No kernel source in the package: DKMS builds it for every Asahi Linux
+# kernel installed, and before each build asahi-source.sh fetches that kernel's driver source and
+# applies the commits (dkms.conf). A kernel whose source they don't apply to keeps its own driver,
+# and the USB-C display stays dark until the commits are brought up to date.
 
 pkgname=taris-tipd-dkms
-pkgver=7.1.13.3
+epoch=1
+pkgver=1.0.0
 pkgrel=1
-_tag=asahi-7.1.13-3
-pkgdesc='TarisOS: the USB-C controller driver that reports displays on USB-C, for DKMS'
+pkgdesc="TarisOS: the USB-C controller's driver with DisplayPort alt mode, for DKMS"
 arch=('aarch64')
 url='https://github.com/AsahiLinux/linux'
 license=('GPL-2.0-only')
-depends=('dkms' 'linux-asahi-headers')
-_files=(Makefile core.c i2c.c spmi.c tps6598x.h trace.c trace.h)
-_raw="https://raw.githubusercontent.com/AsahiLinux/linux/$_tag/drivers/usb/typec/tipd"
-source=("$_tag-Makefile::$_raw/Makefile"
-        "$_tag-core.c::$_raw/core.c"
-        "$_tag-i2c.c::$_raw/i2c.c"
-        "$_tag-spmi.c::$_raw/spmi.c"
-        "$_tag-tps6598x.h::$_raw/tps6598x.h"
-        "$_tag-trace.c::$_raw/trace.c"
-        "$_tag-trace.h::$_raw/trace.h"
-        '0001-usb-typec-tipd-Track-data_status-changes-for-CD321x.patch'
+depends=('dkms' 'linux-asahi-headers' 'git' 'patch')
+source=('0001-usb-typec-tipd-Track-data_status-changes-for-CD321x.patch'
         '0002-usb-typec-tipd-HACK-Use-drm-oob-hotplug-event.patch'
         'taris-notices.patch'
+        'asahi-source.sh'
+        'asahi-source.conf'
         'dkms.conf'
         'NOTICE')
-sha256sums=('04f8a20002ce8b7e0eac327a56539bf79a97cdce63f3a964a70c86307bf02a35'
-            '3f581b0837bf24c085fb08db0043329b6d3043fc1c9f6b25b005f7e7bdba0a72'
-            '6051ba21184915fc3399599655ed3fc8c71a4b0b57d3c8b6ebe32b21025ce9e1'
-            'a0f5b62407cdbf9c22bee02400864c7802be75ca7cb4a4fb170d18eb2937b17e'
-            'cf71a3a19d7d9a39f1987c7631cc955f8a150f8a5761c9567b7c421fbd7fe545'
-            '1aa4062980d6c62ddec438abdff474408ee6ff9c891ca134153a8187fbb92e87'
-            '21a469e23cf48152c31f61c0eea8723d43b650facb730bbb352193c73e27e4e6'
-            '5526af5e4116b80bfe9f31a2ef6bc3d65ff7e444febc9d69f89232a06d0c8060'
+sha256sums=('5526af5e4116b80bfe9f31a2ef6bc3d65ff7e444febc9d69f89232a06d0c8060'
             '5d8f9f10e6d7cd309af76ce23856b37832b74fc83399d998e7563f26cee24db8'
             '308097104b77fff8a113fbf2e7e058c4e343128c2b360e7705eb78781941b03f'
-            'bab4c5c96538dd2934381c7d5c6750dcf4c499562dc4b5eb38b1e3e46c7ef830'
-            '60482ad7e06a66935ce51e544bd06f6d82af00c4f7a809a46be7395787afad54')
-
-prepare() {
-    local f
-    rm -rf tipd
-    mkdir tipd
-    for f in "${_files[@]}"; do
-        cp "$_tag-$f" "tipd/$f"
-    done
-    # The commits are against the whole kernel tree (drivers/usb/typec/tipd/...)
-    patch -d tipd -Np5 <0001-usb-typec-tipd-Track-data_status-changes-for-CD321x.patch
-    patch -d tipd -Np5 <0002-usb-typec-tipd-HACK-Use-drm-oob-hotplug-event.patch
-    # The changed files say so (GPL-2.0 section 2a)
-    patch -d tipd -Np1 <taris-notices.patch
-}
+            '333e32aa08b1ddf108ea25486996a249e48373b3c118ffe3bff0c7b07469862c'
+            '6196a5dfbc759e05bae6c9cd467523b1a7a0e8b8a6a0f2a4a1ccf092006d7a58'
+            '73309c7b63157082bba60a1bc50acbb07b65a072e05db6341a87db23d10f2426'
+            '933ba2045bf1c459a6c7b7314b4657cc9fbd0d36d337c0de8818841622c83113')
 
 package() {
+    local src="$pkgdir/usr/src/taris-tipd-$pkgver"
     grep -qx "PACKAGE_VERSION=\"$pkgver\"" dkms.conf || {
         error "dkms.conf isn't for $pkgver"
         return 1
     }
-    install -Dm644 tipd/* dkms.conf -t "$pkgdir/usr/src/taris-tipd-$pkgver"
-    # What TarisOS changed, with the source and on its own
-    install -Dm644 NOTICE -t "$pkgdir/usr/src/taris-tipd-$pkgver"
+    install -Dm644 ./*.patch asahi-source.conf dkms.conf NOTICE -t "$src"
+    install -Dm755 asahi-source.sh -t "$src"
     install -Dm644 NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
 }

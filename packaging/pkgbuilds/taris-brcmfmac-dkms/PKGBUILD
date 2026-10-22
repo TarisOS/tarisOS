@@ -2,233 +2,43 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 # The M1 Macs' Wi-Fi link in its deeper sleep states (ASPM L1.1 and L1.2) while the firmware runs,
-# about 0.2 W less at idle: the Broadcom Wi-Fi driver (brcmfmac), from the source of the kernel
-# TarisOS runs (Asahi Linux's asahi-7.1.13-3, as asahi-alarm's linux-asahi builds it), with
-# TarisOS's change. The kernel leaves those states off; the driver switches them on once the
-# firmware is up and off again before every reset of the chip, so the firmware always starts with
-# L1 alone, as at boot. DKMS builds it, with the three firmware-vendor modules that use its
-# exports, for that kernel only (dkms.conf): a kernel from newer source keeps its own driver, and
-# the link stays in L1 until this package moves to that source (pkgver is the source's tag;
-# dkms.conf names the same version and kernel).
+# about 0.2 W less at idle: the Broadcom Wi-Fi driver (brcmfmac) with TarisOS's change. The kernel
+# leaves those states off; the driver switches them on once the firmware is up, and off again before
+# every reset of the chip and when the machine wakes (with them on, the firmware sometimes stopped
+# answering a few seconds after a wake). No kernel source in the package: DKMS builds it, with the
+# three firmware-vendor modules that use its exports, for every Asahi Linux kernel installed, and
+# before each build asahi-source.sh fetches that kernel's driver source and applies the change
+# (dkms.conf). A kernel whose source it doesn't apply to keeps its own driver, with the link in L1.
 
 pkgname=taris-brcmfmac-dkms
-pkgver=7.1.13.3
+epoch=1
+pkgver=1.0.0
 pkgrel=1
-_tag=asahi-7.1.13-3
-pkgdesc='TarisOS: the Broadcom Wi-Fi driver with the M1 Wi-Fi link in deeper sleep, for DKMS'
+pkgdesc="TarisOS: the Broadcom Wi-Fi driver with the M1 Wi-Fi link in deeper sleep, for DKMS"
 arch=('aarch64')
 url='https://github.com/AsahiLinux/linux'
 license=('ISC')
-depends=('dkms' 'linux-asahi-headers')
-_files=(brcmfmac/Makefile brcmfmac/acpi.c brcmfmac/bcdc.c brcmfmac/bcdc.h brcmfmac/bcmsdh.c brcmfmac/btcoex.c brcmfmac/btcoex.h brcmfmac/bus.h brcmfmac/cfg80211.c brcmfmac/cfg80211.h brcmfmac/chip.c brcmfmac/chip.h brcmfmac/common.c brcmfmac/common.h brcmfmac/commonring.c brcmfmac/commonring.h brcmfmac/core.c brcmfmac/core.h brcmfmac/debug.c brcmfmac/debug.h brcmfmac/dmi.c brcmfmac/feature.c brcmfmac/feature.h brcmfmac/firmware.c brcmfmac/firmware.h brcmfmac/flowring.c brcmfmac/flowring.h brcmfmac/fweh.c brcmfmac/fweh.h brcmfmac/fwil.c brcmfmac/fwil.h brcmfmac/fwil_types.h brcmfmac/fwsignal.c brcmfmac/fwsignal.h brcmfmac/fwvid.c brcmfmac/fwvid.h brcmfmac/interface_create.c brcmfmac/interface_create.h brcmfmac/join_param.c brcmfmac/join_param.h brcmfmac/msgbuf.c brcmfmac/msgbuf.h brcmfmac/of.c brcmfmac/of.h brcmfmac/p2p.c brcmfmac/p2p.h brcmfmac/pcie.c brcmfmac/pcie.h brcmfmac/pno.c brcmfmac/pno.h brcmfmac/proto.c brcmfmac/proto.h brcmfmac/ratespec.h brcmfmac/scan_param.c brcmfmac/scan_param.h brcmfmac/sdio.c brcmfmac/sdio.h brcmfmac/tracepoint.c brcmfmac/tracepoint.h brcmfmac/usb.c brcmfmac/usb.h brcmfmac/vendor.c brcmfmac/vendor.h brcmfmac/xtlv.c brcmfmac/xtlv.h brcmfmac/wcc/Makefile brcmfmac/wcc/core.c brcmfmac/wcc/module.c brcmfmac/wcc/vops.h brcmfmac/cyw/Makefile brcmfmac/cyw/core.c brcmfmac/cyw/fwil_types.h brcmfmac/cyw/module.c brcmfmac/cyw/vops.h brcmfmac/bca/Makefile brcmfmac/bca/core.c brcmfmac/bca/module.c brcmfmac/bca/vops.h include/brcm_hw_ids.h include/brcmu_d11.h include/brcmu_utils.h include/brcmu_wifi.h include/chipcommon.h include/defs.h include/soc.h)
-_raw="https://raw.githubusercontent.com/AsahiLinux/linux/$_tag/drivers/net/wireless/broadcom/brcm80211"
-source=(
-        "$_tag-brcmfmac-Makefile::$_raw/brcmfmac/Makefile"
-        "$_tag-brcmfmac-acpi.c::$_raw/brcmfmac/acpi.c"
-        "$_tag-brcmfmac-bcdc.c::$_raw/brcmfmac/bcdc.c"
-        "$_tag-brcmfmac-bcdc.h::$_raw/brcmfmac/bcdc.h"
-        "$_tag-brcmfmac-bcmsdh.c::$_raw/brcmfmac/bcmsdh.c"
-        "$_tag-brcmfmac-btcoex.c::$_raw/brcmfmac/btcoex.c"
-        "$_tag-brcmfmac-btcoex.h::$_raw/brcmfmac/btcoex.h"
-        "$_tag-brcmfmac-bus.h::$_raw/brcmfmac/bus.h"
-        "$_tag-brcmfmac-cfg80211.c::$_raw/brcmfmac/cfg80211.c"
-        "$_tag-brcmfmac-cfg80211.h::$_raw/brcmfmac/cfg80211.h"
-        "$_tag-brcmfmac-chip.c::$_raw/brcmfmac/chip.c"
-        "$_tag-brcmfmac-chip.h::$_raw/brcmfmac/chip.h"
-        "$_tag-brcmfmac-common.c::$_raw/brcmfmac/common.c"
-        "$_tag-brcmfmac-common.h::$_raw/brcmfmac/common.h"
-        "$_tag-brcmfmac-commonring.c::$_raw/brcmfmac/commonring.c"
-        "$_tag-brcmfmac-commonring.h::$_raw/brcmfmac/commonring.h"
-        "$_tag-brcmfmac-core.c::$_raw/brcmfmac/core.c"
-        "$_tag-brcmfmac-core.h::$_raw/brcmfmac/core.h"
-        "$_tag-brcmfmac-debug.c::$_raw/brcmfmac/debug.c"
-        "$_tag-brcmfmac-debug.h::$_raw/brcmfmac/debug.h"
-        "$_tag-brcmfmac-dmi.c::$_raw/brcmfmac/dmi.c"
-        "$_tag-brcmfmac-feature.c::$_raw/brcmfmac/feature.c"
-        "$_tag-brcmfmac-feature.h::$_raw/brcmfmac/feature.h"
-        "$_tag-brcmfmac-firmware.c::$_raw/brcmfmac/firmware.c"
-        "$_tag-brcmfmac-firmware.h::$_raw/brcmfmac/firmware.h"
-        "$_tag-brcmfmac-flowring.c::$_raw/brcmfmac/flowring.c"
-        "$_tag-brcmfmac-flowring.h::$_raw/brcmfmac/flowring.h"
-        "$_tag-brcmfmac-fweh.c::$_raw/brcmfmac/fweh.c"
-        "$_tag-brcmfmac-fweh.h::$_raw/brcmfmac/fweh.h"
-        "$_tag-brcmfmac-fwil.c::$_raw/brcmfmac/fwil.c"
-        "$_tag-brcmfmac-fwil.h::$_raw/brcmfmac/fwil.h"
-        "$_tag-brcmfmac-fwil_types.h::$_raw/brcmfmac/fwil_types.h"
-        "$_tag-brcmfmac-fwsignal.c::$_raw/brcmfmac/fwsignal.c"
-        "$_tag-brcmfmac-fwsignal.h::$_raw/brcmfmac/fwsignal.h"
-        "$_tag-brcmfmac-fwvid.c::$_raw/brcmfmac/fwvid.c"
-        "$_tag-brcmfmac-fwvid.h::$_raw/brcmfmac/fwvid.h"
-        "$_tag-brcmfmac-interface_create.c::$_raw/brcmfmac/interface_create.c"
-        "$_tag-brcmfmac-interface_create.h::$_raw/brcmfmac/interface_create.h"
-        "$_tag-brcmfmac-join_param.c::$_raw/brcmfmac/join_param.c"
-        "$_tag-brcmfmac-join_param.h::$_raw/brcmfmac/join_param.h"
-        "$_tag-brcmfmac-msgbuf.c::$_raw/brcmfmac/msgbuf.c"
-        "$_tag-brcmfmac-msgbuf.h::$_raw/brcmfmac/msgbuf.h"
-        "$_tag-brcmfmac-of.c::$_raw/brcmfmac/of.c"
-        "$_tag-brcmfmac-of.h::$_raw/brcmfmac/of.h"
-        "$_tag-brcmfmac-p2p.c::$_raw/brcmfmac/p2p.c"
-        "$_tag-brcmfmac-p2p.h::$_raw/brcmfmac/p2p.h"
-        "$_tag-brcmfmac-pcie.c::$_raw/brcmfmac/pcie.c"
-        "$_tag-brcmfmac-pcie.h::$_raw/brcmfmac/pcie.h"
-        "$_tag-brcmfmac-pno.c::$_raw/brcmfmac/pno.c"
-        "$_tag-brcmfmac-pno.h::$_raw/brcmfmac/pno.h"
-        "$_tag-brcmfmac-proto.c::$_raw/brcmfmac/proto.c"
-        "$_tag-brcmfmac-proto.h::$_raw/brcmfmac/proto.h"
-        "$_tag-brcmfmac-ratespec.h::$_raw/brcmfmac/ratespec.h"
-        "$_tag-brcmfmac-scan_param.c::$_raw/brcmfmac/scan_param.c"
-        "$_tag-brcmfmac-scan_param.h::$_raw/brcmfmac/scan_param.h"
-        "$_tag-brcmfmac-sdio.c::$_raw/brcmfmac/sdio.c"
-        "$_tag-brcmfmac-sdio.h::$_raw/brcmfmac/sdio.h"
-        "$_tag-brcmfmac-tracepoint.c::$_raw/brcmfmac/tracepoint.c"
-        "$_tag-brcmfmac-tracepoint.h::$_raw/brcmfmac/tracepoint.h"
-        "$_tag-brcmfmac-usb.c::$_raw/brcmfmac/usb.c"
-        "$_tag-brcmfmac-usb.h::$_raw/brcmfmac/usb.h"
-        "$_tag-brcmfmac-vendor.c::$_raw/brcmfmac/vendor.c"
-        "$_tag-brcmfmac-vendor.h::$_raw/brcmfmac/vendor.h"
-        "$_tag-brcmfmac-xtlv.c::$_raw/brcmfmac/xtlv.c"
-        "$_tag-brcmfmac-xtlv.h::$_raw/brcmfmac/xtlv.h"
-        "$_tag-brcmfmac-wcc-Makefile::$_raw/brcmfmac/wcc/Makefile"
-        "$_tag-brcmfmac-wcc-core.c::$_raw/brcmfmac/wcc/core.c"
-        "$_tag-brcmfmac-wcc-module.c::$_raw/brcmfmac/wcc/module.c"
-        "$_tag-brcmfmac-wcc-vops.h::$_raw/brcmfmac/wcc/vops.h"
-        "$_tag-brcmfmac-cyw-Makefile::$_raw/brcmfmac/cyw/Makefile"
-        "$_tag-brcmfmac-cyw-core.c::$_raw/brcmfmac/cyw/core.c"
-        "$_tag-brcmfmac-cyw-fwil_types.h::$_raw/brcmfmac/cyw/fwil_types.h"
-        "$_tag-brcmfmac-cyw-module.c::$_raw/brcmfmac/cyw/module.c"
-        "$_tag-brcmfmac-cyw-vops.h::$_raw/brcmfmac/cyw/vops.h"
-        "$_tag-brcmfmac-bca-Makefile::$_raw/brcmfmac/bca/Makefile"
-        "$_tag-brcmfmac-bca-core.c::$_raw/brcmfmac/bca/core.c"
-        "$_tag-brcmfmac-bca-module.c::$_raw/brcmfmac/bca/module.c"
-        "$_tag-brcmfmac-bca-vops.h::$_raw/brcmfmac/bca/vops.h"
-        "$_tag-include-brcm_hw_ids.h::$_raw/include/brcm_hw_ids.h"
-        "$_tag-include-brcmu_d11.h::$_raw/include/brcmu_d11.h"
-        "$_tag-include-brcmu_utils.h::$_raw/include/brcmu_utils.h"
-        "$_tag-include-brcmu_wifi.h::$_raw/include/brcmu_wifi.h"
-        "$_tag-include-chipcommon.h::$_raw/include/chipcommon.h"
-        "$_tag-include-defs.h::$_raw/include/defs.h"
-        "$_tag-include-soc.h::$_raw/include/soc.h"
-        '0001-wifi-brcmfmac-pcie-BCM4378-L1-substates-only-while-the-firmware-runs.patch'
+depends=('dkms' 'linux-asahi-headers' 'git' 'patch')
+source=('0001-wifi-brcmfmac-pcie-BCM4378-L1-substates-only-while-the-firmware-runs.patch'
         'taris-notices.patch'
+        'asahi-source.sh'
+        'asahi-source.conf'
         'dkms.conf'
         'NOTICE')
-sha256sums=('f9fba84bfee9de092d65ac50a8e9ae33dbc3dcf486a045e0af18d89be3f425ab'
-            'af412ce1d3272d28dc971639a8f831d64118d11db43878dadf70ce6167cf6dfa'
-            '57a06f51624f3128f38df82223cc0501ec11594a7d0428a855e156854ce7959b'
-            '98aca9e796804b6cd0f15c490370c674bbdb2b1be84e3210c0a657a14afc6fea'
-            '9cf9ce0e27981ec399957c4e098de9bd9924332c6a36c4330cf61ff165f6b7d0'
-            'bce337ad63ef4cccc5ec2bba0b64fe58f122e6b3e79111160c6d4877697028b0'
-            '2be4914926e397f223564af45b31cf350bd5d9f67c1494752f9148ae41607bee'
-            'e4d18c919c6689a65f35915fa54d1897c12ff621153814f6ad485069eb95d00d'
-            '03883869538eb7a02f826079a4e44ee865c85c9a7ae37162e2a59c8a31558d8f'
-            '57bb0026081ea65b676905fd59c416b50ab8a64a91b415f8d6c7af4c7340ae53'
-            'c9de47e55be3e45e5c26c8bf94d8b40f498266aaa63e6f0d289ce6aa67a4fdde'
-            'cb6ffbc01bfd35629acfaf87daa8f5a6ef4f9ce4f4f393c19b05c2bd18ff791e'
-            'f4416a49f0f0367694eb438a1e39575bc7d1e44bdb10170473d70fb556343101'
-            'b319771764b2ff2f32ee7e57718ff350b3ecfc093c07066dcbaa4a480a63c590'
-            '4a5a5ac64da90251b1a6a24262d421f47c3ab365d58a95633bdf7380a3472473'
-            'b2899336d680ca868536b25d1601ae99325ab66aaf1c565b4e638c71827b7369'
-            '22267c24d075abfad58bd87fc136991615d5887c0d6efa6375c5777e95b9f807'
-            '0d833c49d9ed9836a467a3c56080f8be6e896dbb861eba8b9b6e2edef6adee14'
-            'bbc97b72f2bcfa04757184daddab1de03d57da1d9eb3f3f8374722f5351dfa39'
-            '9a0d43d8f5f91be9a9bf0b5d14f3e16e3e2c3167c1c935398a8b0e6844295b01'
-            'b45b39f0981a2a057cccc8382be2638a6421e82ab8ce1efe25af0f4a7e0f0d0b'
-            '72dbe4cc0ed76c74901addb8bae49ac4e8f3d677fefef94d417b5a3fdd2d15de'
-            '46e5bc7cd3c47c63ce3d650cc0abdc2f203fd0708c91ef648251a6a8c7083b27'
-            'f2b6fe570981bf69a81fd5965712f18840df9b97dabcdbd4aa4cf260b4e9760b'
-            '166e4115f3d25e27526d94e04322286228e33ae2b6c983985c1d6d2a56c40123'
-            '7c58d8f3a5069b8c60c6d2590a8adfce5875ee89076f983b4375ee04e28705a9'
-            '4b8c494a06a911f3a01c45aa42e4cb93a53aac78cab644288996a27420200925'
-            '28c84eb4045cde28e615351dcbf471398142a35a9828c5ad376283c655b9ac28'
-            '047f31d437e968d919ed84592455cc216be4fce63e3addb24e1873ea313f2077'
-            '1ba05bb9a089f6da2e7cdc863473c6168e2443e5c97d9e4906a94bde8bb202a9'
-            '770964dcbe004e1df7e7c5faecda90358e44cbd2fd56f25ceb73aaaf6a296f79'
-            'b829feba2107405853d3d0434d5f7a3882e0b2524d8904abef0d8bbf38fabe0d'
-            '1cf8308959ad6ae2651f97c94bb391b88f0e6b39edf6712889a37fe1366dc266'
-            '51f14e634a8bf96de8d31a4861064038f9755daa1df6be80ef4e391b5e0c1966'
-            '0b495cc8e5287c1f24b1ae411f0d74c6c0bbe491a866c1982f6a0d0eb616a7c1'
-            '6d9150aaa8257c87eb7a093819c115ad197fe1c1a9850fd9ba80df747a5952fc'
-            '02a8e54c3357c0b7277677b1b7de8ea67070cebe78fcfef747112dae36e5ccd0'
-            '5700e42822566281c42608d1a5ae0324a90fc3feb74029fccdc2f302ccd7b975'
-            '7e1616ba5b0ae856fc45fa17564e62945bade31ed23fb9c6145e90f1aa95a333'
-            '0f69e1c80c918f9363ac6a36492d1420bbf39d4dcb81c27bf33c64c48722da8c'
-            '4408548354c9a28424ae024a078f42d92d454e52a7e9fee1513dc64b237cba0c'
-            '04c8a06add9f61e489538afb0545a57d534b6275760b222b4479df334fa1aecc'
-            'a3005c3984c5473277ad67a8da4d718084675b061f0863fc6614d3b33992acf8'
-            'd27052440389dbc249e7435fccef43c18f8d07bf641563327ef0cf2bfab3cd7b'
-            '15a87dddd22dafbee4e7b3462cbc8854457b99311e81459ad5f448355131dfad'
-            '22ef3d1394b01eb096c67fcd08396f2b233ac840af1632d52716580088a6567f'
-            'faf7f194977a85d041ccbfac000e7a1959e70048c9afded2462b36080bd579c5'
-            '5d48671dc3226f929b813a0f48038d51a9a1b7de29711f41954fc4b6ce48680b'
-            '5cd4e5454a4936b6341133e9927ae11efa90cd66e5ba4c8e2a1a6ab584829631'
-            '6cee22ec350a8dec0c90cbbe1cfe5483a11465c6124905028c87757e6edd8edb'
-            'e22e27641979e939f44657fc1e74495bb8cacb80e593cc5b100d9c957a6e8c23'
-            '1c815ae635b0aa6434861be03d44eb715a4c6c359f4c9b834566c4de8944e081'
-            '0ed2b9b0895372b9cc28f94bd9664c1e6722acf0eb7b96caf965594a2ff613e3'
-            'e64548895f81152d55e82d1ba0a6ee9426b78f6ae5f00e4469183820b198dd3b'
-            '03e4c772b3ee90edbdc15b6f1857b81d728f9d9b6e254cea034a011a5f99e7e0'
-            '34fc58d2b878a71125020b6bcf8eaa0f4363aa3df59c1b6146613f35b7943c84'
-            '245881dce2fc3a9765a547ed29a56c0761ccfbaf6d7406ad43081e0d509a2d1b'
-            'ef90882e078eee963a8ae2dcbbd0ef2608af38654d48a16de9c904a55467001c'
-            '1e76ac445913a9a77bf1d2fb501144048394125b638f831fb12ba4e406799932'
-            '596d2635d32f549db77e5c4bde7cf8873033b82cc9310b5f962523147e57cc91'
-            '0c9675eb3c21dd861fadf220190ce8ee5cb90f797e15a5f0f237fe773cfd774f'
-            '3ddfd4441d70028324e92e91d2c2dd78d708bf5ed7f26194fb150c5189fe6414'
-            '24b201a75470706ceb47d4526db2b246aef7b89c17ec864eb7dfd7042841928f'
-            'ff938acbe02c36881a51f83ca93e0265122edbb346fc8ca958946768e5dbb994'
-            '6e2d62dda30960e008bd29c2cd9b5f9b9a20884014f65f6b32d3b9f32f912983'
-            'c5d3e784b7629c9af24ee00bb133047baa6439e47893252e6514b64c38713e37'
-            'a9ce6bb39905dcbf13e4276adc7563c8e20a57768070646abcab48f6c2199885'
-            '5a2b30fa87576b3411c6399bd10539d1a05e74549f0af952d6adef78f2ecaaa1'
-            '1197bea9205d535c10fbd63dd498e92c2eae882e1392aa5a0e9a66c555d11788'
-            '4778fece953ca85f9d9e46a5f8edc1fa23139e09afcb043929ac1778dde4e6ca'
-            'e0f1f865f60b0c3a4ce4320c7dbebe169fcabce33e01ee018b21925fb84c2ff7'
-            'e700b02a130f543f12a238928f84ec9b70b238750ca15d3dfb7570b73bf4973c'
-            'bf88ed5ceb44279951199d9cd8e9dd0538f5352876425ab8492d27be6b62e96d'
-            '003495b3c00879aa9e0f32085d2eeb42f318cffbe202c8ed6b2c94848aad99ac'
-            '6c39522eb3de877fcd9970e5931f89118f75d0894d2dc049ca7be602725e52d2'
-            '458cd390000adcf2a9139ea5942d0e465bc46f2a2e214664150ec06ee21b3394'
-            'b6df241efded8bc5f04f7fae146bc4cffbebf68956d4154557af8797b35de874'
-            '4c8bc4a10d463cd4f9494745da61706044e7b30b782af0b8d0338a4cab08f60a'
-            'de58c78800df351ca4e2543699328ba617ae56bf638f1f1a56b217263775cbc5'
-            '13801fb33eab2b2b5be1269586cc157cc52987ba4767a44ad6bf10c9694c00cf'
-            'b033458f10401bde6e2ef1c14f64f137f15c0858c8df934f22718e248201d478'
-            '7f105d7c0753733121d9ca802d7ec593c460dc496edfdd424d7f35b5ce5e8880'
-            '9f89cd7ef044bbf5473a6c61a701602034e149daec95e399c586097273461b24'
-            '80568f1354dd96c0dbd49f64939e652d9d25d12a2d54c890068bf64eda23466a'
-            '7b74ceaf8afce6ec9c79f9f3053c5120d6e68a61c41f19a8cb6084a65046fbfa'
-            'ddcb151ff69702c0b3a99bdc0b722fd23be4a8ad812d93fe5d9c49d4d418668f'
+sha256sums=('901443a449fc8b70f62b7db85786b376b7d3331a055eee80706c25cb7e812501'
             '4284f7fc75ae6988e9c489edd3845f420f4306cbcc37199f281a5aaa9d9cf27c'
-            '0eb6cbff761a0228f3f4da43d42e7cfa08bfb4a37ed66fc6201ad4d01be8a6a7'
-            '3ec8fd7461293e95502adb606ff0eaa99485ce85a75b5794fa10e4387beecfb0')
-
-prepare() {
-    local f
-    rm -rf brcm80211
-    mkdir -p brcm80211/brcmfmac/{wcc,cyw,bca} brcm80211/include
-    for f in "${_files[@]}"; do
-        cp "$_tag-${f//\//-}" "brcm80211/$f"
-    done
-    # The change is against the whole kernel tree (drivers/net/wireless/broadcom/brcm80211/...)
-    patch -d brcm80211 -Np6 <0001-wifi-brcmfmac-pcie-BCM4378-L1-substates-only-while-the-firmware-runs.patch
-    # The changed file says so
-    patch -d brcm80211 -Np1 <taris-notices.patch
-}
+            '333e32aa08b1ddf108ea25486996a249e48373b3c118ffe3bff0c7b07469862c'
+            'dd2884cf100233a43cf0f754aa4b17cabc7c2f85a313f52e83631052830c9172'
+            'ebc748216060121a75e6221cfa497fa6b68d86be3a9793b020cd98905ceefbc8'
+            '9cecdc46ad6f031cfd3e87f0be68a50dbffac8fa0762d9be976a8244adfe9da6')
 
 package() {
-    local dir
+    local src="$pkgdir/usr/src/taris-brcmfmac-$pkgver"
     grep -qx "PACKAGE_VERSION=\"$pkgver\"" dkms.conf || {
         error "dkms.conf isn't for $pkgver"
         return 1
     }
-    for dir in brcmfmac brcmfmac/wcc brcmfmac/cyw brcmfmac/bca include; do
-        install -Dm644 brcm80211/$dir/*.[ch] -t "$pkgdir/usr/src/taris-brcmfmac-$pkgver/$dir"
-    done
-    for dir in brcmfmac brcmfmac/wcc brcmfmac/cyw brcmfmac/bca; do
-        install -Dm644 brcm80211/$dir/Makefile -t "$pkgdir/usr/src/taris-brcmfmac-$pkgver/$dir"
-    done
-    install -Dm644 dkms.conf -t "$pkgdir/usr/src/taris-brcmfmac-$pkgver"
-    # What TarisOS changed, with the source and on its own
-    install -Dm644 NOTICE -t "$pkgdir/usr/src/taris-brcmfmac-$pkgver"
+    install -Dm644 ./*.patch asahi-source.conf dkms.conf NOTICE -t "$src"
+    install -Dm755 asahi-source.sh -t "$src"
     install -Dm644 NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
 }
