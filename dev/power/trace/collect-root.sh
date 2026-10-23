@@ -42,7 +42,8 @@ events=(irq:irq_handler_entry timer:timer_expire_entry timer:hrtimer_expire_entr
 
 # The tracing state as found, put back on any exit
 old_on=$(<"$tr/tracing_on")
-old_size=$(<"$tr/buffer_size_kb")
+# "7 (expanded: 1408)" before tracing is first used: the size it takes then, a number either way
+old_size=$(sed -E 's/.*expanded: ([0-9]+).*/\1/; s/^([0-9]+).*/\1/' "$tr/buffer_size_kb")
 old_events=$(<"$tr/set_event")
 player=""
 restore() {

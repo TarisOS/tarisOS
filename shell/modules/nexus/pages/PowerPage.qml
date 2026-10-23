@@ -12,8 +12,10 @@ import Taris.I18n
 import qs.components
 import qs.components.controls
 import qs.modules.nexus.common
+import qs.modules.nexus.pages.power
 
-// Power: profile, idle timeouts (lock, screen off, suspend), sleep and battery behaviour
+// Power: the battery's last 24 hours, profile, idle timeouts (lock, screen off, suspend), sleep and
+// battery behaviour
 PageBase {
     id: root
 
@@ -62,6 +64,16 @@ PageBase {
 
         SectionHeader {
             first: true
+            visible: UPower.displayDevice.isLaptopBattery
+            text: Tr.tr("Battery")
+        }
+
+        BatteryHistory {
+            visible: UPower.displayDevice.isLaptopBattery
+        }
+
+        SectionHeader {
+            first: !UPower.displayDevice.isLaptopBattery
             text: Tr.tr("Power profile")
         }
 
