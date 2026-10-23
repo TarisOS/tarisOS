@@ -19,8 +19,26 @@ ColumnLayout {
 
     required property PopoutState popouts
 
+    // Bluetooth discovers devices only while this panel is open (or Settings' pairing page)
+    function setDiscovering(on: bool): void {
+        const adapter = Bluetooth.defaultAdapter; // qmllint disable unresolved-type
+        if (adapter?.enabled)
+            adapter.discovering = on;
+    }
+
     width: 300
     spacing: Tokens.spacing.small
+
+    Component.onCompleted: setDiscovering(true)
+    Component.onDestruction: setDiscovering(false)
+
+    Connections {
+        function onEnabledChanged(): void {
+            root.setDiscovering(true);
+        }
+
+        target: Bluetooth.defaultAdapter // qmllint disable unresolved-type
+    }
 
     StyledText {
         Layout.topMargin: Tokens.padding.medium

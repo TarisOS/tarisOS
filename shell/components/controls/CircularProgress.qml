@@ -89,7 +89,7 @@ Item {
             id: waveProgAnim
 
             running: true
-            paused: root.wavePaused || wave.amplitudeMultiplier === 0 || !root.visible
+            paused: root.wavePaused || wave.amplitudeMultiplier === 0 || !root.visible || root.Tokens.anim.durations.suspended
             from: 0
             to: 1
             duration: 2000

@@ -155,44 +155,59 @@ void AnimDurations::bindTokens(AnimDurationTokens* tokens) {
     connectTokenSignals(tokens, this);
 }
 
+bool AnimDurations::suspended() const {
+    return m_suspended;
+}
+
+void AnimDurations::setSuspended(bool suspended) {
+    if (m_suspended == suspended)
+        return;
+    m_suspended = suspended;
+    emit valuesChanged();
+}
+
+int AnimDurations::scaled(qreal duration) const {
+    return m_suspended ? 0 : static_cast<int>(duration * m_scale);
+}
+
 int AnimDurations::small() const {
-    return m_tokens ? static_cast<int>(m_tokens->small() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->small()) : 0;
 }
 
 int AnimDurations::normal() const {
-    return m_tokens ? static_cast<int>(m_tokens->normal() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->normal()) : 0;
 }
 
 int AnimDurations::large() const {
-    return m_tokens ? static_cast<int>(m_tokens->large() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->large()) : 0;
 }
 
 int AnimDurations::extraLarge() const {
-    return m_tokens ? static_cast<int>(m_tokens->extraLarge() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->extraLarge()) : 0;
 }
 
 int AnimDurations::expressiveFastSpatial() const {
-    return m_tokens ? static_cast<int>(m_tokens->expressiveFastSpatial() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->expressiveFastSpatial()) : 0;
 }
 
 int AnimDurations::expressiveDefaultSpatial() const {
-    return m_tokens ? static_cast<int>(m_tokens->expressiveDefaultSpatial() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->expressiveDefaultSpatial()) : 0;
 }
 
 int AnimDurations::expressiveSlowSpatial() const {
-    return m_tokens ? static_cast<int>(m_tokens->expressiveSlowSpatial() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->expressiveSlowSpatial()) : 0;
 }
 
 int AnimDurations::expressiveFastEffects() const {
-    return m_tokens ? static_cast<int>(m_tokens->expressiveFastEffects() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->expressiveFastEffects()) : 0;
 }
 
 int AnimDurations::expressiveDefaultEffects() const {
-    return m_tokens ? static_cast<int>(m_tokens->expressiveDefaultEffects() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->expressiveDefaultEffects()) : 0;
 }
 
 int AnimDurations::expressiveSlowEffects() const {
-    return m_tokens ? static_cast<int>(m_tokens->expressiveSlowEffects() * m_scale) : 0;
+    return m_tokens ? scaled(m_tokens->expressiveSlowEffects()) : 0;
 }
 
 } // namespace taris::config

@@ -19,39 +19,54 @@ StyledRect {
     color: Colours.tPalette.m3surfaceContainer
     radius: Tokens.rounding.medium
 
-    implicitWidth: layout.implicitWidth + Tokens.padding.extraLargeIncreased * 2
+    implicitWidth: layout.implicitWidth + Tokens.padding.large * 2
     implicitHeight: layout.implicitHeight + Tokens.padding.large * 2
 
     ServiceRef {
         service: root.visible ? Memory : null
     }
 
-    ColumnLayout {
+    // Beside the CPU: the name and the amount used on the left, the usage ring on the right
+    RowLayout {
         id: layout
 
-        anchors.centerIn: parent
-        spacing: Tokens.spacing.extraSmall
+        anchors.fill: parent
+        anchors.margins: Tokens.padding.large
+        spacing: Tokens.spacing.large
 
-        RowLayout {
-            Layout.leftMargin: -Tokens.padding.extraSmall
-            spacing: Tokens.spacing.small
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: Tokens.spacing.extraSmall
 
-            MaterialIcon {
-                text: "memory_alt"
-                fill: 1
-                color: root.accent
-                fontStyle: Tokens.font.icon.builders.medium.weight(Font.DemiBold).build() // DemiBold to fix fill issues
+            RowLayout {
+                spacing: Tokens.spacing.small
+
+                MaterialIcon {
+                    text: "memory_alt"
+                    fill: 1
+                    color: root.accent
+                    fontStyle: Tokens.font.icon.builders.medium.weight(Font.DemiBold).build() // DemiBold to fix fill issues
+                }
+
+                StyledText {
+                    text: Tr.tr("Memory")
+                    font: Tokens.font.title.medium
+                }
+            }
+
+            Item {
+                Layout.fillHeight: true
             }
 
             StyledText {
-                text: Tr.tr("Memory")
-                font: Tokens.font.title.medium
+                text: Units.formatKibUsage(Memory.used, Memory.total)
+                font: Tokens.font.body.medium
             }
         }
 
         CircularProgress {
-            Layout.topMargin: Tokens.spacing.large
-            Layout.alignment: Qt.AlignHCenter
+            Layout.alignment: Qt.AlignVCenter
             implicitSize: usageColumn.implicitHeight + thickness + Tokens.padding.largeIncreased * 2
             startAngle: -225
             sweepAngle: 270
@@ -84,12 +99,6 @@ StyledRect {
                     color: Colours.palette.m3onSurfaceVariant
                 }
             }
-        }
-
-        StyledText {
-            Layout.alignment: Qt.AlignHCenter
-            text: Units.formatKibUsage(Memory.used, Memory.total)
-            font: Tokens.font.body.medium
         }
     }
 }

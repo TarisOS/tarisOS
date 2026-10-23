@@ -59,8 +59,9 @@ Item {
                 color: root.colour
                 fill: 1
 
+                // Not while animations are off (Power saver): steps of no length would loop every frame
                 SequentialAnimation on opacity {
-                    running: device.modelData?.state !== BluetoothDeviceState.Connected // qmllint disable unresolved-type
+                    running: device.modelData?.state !== BluetoothDeviceState.Connected && Tokens.anim.durations.large > 0 // qmllint disable unresolved-type
                     alwaysRunToEnd: true
                     loops: Animation.Infinite
 

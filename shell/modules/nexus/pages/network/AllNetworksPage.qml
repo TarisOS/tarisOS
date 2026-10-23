@@ -25,8 +25,9 @@ PageBase {
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 
+        // Not in Power saver: scans only from the bar's Rescan button there
         Timer {
-            running: root.visible && Nmcli.wifiEnabled
+            running: root.visible && Nmcli.wifiEnabled && !PowerSaver.active
             repeat: true
             triggeredOnStart: true
             interval: GlobalConfig.nexus.networkRescanInterval

@@ -18,7 +18,11 @@ Clock PM and the PCI-PM substates stay off.
 Switch them off again when the system wakes (brcmf_pcie_pm_leave_D3()):
 with them on, the firmware stopped answering a few seconds after some
 wakes (scans and every command timing out until a restart); with them
-blocked, every wake in testing recovered.
+blocked, every wake in testing recovered. Switch them back on 90 seconds
+after a wake that found the firmware running, once it has reconnected
+and settled, so the saving holds from one sleep to the next; the delayed
+switch is cancelled when the system sleeps again, the chip is reset or
+the device goes away.
 
 Reloading the driver fails now and then on this chip ("FW failed to
 initialize", only a restart brings the chip back) with or without these
@@ -26,7 +30,23 @@ states; this doesn't change that.
 ---
 --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
 +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
-@@ -729,6 +729,27 @@
+@@ -17,6 +17,7 @@
+ #include <linux/io.h>
+ #include <linux/random.h>
+ #include <linux/unaligned.h>
++#include <linux/workqueue.h>
+ 
+ #include <soc.h>
+ #include <chipcommon.h>
+@@ -427,6 +428,7 @@
+ 	struct brcmf_mp_device *settings;
+ 	struct brcmf_otp_params otp;
+ 	bool fwseed;
++	struct delayed_work l1ss_work;
+ #ifdef DEBUG
+ 	u32 console_interval;
+ 	bool console_active;
+@@ -729,6 +731,45 @@
  }
  
  
@@ -35,9 +55,13 @@ states; this doesn't change that.
 + * switched off again at the start of every reset of the chip (at probe,
 + * removal, a firmware crash and a wake that finds the firmware gone), so the
 + * firmware always starts as it does at boot, with L1 alone, as every start
-+ * that worked in testing did. The ASPM core keeps applying the policy and any
-+ * states blocked through sysfs; clock PM and the PCI-PM substates stay off.
++ * that worked in testing did, and when the machine wakes, until the firmware
++ * has settled (BRCMF_PCIE_L1SS_WAKE_DELAY). The ASPM core keeps applying the
++ * policy and any states blocked through sysfs; clock PM and the PCI-PM
++ * substates stay off.
 + */
++#define BRCMF_PCIE_L1SS_WAKE_DELAY	(90 * HZ)
++
 +static void brcmf_pcie_l1ss(struct brcmf_pciedev_info *devinfo, bool enable)
 +{
 +	int state = PCIE_LINK_STATE_L1;
@@ -45,16 +69,30 @@ states; this doesn't change that.
 +	if (devinfo->pdev->device != BRCM_PCIE_4378_DEVICE_ID)
 +		return;
 +
-+	if (enable)
++	if (enable) {
 +		state |= PCIE_LINK_STATE_L1_1 | PCIE_LINK_STATE_L1_2;
++	} else {
++		/* A reset or a wake: not back on behind its back */
++		cancel_delayed_work(&devinfo->l1ss_work);
++	}
 +	pci_enable_link_state(devinfo->pdev, state);
++}
++
++static void brcmf_pcie_l1ss_worker(struct work_struct *work)
++{
++	struct brcmf_pciedev_info *devinfo =
++		container_of(to_delayed_work(work), struct brcmf_pciedev_info,
++			     l1ss_work);
++
++	if (devinfo->state == BRCMFMAC_PCIE_STATE_UP)
++		brcmf_pcie_l1ss(devinfo, true);
 +}
 +
 +
  static void brcmf_pcie_reset_device(struct brcmf_pciedev_info *devinfo)
  {
  	struct brcmf_core *core;
-@@ -749,6 +770,8 @@
+@@ -749,6 +790,8 @@
  	u32 val;
  	u32 lsc;
  
@@ -63,7 +101,7 @@ states; this doesn't change that.
  	if (!devinfo->ci)
  		return;
  
-@@ -2587,6 +2610,8 @@
+@@ -2587,6 +2630,8 @@
  	if (ret)
  		goto fail;
  
@@ -72,13 +110,48 @@ states; this doesn't change that.
  	brcmf_pcie_bus_console_read(devinfo, false);
  
  	brcmf_pcie_fwcon_timer(devinfo, true);
-@@ -3045,6 +3070,9 @@
+@@ -2834,6 +2879,7 @@
+ 		return ret;
+ 
+ 	devinfo->pdev = pdev;
++	INIT_DELAYED_WORK(&devinfo->l1ss_work, brcmf_pcie_l1ss_worker);
+ 	pcie_bus_dev = NULL;
+ 	devinfo->ci = brcmf_chip_attach(devinfo, pdev->device,
+ 					&brcmf_pcie_buscore_ops);
+@@ -2965,6 +3011,7 @@
+ 	brcmf_pcie_fwcon_timer(devinfo, false);
+ 
+ 	devinfo->state = BRCMFMAC_PCIE_STATE_DOWN;
++	cancel_delayed_work_sync(&devinfo->l1ss_work);
+ 	if (devinfo->ci)
+ 		brcmf_pcie_intr_disable(devinfo);
+ 
+@@ -3013,6 +3060,8 @@
+ 	devinfo = bus->bus_priv.pcie->devinfo;
+ 
+ 	brcmf_pcie_fwcon_timer(devinfo, false);
++	/* Asleep again before they came back: they come back after the next wake */
++	cancel_delayed_work_sync(&devinfo->l1ss_work);
+ 	brcmf_bus_change_state(bus, BRCMF_BUS_DOWN);
+ 
+ 	devinfo->mbdata_completed = false;
+@@ -3045,6 +3094,9 @@
  	devinfo = bus->bus_priv.pcie->devinfo;
  	brcmf_dbg(PCIE, "Enter, dev=%p, bus=%p\n", dev, bus);
  
-+	/* The machine woke: the link out of L1.1/L1.2 */
++	/* The machine woke: the link out of L1.1/L1.2 until the firmware has settled */
 +	brcmf_pcie_l1ss(devinfo, false);
 +
  	/* Check if device is still up and running, if so we are ready */
  	if (brcmf_pcie_read_pcie32(devinfo, devinfo->reginfo->intmask) != 0) {
  		brcmf_dbg(PCIE, "Try to wakeup device....\n");
+@@ -3058,6 +3110,9 @@
+ 		brcmf_pcie_intr_enable(devinfo);
+ 		brcmf_pcie_hostready(devinfo);
+ 		brcmf_pcie_fwcon_timer(devinfo, true);
++		if (devinfo->pdev->device == BRCM_PCIE_4378_DEVICE_ID)
++			schedule_delayed_work(&devinfo->l1ss_work,
++					      BRCMF_PCIE_L1SS_WAKE_DELAY);
+ 		return 0;
+ 	}
+ 

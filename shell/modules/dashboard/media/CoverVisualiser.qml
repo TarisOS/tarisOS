@@ -21,12 +21,14 @@ Item {
     readonly property real spacing: Tokens.spacing.medium
     readonly property real maxMagnitude: (implicitWidth - cover.implicitWidth) / 2 - spacing
 
+    // No audio bars in Power saver (animations off), and no audio analysis for them
     ServiceRef {
-        service: root.visible ? Audio.cava : null
+        service: root.visible && !root.Tokens.anim.durations.suspended ? Audio.cava : null
     }
 
     Shape {
         anchors.fill: parent
+        visible: !root.Tokens.anim.durations.suspended
         asynchronous: true
         preferredRendererType: Shape.CurveRenderer
         data: bars.instances

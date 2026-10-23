@@ -10,6 +10,7 @@ for.
 Changed by TarisOS (https://github.com/TarisOS/tarisOS) in 2026, in
 0001-wifi-brcmfmac-pcie-BCM4378-L1-substates-only-while-the-firmware-runs.patch: the BCM4378's PCIe
 link uses ASPM L1.1 and L1.2 while its firmware runs, and they're switched off before every chip
-reset, so the firmware always starts with L1 alone, as at boot, and again when the machine wakes.
+reset, so the firmware always starts with L1 alone, as at boot, and again when the machine wakes,
+until 90 seconds after the wake.
 pcie.c, the file it changes, says so near its top (taris-notices.patch). Both patches are in
 TarisOS's source, packaging/pkgbuilds/taris-brcmfmac-dkms.

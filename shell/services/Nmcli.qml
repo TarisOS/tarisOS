@@ -1714,9 +1714,17 @@ Singleton {
                 LC_ALL: "C.UTF-8"
             })
         stdout: SplitParser {
-            onRead: root.refreshOnConnectionChange()
+            onRead: monitorRefreshTimer.start()
         }
         onExited: monitorRestartTimer.start() // qmllint disable signal-handler-parameters
+    }
+
+    // One refresh per burst: a single change prints several monitor lines (D7)
+    Timer {
+        id: monitorRefreshTimer
+
+        interval: 500
+        onTriggered: root.refreshOnConnectionChange()
     }
 
     Timer {

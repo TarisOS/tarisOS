@@ -1,0 +1,24 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The efficiency cores, as a CPU list for taskset and systemd's AllowedCPUs ("0,1,2,3" on an M1):
+# the CPUs with the lowest capacity the kernel gives them. Run by power-saver-background and update
+# (Power saver keeps background work there).
+# Usage: efficiency-cpus
+set -euo pipefail
+
+min=""
+cpus=()
+for file in /sys/devices/system/cpu/cpu[0-9]*/cpu_capacity; do
+	capacity=$(<"$file")
+	cpu=${file%/cpu_capacity}
+	cpu=${cpu##*/cpu}
+	if [[ -z $min ]] || (( capacity < min )); then
+		min=$capacity
+		cpus=("$cpu")
+	elif (( capacity == min )); then
+		cpus+=("$cpu")
+	fi
+done
+(IFS=,; echo "${cpus[*]}")

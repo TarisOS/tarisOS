@@ -20,10 +20,10 @@ updates reach installed machines and removing the package undoes it. The image i
   `taris-chromium`, the firewall in `taris-firewall`, everything through Tor (its own Tor, the
   rules that send everything to it, the time through it) in `taris-tor`, thumbnails that never
   outlive their files' contents in `taris-thumbnails`. Packages built only because Arch Linux ARM
-  lacks them sit next to them, and so do TarisOS's patched builds of other packages:
-  `quickshell-taris` beside Quickshell (in `/opt`), `tiny-dfr-taris` in place of Asahi's `tiny-dfr`
-  (`replaces`, so a full upgrade swaps it in), which has to stay at Asahi's version with their
-  patches moved along. `distro/config.sh` lists every package in build order.
+  lacks them sit next to them, and so do TarisOS's patches to other packages: `quickshell-taris`
+  beside Quickshell (in `/opt`); `tiny-dfr-taris` and `speakersafetyd-taris`, which build Asahi's
+  installed version with TarisOS's patches (see "Patches that follow every version" below).
+  `distro/config.sh` lists every package in build order.
 - System-wide defaults go where programs read them for every account (`/etc/xdg/...`,
   `/usr/share/taris/...`), not into home folders. Only what can't work that way goes into
   `user-defaults` (see [`upgrades.md`](upgrades.md)).
@@ -53,6 +53,29 @@ updates reach installed machines and removing the package undoes it. The image i
   they don't expect.
 - Raw `pacman`, `command -v` and `pacman-key` are fine in package and build tooling, where direct
   package-manager behaviour is the point.
+
+## Patches that follow every version
+
+No TarisOS fix may rely on a specific version of what it fixes (the maintainer, 2026-10-23): each
+applies itself to whatever version is installed, idempotently, and leaves a version it doesn't fit
+as it is.
+
+- Kernel drivers: the DKMS packages and `asahi-source.sh` (next section).
+- Programs from Asahi's repository (`tiny-dfr-taris`, `speakersafetyd-taris`): Asahi's package
+  stays installed. Ours carries only the patches, `asahi-package.sh` (the same script in both; what
+  each builds is in its `asahi-package.conf`), a pacman hook and a systemd drop-in. The hook runs
+  the script after Asahi's package or ours is installed or upgraded: it fetches Asahi's packaging
+  for the installed version (asahi-alarm/PKGBUILDs; their sources, checksums and patches), runs
+  their `prepare()`, applies TarisOS's patches (skipped when the source has them, the build stops
+  when one doesn't apply), runs their build as `nobody` and keeps the binary in
+  `/var/lib/taris/asahi-package/<package>/`. The drop-in bind-mounts it over the stock binary
+  (`BindReadOnlyPaths=-...`) only while one exists for the installed version, so the stock binary
+  runs otherwise. When Asahi's packaging has moved past the installed version, the build waits for
+  the next upgrade. To change a patch: edit it, rebuild the package; the hook builds again.
+- TarisOS's own builds of other projects (`quickshell-taris` from Quickshell's git, `taris-music`'s
+  cpal): each patch is skipped when the source has it and applied while it fits; the build stops
+  when it doesn't, and the patch has to be brought up to date.
+- Device trees (`usb-c-display`) follow the tree's structure, not a kernel version.
 
 ## Drivers patched for every kernel
 

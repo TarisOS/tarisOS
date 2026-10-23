@@ -1,0 +1,242 @@
+TarisOS: in Power saver (the power profile the user chose, as power-profiles-daemon saves it at
+each change: /var/lib/power-profiles-daemon/state.ini, watched with inotify, since this daemon
+can't reach the session's bus) the Touch Bar dims and goes off twice as fast, and only its own use
+counts (a touch, or Fn, which switches its keys), not the keyboard's or the trackpad's. The
+profile is also there for taris-unlit-keyboard.patch.
+
+diff -ruN a/src/backlight.rs b/src/backlight.rs
+--- a/src/backlight.rs	2006-07-24 02:21:28.000000000 +0100
++++ b/src/backlight.rs	2026-10-23 00:12:09.323916457 +0100
+@@ -2,9 +2,11 @@
+ use crate::TIMEOUT_MS;
+ use anyhow::{anyhow, Result};
+ use input::event::{
++    keyboard::{KeyboardEvent, KeyboardEventTrait},
+     switch::{Switch, SwitchEvent, SwitchState},
+     Event,
+ };
++use input_linux::Key;
+ use std::{
+     cmp::min,
+     fs::{self, File, OpenOptions},
+@@ -17,6 +19,10 @@
+ const MAX_TOUCH_BAR_BRIGHTNESS: u32 = 255;
+ const BRIGHTNESS_DIM_TIMEOUT: i32 = TIMEOUT_MS * 3; // should be a multiple of TIMEOUT_MS
+ const BRIGHTNESS_OFF_TIMEOUT: i32 = TIMEOUT_MS * 6; // should be a multiple of TIMEOUT_MS
++// Power saver: twice as fast, and only the Touch Bar's own use counts (a touch, or Fn, which
++// switches its keys), not the keyboard's or the trackpad's
++const SAVER_DIM_TIMEOUT: i32 = BRIGHTNESS_DIM_TIMEOUT / 2;
++const SAVER_OFF_TIMEOUT: i32 = BRIGHTNESS_OFF_TIMEOUT / 2;
+ const DIMMED_BRIGHTNESS: u32 = 1;
+ 
+ fn read_attr(path: &Path, attr: &str) -> u32 {
+@@ -67,6 +73,7 @@
+ 
+ pub struct BacklightManager {
+     last_active: Instant,
++    last_touch_bar_active: Instant,
+     max_bl: u32,
+     current_bl: u32,
+     lid_state: SwitchState,
+@@ -88,6 +95,7 @@
+             max_bl: read_attr(&bl_path, "max_brightness"),
+             current_bl: read_attr(&bl_path, "brightness"),
+             last_active: Instant::now(),
++            last_touch_bar_active: Instant::now(),
+             display_bl_path,
+         }
+     }
+@@ -99,7 +107,15 @@
+     }
+     pub fn process_event(&mut self, event: &Event) {
+         match event {
+-            Event::Keyboard(_) | Event::Pointer(_) | Event::Gesture(_) | Event::Touch(_) => {
++            Event::Touch(_) => {
++                self.last_active = Instant::now();
++                self.last_touch_bar_active = self.last_active;
++            }
++            Event::Keyboard(KeyboardEvent::Key(key)) if key.key() == Key::Fn as u32 => {
++                self.last_active = Instant::now();
++                self.last_touch_bar_active = self.last_active;
++            }
++            Event::Keyboard(_) | Event::Pointer(_) | Event::Gesture(_) => {
+                 self.last_active = Instant::now();
+             }
+             Event::Switch(SwitchEvent::Toggle(toggle)) => {
+@@ -108,19 +124,41 @@
+                     println!("Lid Switch event: {:?}", self.lid_state);
+                     if toggle.switch_state() == SwitchState::Off {
+                         self.last_active = Instant::now();
++                        self.last_touch_bar_active = self.last_active;
+                     }
+                 }
+             }
+             _ => {}
+         }
+     }
+-    pub fn update_backlight(&mut self, cfg: &Config) {
+-        let since_last_active = (Instant::now() - self.last_active).as_millis() as u64;
++    fn timeouts(&self, power_saver: bool) -> (u64, u64, u64) {
++        if power_saver {
++            let since = self.last_touch_bar_active.elapsed().as_millis() as u64;
++            (since, SAVER_DIM_TIMEOUT as u64, SAVER_OFF_TIMEOUT as u64)
++        } else {
++            let since = self.last_active.elapsed().as_millis() as u64;
++            (since, BRIGHTNESS_DIM_TIMEOUT as u64, BRIGHTNESS_OFF_TIMEOUT as u64)
++        }
++    }
++    // Until it dims or goes off, for the main loop's timeout (Power saver's aren't multiples of
++    // TIMEOUT_MS); none once it's off
++    pub fn ms_until_change(&self, power_saver: bool) -> Option<i32> {
++        let (since, dim, off) = self.timeouts(power_saver);
++        if since < dim {
++            Some((dim - since) as i32)
++        } else if since < off {
++            Some((off - since) as i32)
++        } else {
++            None
++        }
++    }
++    pub fn update_backlight(&mut self, cfg: &Config, power_saver: bool) {
++        let (since_last_active, dim_timeout, off_timeout) = self.timeouts(power_saver);
+         let new_bl = min(
+             self.max_bl,
+             if self.lid_state == SwitchState::On {
+                 0
+-            } else if since_last_active < BRIGHTNESS_DIM_TIMEOUT as u64 {
++            } else if since_last_active < dim_timeout {
+                 if cfg.adaptive_brightness {
+                     BacklightManager::display_to_touchbar(
+                         read_attr(&self.display_bl_path, "brightness"),
+@@ -129,7 +167,7 @@
+                 } else {
+                     cfg.active_brightness
+                 }
+-            } else if since_last_active < BRIGHTNESS_OFF_TIMEOUT as u64 {
++            } else if since_last_active < off_timeout {
+                 DIMMED_BRIGHTNESS
+             } else {
+                 0
+diff -ruN a/src/main.rs b/src/main.rs
+--- a/src/main.rs	2026-10-22 23:26:05.693317309 +0100
++++ b/src/main.rs	2026-10-23 00:12:09.326586301 +0100
+@@ -42,12 +42,14 @@
+ mod display;
+ mod fonts;
+ mod pixel_shift;
++mod power_profile;
+ 
+ use crate::config::ConfigManager;
+ use backlight::BacklightManager;
+ use config::{ButtonConfig, Config};
+ use display::DrmBackend;
+ use pixel_shift::{PixelShiftManager, PIXEL_SHIFT_WIDTH_PX};
++use power_profile::PowerProfile;
+ 
+ const BUTTON_SPACING_PX: i32 = 16;
+ const BUTTON_COLOR_INACTIVE: f64 = 0.200;
+@@ -826,6 +828,7 @@
+     let mut cfg_mgr = ConfigManager::new();
+     let (mut cfg, mut layers) = cfg_mgr.load_config(width);
+     let mut pixel_shift = PixelShiftManager::new();
++    let mut profile = PowerProfile::new();
+ 
+     // drop privileges to input and video group
+     let groups = ["input", "video"];
+@@ -864,6 +867,9 @@
+     epoll
+         .add(&udev_monitor, EpollEvent::new(EpollFlags::EPOLLIN, 3))
+         .unwrap();
++    if let Some(fd) = profile.fd() {
++        epoll.add(fd, EpollEvent::new(EpollFlags::EPOLLIN, 5)).unwrap();
++    }
+     uinput.set_evbit(EventKind::Key).unwrap();
+     for k in MODIFIERS {
+         uinput.set_keybit(k).unwrap();
+@@ -920,6 +926,9 @@
+             }
+             next_timeout_ms = min(next_timeout_ms, pixel_shift_next_timeout_ms);
+         }
++        if let Some(ms) = backlight.ms_until_change(profile.power_saver()) {
++            next_timeout_ms = min(next_timeout_ms, ms);
++        }
+ 
+         let current_ts = if layers[active_layer].faster_refresh {
+             Local::now().second()
+@@ -967,6 +976,7 @@
+         };
+ 
+         _ = udev_monitor.iter().last();
++        profile.update();
+ 
+         input_tb.dispatch().unwrap();
+         input_main.dispatch().unwrap();
+@@ -1045,6 +1055,6 @@
+                 _ => {}
+             }
+         }
+-        backlight.update_backlight(&cfg);
++        backlight.update_backlight(&cfg, profile.power_saver());
+     }
+ }
+diff -ruN a/src/power_profile.rs b/src/power_profile.rs
+--- a/src/power_profile.rs	1970-01-01 01:00:00.000000000 +0100
++++ b/src/power_profile.rs	2026-10-23 00:12:09.310725986 +0100
+@@ -0,0 +1,57 @@
++use nix::{
++    errno::Errno,
++    sys::inotify::{AddWatchFlags, InitFlags, Inotify},
++};
++use std::{fs, path::PathBuf};
++
++// The power profile the user chose, as power-profiles-daemon saves it at each change (written
++// elsewhere and renamed into place); the session's own bus is out of reach of this daemon
++const PPD_STATE_DIR: &str = "/var/lib/power-profiles-daemon";
++const PPD_STATE_FILE: &str = "state.ini";
++
++fn power_saver_chosen() -> bool {
++    fs::read_to_string(PathBuf::from(PPD_STATE_DIR).join(PPD_STATE_FILE))
++        .map(|s| s.lines().any(|l| l.trim() == "Profile=power-saver"))
++        .unwrap_or(false)
++}
++
++pub struct PowerProfile {
++    watch: Option<Inotify>,
++    power_saver: bool,
++}
++
++impl PowerProfile {
++    // Without power-profiles-daemon, never Power saver
++    pub fn new() -> PowerProfile {
++        let watch = Inotify::init(InitFlags::IN_NONBLOCK).ok().filter(|watch| {
++            watch
++                .add_watch(PPD_STATE_DIR, AddWatchFlags::IN_MOVED_TO | AddWatchFlags::IN_CLOSE_WRITE)
++                .is_ok()
++        });
++        PowerProfile {
++            watch,
++            power_saver: power_saver_chosen(),
++        }
++    }
++    pub fn power_saver(&self) -> bool {
++        self.power_saver
++    }
++    // For the main loop's epoll: a change of the profile wakes it
++    pub fn fd(&self) -> Option<&Inotify> {
++        self.watch.as_ref()
++    }
++    pub fn update(&mut self) {
++        let Some(watch) = self.watch.as_ref() else {
++            return;
++        };
++        match watch.read_events() {
++            Ok(events) => {
++                if events.iter().any(|e| e.name.as_deref().is_some_and(|n| n == PPD_STATE_FILE)) {
++                    self.power_saver = power_saver_chosen();
++                }
++            }
++            Err(Errno::EAGAIN) => {}
++            Err(_) => self.watch = None,
++        }
++    }
++}

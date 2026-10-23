@@ -1,61 +1,45 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# tiny-dfr, the Touch Bar's daemon, with TarisOS's patches (taris-*.patch, applied in name order):
-# the modifiers held on the keyboard go with the Touch Bar's keys, so Ctrl+Alt+F1-F12 switch text
-# consoles; and the keyboard's backlight goes off after a minute without a key press. Based on Asahi
-# ALARM's tiny-dfr PKGBUILD (asahi-alarm/PKGBUILDs), with its patch (81.patch); replaces that
-# package, which a full upgrade swaps for this one. Keep it at Asahi's version: when theirs moves
-# on, move this with it (pkgver, their patches, updpkgsums). A patch that no longer applies stops
-# the build.
+# TarisOS's patches to tiny-dfr, the Touch Bar's daemon, for whatever version Asahi's repository
+# has: the modifiers held on the keyboard go with the Touch Bar's keys, so Ctrl+Alt+F1-F12 switch
+# text consoles; the keyboard's backlight goes off after a minute without a key press (30 s in
+# Power saver); and in Power saver the Touch Bar goes off twice as fast, counting only its own use.
+# Asahi's tiny-dfr stays installed. After it (or this) is installed or upgraded, a pacman hook
+# builds it again from Asahi's own packaging for the installed version with these patches on top
+# (asahi-package.sh, as the kernel driver packages do with asahi-source.sh), and the service runs
+# that build in place of the stock binary (a systemd drop-in). A patch that no longer applies, or
+# no network, leaves the stock binary running.
 
-_pkgname=tiny-dfr
 pkgname=tiny-dfr-taris
-pkgver=0.3.7
-pkgrel=2
-pkgdesc='Apple silicon touch bar input / display daemon, with TarisOS patches'
+epoch=1
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="TarisOS: its patches to the Touch Bar's daemon, built for the installed tiny-dfr"
 arch=('aarch64')
-url=https://crates.io/crates/tiny-dfr
-license=('MIT' 'Apache-2.0')
-makedepends=('rust')
-depends=('pango' 'libinput' 'gdk-pixbuf2' 'librsvg')
-provides=("$_pkgname=$pkgver")
-conflicts=("$_pkgname")
-replaces=("$_pkgname")
-source=(
-  "$_pkgname-$pkgver.crate::https://static.crates.io/crates/tiny-dfr/tiny-dfr-$pkgver.crate"
-  '81.patch'
-  'taris-send-held-modifiers.patch'
-  'taris-unlit-keyboard.patch')
-sha512sums=('af8ac6116c80cf7e87f06158c0917af4faad1804531666bd21d8382d729b969cc8902e0e1b9e78e628f4bda4f54ae942a36ce64d8388edb0db2b6ce167214cb7'
-            '7ee49f123225757b57b89ae21b5ed53cc3249e51c5ed24caf55edf5b5f4a77c2c6bc2e34f4dc81a4db23e85b57c74b9d3f14f63c2700905fbf285a26943a2cfb'
-            '89b5834782ad0336f9d684f803149c14d10cf0dac6552a8aee033c39006630e1d4cafa24fa9b224f1ea4fb64ce7e6fcd564907c8de74cb113806a1f4df60a787'
-            '8ae0b6657cdbcb288ed9da78332cb21098c1e395731d0ada248ca673271e78dd325d4acf03e1cd82ec6dff464bf02ffd3adb0e35a0905cb4d586872d46655520')
-
-prepare() {
-  tar -xf $_pkgname-$pkgver.crate
-  cd $_pkgname-$pkgver
-  patch -p1 -s --fuzz=0 --no-backup-if-mismatch -f <../81.patch
-  local p
-  for p in ../taris-*.patch; do
-    patch -p1 -s --fuzz=0 --no-backup-if-mismatch -f <"$p"
-  done
-  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
-}
-
-build() {
-  cd $_pkgname-$pkgver
-  export CARGO_TARGET_DIR=target
-  cargo build --frozen --release --all-features
-}
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only' 'MIT' 'Apache-2.0')
+depends=('tiny-dfr' 'cargo' 'git' 'patch' 'fakeroot')
+install=tiny-dfr-taris.install
+source=('taris-send-held-modifiers.patch'
+        'taris-touch-bar-power-saver.patch'
+        'taris-unlit-keyboard.patch'
+        'asahi-package.sh'
+        'asahi-package.conf'
+        '50-taris.conf'
+        '90-taris-tiny-dfr.hook')
+sha256sums=('c6f59bf203cc6d0f551f4083fd279be8186fd0a9253a80780f5c5f007e1e6076'
+            'edeb55279676a780d8ad2e67e7094b32836d8e814fe1dcb6d7b5ec2547df848f'
+            '43a664ebe2290941f32b7cdb2c3a9917aa216a7c08ab972dc66c47ef36c40e0d'
+            'fbe31153b112e8413f08b279cb91cfa7396dfea2ec61654a349a72f1abf89cd9'
+            '664792206b8464136519f115a40703e77508bb7994a4b4a99172340f1106d9ba'
+            '373029df16ed390ebe2de44a3e0274ffab77d206f91fd16cdd80811c70afad4a'
+            'd0923bdac4d7cc2f1a79e84180a54a01cf9b43e31c759fff96adea3eeb658859')
 
 package() {
-  cd $_pkgname-$pkgver
-  install -Dm755 target/release/$_pkgname "$pkgdir"/usr/bin/$_pkgname
-  install -Dm644 share/$_pkgname/* -t "$pkgdir/usr/share/$_pkgname"
-  install -Dm644 etc/systemd/system/$_pkgname.service "$pkgdir/usr/lib/systemd/system/$_pkgname.service"
-  install -Dm644 etc/udev/rules.d/99-touchbar-seat.rules "$pkgdir/usr/lib/udev/rules.d/99-touchbar-seat.rules"
-  install -Dm644 etc/udev/rules.d/99-touchbar-tiny-dfr.rules "$pkgdir/usr/lib/udev/rules.d/99-touchbar-tiny-dfr.rules"
-  install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
-  install -Dm644 LICENSE.material "$pkgdir"/usr/share/licenses/$pkgname/LICENSE.material
+    local share="$pkgdir/usr/share/taris/asahi-package/tiny-dfr"
+    install -Dm644 taris-*.patch asahi-package.conf -t "$share"
+    install -Dm755 asahi-package.sh -t "$share"
+    install -Dm644 50-taris.conf -t "$pkgdir/usr/lib/systemd/system/tiny-dfr.service.d"
+    install -Dm644 90-taris-tiny-dfr.hook -t "$pkgdir/usr/share/libalpm/hooks"
 }

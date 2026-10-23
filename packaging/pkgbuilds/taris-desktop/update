@@ -4,10 +4,17 @@
 
 # Everything updated at once (the Updates page runs it in a terminal): Arch Linux ARM, Asahi, the
 # TarisOS repository and the AUR (yay, else pacman; taris-snapshots takes a snapshot before any
-# package changes), then the Flatpak apps.
+# package changes), then the Flatpak apps. In Power saver (the profile the user chose, as
+# power-profiles-daemon saves it), on the efficiency cores, as background work is
+# (power-saver-background): it takes longer, for much less energy. Everything it starts inherits
+# that, builds and pacman's hooks included.
 set -u
 
 status=0
+if grep -qsx 'Profile=power-saver' /var/lib/power-profiles-daemon/state.ini; then
+	taskset -cp "$(/usr/lib/taris/efficiency-cpus)" "$$" >/dev/null
+fi
+
 # The freshest mirrors first, so the package lists read now are up to date
 sudo /usr/lib/taris/mirrors
 if command -v yay >/dev/null; then

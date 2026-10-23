@@ -14,6 +14,9 @@
 #   --load-extension line, a list; a second line would replace the first).
 # - No GPU render node (the GPU driver didn't load): software rendering, or Chromium (and VSCodium,
 #   an Electron app: ~/.config/codium-flags.conf) can start with no window.
+# - Memory Saver on, at maximum savings: once per account, in its Local State (the setting is
+#   Chromium's own there; its policy would lock it), so the account's own choice stays after that.
+#   Not while Chromium runs, which would write its own over it: at the next login then.
 set -u
 
 flags="${XDG_CONFIG_HOME:-$HOME/.config}/chromium-flags.conf"
@@ -54,3 +57,23 @@ for app in chromium codium; do
 		touch "$added"
 	fi
 done
+
+memory_saver="${XDG_STATE_HOME:-$HOME/.local/state}/taris/chromium-memory-saver"
+if [[ ! -e $memory_saver ]] && ! pgrep -u "$UID" -x chromium >/dev/null; then
+	python3 -I - "${XDG_CONFIG_HOME:-$HOME/.config}/chromium/Local State" <<'PY' && mkdir -p "$(dirname "$memory_saver")" && touch "$memory_saver"
+import json, os, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        state = json.load(f)
+except FileNotFoundError:
+    state = {}
+mode = state.setdefault("performance_tuning", {}).setdefault("high_efficiency_mode", {})
+mode["state"] = 2  # MemorySaverModeState::kEnabled
+mode["aggressiveness"] = 2  # MemorySaverModeAggressiveness::kAggressive: maximum savings
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(path + ".taris", "w") as f:
+    json.dump(state, f)
+os.replace(path + ".taris", path)
+PY
+fi

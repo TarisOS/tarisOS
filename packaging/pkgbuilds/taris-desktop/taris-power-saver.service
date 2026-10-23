@@ -1,0 +1,11 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Unit]
+Description=Hold background work in Power saver
+# After the timers have started at boot, so maintenance's can be held
+After=power-profiles-daemon.service timers.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/taris/power-saver-background

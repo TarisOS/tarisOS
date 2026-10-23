@@ -2,9 +2,9 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# Loads the draft read-only SMC key reader (taris_smc_keys.ko, built here with make) and saves
-# its key list and the power keys' values into results/ next to this script. Nothing is written
-# to the SMC and nothing on the system is replaced; test-revert.sh unloads the module.
+# Loads the draft read-only SMC key reader (taris_smc_keys.ko, built here for the running kernel)
+# and saves its key list and the power keys' values into results/ next to this script. Nothing is
+# written to the SMC and nothing on the system is replaced; test-revert.sh unloads the module.
 # Run by the maintainer, as root:
 #   sudo dev/power/smc-keys/test-install.sh [KEY,KEY,...]
 # KEY,KEY,...: optional float keys to expose in /sys/kernel/taris-smc/sample (at most 16)
@@ -24,14 +24,15 @@ if [[ -d /sys/module/taris_smc_keys ]]; then
   echo "taris_smc_keys is already loaded: run test-revert.sh first." >&2
   exit 1
 fi
-if [[ ! -f $ko ]]; then
-  echo "No $ko: run make in $here first (as your own user)." >&2
-  exit 1
+# Built (again) for the running kernel when it's missing or for another one, as the folder's owner
+# so no root-owned files are left in the checkout
+vermagic=""
+if [[ -f $ko ]]; then
+  vermagic=$(modinfo -F vermagic "$ko")
 fi
-vermagic=$(modinfo -F vermagic "$ko")
 if [[ ${vermagic%% *} != "$(uname -r)" ]]; then
-  echo "The module was built for ${vermagic%% *}, this kernel is $(uname -r): run make again." >&2
-  exit 1
+  echo "Building the module for $(uname -r)..."
+  runuser -u "$(stat -c %U "$here")" -- make -C "$here" >/dev/null
 fi
 
 if [[ -n ${1:-} ]]; then

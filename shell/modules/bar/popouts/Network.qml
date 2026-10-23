@@ -26,6 +26,13 @@ ColumnLayout {
     spacing: Tokens.spacing.small
     width: Tokens.sizes.bar.networkWidth
 
+    // Wi-Fi scans only when asked: this panel opening, the Rescan button, Settings' network pages;
+    // in Power saver, only the Rescan button
+    Component.onCompleted: {
+        if (Nmcli.wifiEnabled && !PowerSaver.active)
+            Nmcli.rescanWifi();
+    }
+
     // Wireless section
     StyledText {
         visible: root.view === "wireless"

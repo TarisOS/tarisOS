@@ -8,18 +8,17 @@
 # Rust is refused. Built for 64-bit ARM. Its launcher opens it as the music workspace over
 # everything (TarisOS's Hyprland config).
 #
-# Its sound goes out through cpal 0.17.3 (rodio's ALSA output) with TarisOS's patch
-# (taris-cpal-xrun-recovery.patch, cpal 0.18's fix backported). After an underrun, pipewire-alsa
-# reports POLLERR until the stream is prepared again; cpal 0.17 returned an error on it instead of
-# recovering, so its audio thread spun at 100% of a core, playing silence until the app was quit.
-# Drop the patch when Taris Music moves to rodio 0.23 (cpal 0.18.2); with another cpal in
-# Cargo.lock the build stops.
+# Its sound goes out through cpal (rodio's ALSA output) with TarisOS's patch
+# (taris-cpal-xrun-recovery.patch, cpal 0.18's fix backported) for any cpal before 0.18 that
+# Cargo.lock has. After an underrun, pipewire-alsa reports POLLERR until the stream is prepared
+# again; cpal 0.17 returned an error on it instead of recovering, so its audio thread spun at 100%
+# of a core, playing silence until the app was quit.
 #
 # TARIS_SRC=/path/to/music builds another checkout's music folder.
 
 pkgname=taris-music
 pkgver=1.4.0
-pkgrel=4
+pkgrel=5
 pkgdesc='The TarisOS music player (YouTube Music), based on Zuno'
 arch=('aarch64')
 url='https://github.com/TarisOS/tarisOS'
@@ -50,17 +49,33 @@ prepare() {
     npm ci
 
     # cpal with TarisOS's patch (see the top), in place of crates.io's through cargo's [patch]
-    # table, from a config file the build finds above src-tauri
+    # table, from a config file the build finds above src-tauri: whatever cpal Cargo.lock has.
+    # From 0.18 cpal has the fix itself; before, the patch is applied unless that cpal already has
+    # it, and the build stops if it doesn't fit (the patch has to be brought up to date)
     export CARGO_HOME="$srcdir/cargo"
     cargo fetch --locked --manifest-path src-tauri/Cargo.toml
-    local cpal=("$CARGO_HOME"/registry/src/*/cpal-0.17.3)
-    if [[ ! -d ${cpal[0]} ]]; then
-        echo "Cargo.lock has no cpal 0.17.3 any more: update or drop taris-cpal-xrun-recovery.patch" >&2
+    local version
+    version=$(awk '/^name = "cpal"$/ { getline; gsub(/"/, "", $3); print $3; exit }' src-tauri/Cargo.lock)
+    if [[ -z $version ]]; then
+        error "Cargo.lock has no cpal"
         return 1
     fi
+    if (( $(vercmp "$version" 0.18.0) >= 0 )); then
+        msg2 "cpal $version has its own xrun recovery: no patch"
+        return 0
+    fi
+    local cpal=("$CARGO_HOME"/registry/src/*/cpal-"$version")
     rm -rf "$srcdir/cpal"
     cp -r "${cpal[0]}" "$srcdir/cpal"
-    patch -d "$srcdir/cpal" -p1 -s --fuzz=0 --no-backup-if-mismatch -f <"$srcdir/taris-cpal-xrun-recovery.patch"
+    local p=$srcdir/taris-cpal-xrun-recovery.patch
+    if patch -d "$srcdir/cpal" -p1 -R -f -s --dry-run <"$p" >/dev/null 2>&1; then
+        msg2 "cpal $version already has taris-cpal-xrun-recovery.patch"
+    elif patch -d "$srcdir/cpal" -p1 -N -f -s --dry-run <"$p" >/dev/null 2>&1; then
+        patch -d "$srcdir/cpal" -p1 -N -f -s <"$p"
+    else
+        error "taris-cpal-xrun-recovery.patch doesn't apply to cpal $version"
+        return 1
+    fi
     mkdir -p .cargo
     printf '[patch.crates-io]\ncpal = { path = "%s" }\n' "$srcdir/cpal" >.cargo/config.toml
 }

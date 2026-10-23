@@ -7,12 +7,13 @@
 # that report more channel volumes than channels (Asahi's microphone, TarisOS's mono copy of it)
 # get their volume and mute state read and set instead of ignored; an IdleMonitor whose timeout or
 # enabled state changes keeps reporting idle (the shell's idle timers went dead after a settings
-# change or media playback). A patch that no longer applies stops the build.
+# change or media playback). A patch Quickshell already has is skipped; one that no longer applies
+# stops the build.
 
 _pkgname=quickshell
 pkgname=quickshell-taris
-pkgver=0.3.2.r7.g2b4501a
-pkgrel=2
+pkgver=0.3.2.r11.g9b0f339
+pkgrel=1
 pkgdesc='Quickshell (git) in /opt, used by the TarisOS shell'
 arch=(x86_64 aarch64)
 url='https://git.outfoxxed.me/quickshell/quickshell'
@@ -59,10 +60,21 @@ pkgver() {
     | sed -E 's/^[^0-9]*//;s/([^-]*-g)/r\1/;s/-/./g'
 }
 
+# Each patch: skipped once Quickshell has it, applied while it fits, and the build stops if
+# neither (the patch has to be brought up to date)
 prepare() {
   cd "$_pkgname"
-  patch -Np1 -i ../taris-volume.patch
-  patch -Np1 -i ../taris-idle-monitor.patch
+  local p
+  for p in ../taris-*.patch; do
+    if patch -p1 -R -f -s --dry-run <"$p" >/dev/null 2>&1; then
+      msg2 "Quickshell already has ${p#../}"
+    elif patch -p1 -N -f -s --dry-run <"$p" >/dev/null 2>&1; then
+      patch -p1 -N -f -s <"$p"
+    else
+      error "${p#../} doesn't apply to this Quickshell"
+      return 1
+    fi
+  done
 }
 
 build() {

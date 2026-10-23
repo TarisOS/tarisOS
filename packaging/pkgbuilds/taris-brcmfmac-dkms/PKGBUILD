@@ -5,15 +5,16 @@
 # about 0.2 W less at idle: the Broadcom Wi-Fi driver (brcmfmac) with TarisOS's change. The kernel
 # leaves those states off; the driver switches them on once the firmware is up, and off again before
 # every reset of the chip and when the machine wakes (with them on, the firmware sometimes stopped
-# answering a few seconds after a wake). No kernel source in the package: DKMS builds it, with the
-# three firmware-vendor modules that use its exports, for every Asahi Linux kernel installed, and
-# before each build asahi-source.sh fetches that kernel's driver source and applies the change
-# (dkms.conf). A kernel whose source it doesn't apply to keeps its own driver, with the link in L1.
+# answering a few seconds after a wake), on again 90 s after the wake. No kernel source in the
+# package: DKMS builds it, with the three firmware-vendor modules that use its exports, for every
+# Asahi Linux kernel installed, and before each build asahi-source.sh fetches that kernel's driver
+# source and applies the change (dkms.conf). A kernel whose source it doesn't apply to keeps its own
+# driver, with the link in L1.
 
 pkgname=taris-brcmfmac-dkms
 epoch=1
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="TarisOS: the Broadcom Wi-Fi driver with the M1 Wi-Fi link in deeper sleep, for DKMS"
 arch=('aarch64')
 url='https://github.com/AsahiLinux/linux'
@@ -25,12 +26,12 @@ source=('0001-wifi-brcmfmac-pcie-BCM4378-L1-substates-only-while-the-firmware-ru
         'asahi-source.conf'
         'dkms.conf'
         'NOTICE')
-sha256sums=('901443a449fc8b70f62b7db85786b376b7d3331a055eee80706c25cb7e812501'
+sha256sums=('954b823bcfe29c784df7ebca5766d3effd74bc10e4de058c2993705f354ec83a'
             '4284f7fc75ae6988e9c489edd3845f420f4306cbcc37199f281a5aaa9d9cf27c'
             '333e32aa08b1ddf108ea25486996a249e48373b3c118ffe3bff0c7b07469862c'
             'dd2884cf100233a43cf0f754aa4b17cabc7c2f85a313f52e83631052830c9172'
             'ebc748216060121a75e6221cfa497fa6b68d86be3a9793b020cd98905ceefbc8'
-            '9cecdc46ad6f031cfd3e87f0be68a50dbffac8fa0762d9be976a8244adfe9da6')
+            '6b3e3925d702bf6ed01667ed345ccdbc36b78390b061b709cc721f92c553661f')
 
 package() {
     local src="$pkgdir/usr/src/taris-brcmfmac-$pkgver"

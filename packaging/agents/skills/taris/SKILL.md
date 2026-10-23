@@ -183,8 +183,8 @@ for an app's menu.
 
 ## Touch Bar
 
-On MacBooks that have one, `tiny-dfr` draws it (TarisOS's build, `tiny-dfr-taris`, which sends
-the modifiers held on the keyboard with the Touch Bar's keys). Its settings are the owner account's
+On MacBooks that have one, `tiny-dfr` draws it (with TarisOS's patches, built by `tiny-dfr-taris`
+for the installed version: it sends the modifiers held on the keyboard with the Touch Bar's keys). Its settings are the owner account's
 own (the account the setup screen made), changed as that account without sudo from
 `~/.config/taris/touchbar.toml`. That's a link to the file itself,
 `/var/lib/taris/touchbar/config.toml`, which `/etc/tiny-dfr/config.toml` links to as well: tiny-dfr

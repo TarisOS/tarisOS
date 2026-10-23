@@ -39,6 +39,7 @@ PageBase {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: implicitWidth
                     Layout.preferredHeight: implicitHeight
+                    skipIntroAnimation: Tokens.anim.durations.suspended
                 }
 
                 StyledText {

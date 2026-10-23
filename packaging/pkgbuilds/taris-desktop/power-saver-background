@@ -1,0 +1,68 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Power saver's hold on background work: while the power profile is Power saver, every service a
+# timer starts (backups, mirror ranking, man-db, the keyring's sync...) and a backup started by hand
+# run on the efficiency cores only; otherwise on every core. They take longer there, for much less
+# energy. The setting is systemd's (AllowedCPUs, for this boot only): it holds for a service that
+# starts later too, and one running now moves at once. Updates hold themselves (update).
+# On battery, maintenance waits altogether: its timers are stopped, and started again once Power
+# saver goes off or the charger is in; those that keep their last run (Persistent=) catch up on a
+# run they missed then. A job already running finishes. Only timers this stopped are started again.
+# The profile is the one the user chose, as power-profiles-daemon saves it at each change. Run as
+# root by taris-power-saver.service: at boot, at each change of the profile
+# (taris-power-saver.path) and when the charger comes or goes (90-taris-power-saver.rules).
+# Usage: power-saver-background
+set -euo pipefail
+
+state=/var/lib/power-profiles-daemon/state.ini
+held=/run/taris-power-saver/held-timers
+maintenance=(taris-backups-auto.timer taris-mirrors.timer man-db.timer shadow.timer
+	archlinux-keyring-wkd-sync.timer systemd-tmpfiles-clean.timer)
+
+saver=""
+if grep -qsx 'Profile=power-saver' "$state"; then
+	saver=1
+fi
+on_ac=""
+for supply in /sys/class/power_supply/*; do
+	if [[ $(<"$supply/type") == "Mains" && $(cat "$supply/online" 2>/dev/null) == "1" ]]; then
+		on_ac=1
+	fi
+done
+
+cpus=""
+if [[ $saver ]]; then
+	cpus=$(/usr/lib/taris/efficiency-cpus)
+fi
+mapfile -t units < <(systemctl list-timers --all --output=json --no-pager |
+	python3 -I -c 'import json, sys; print("\n".join(t["activates"] for t in json.load(sys.stdin) if t.get("activates")))')
+units+=(taris-backups.service)
+for unit in "${units[@]}"; do
+	# A unit that isn't installed (taris-backups without taris-snapshots) is left out
+	systemctl set-property --runtime "$unit" "AllowedCPUs=$cpus" 2>/dev/null ||
+		echo "power-saver-background: $unit left as it is" >&2
+done
+
+if [[ $saver && ! $on_ac ]]; then
+	if [[ ! -e $held ]]; then
+		mkdir -p "${held%/*}"
+		: >"$held"
+		for timer in "${maintenance[@]}"; do
+			if systemctl -q is-active "$timer"; then
+				echo "$timer" >>"$held"
+			fi
+		done
+		mapfile -t timers <"$held"
+		if (( ${#timers[@]} > 0 )); then
+			systemctl stop "${timers[@]}"
+		fi
+	fi
+elif [[ -e $held ]]; then
+	mapfile -t timers <"$held"
+	if (( ${#timers[@]} > 0 )); then
+		systemctl start "${timers[@]}"
+	fi
+	rm -f "$held"
+fi

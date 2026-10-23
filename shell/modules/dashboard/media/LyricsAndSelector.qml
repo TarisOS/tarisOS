@@ -50,7 +50,7 @@ Item {
         AnimatedImage {
             Layout.fillWidth: true
             Layout.preferredHeight: Tokens.sizes.dashboard.mediaSectionWidth / 3
-            playing: Players.active?.isPlaying ?? false
+            playing: (Players.active?.isPlaying ?? false) && !root.Tokens.anim.durations.suspended
             speed: Audio.beatTracker.bpm / Config.general.mediaGifSpeedAdjustment // qmllint disable unresolved-type
             source: Paths.absolutePath(Config.paths.mediaGif)
             asynchronous: true
@@ -59,6 +59,6 @@ Item {
     }
 
     ServiceRef {
-        service: root.visible ? Audio.beatTracker : null
+        service: root.visible && !root.Tokens.anim.durations.suspended ? Audio.beatTracker : null
     }
 }

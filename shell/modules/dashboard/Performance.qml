@@ -67,7 +67,7 @@ Item {
 
             RowLayout {
                 spacing: Tokens.spacing.medium
-                visible: cpuCard.active || gpuCard.active
+                visible: cpuCard.active || gpuCard.active || memoryCard.active
 
                 WrappedLoader {
                     id: cpuCard
@@ -106,15 +106,24 @@ Item {
                         }
                     }
                 }
+
+                WrappedLoader {
+                    id: memoryCard
+
+                    active: Config.dashboard.performance.showMemory
+                    sourceComponent: MemoryCard {}
+                }
             }
 
+            // Storage at its own size; Network takes the rest of the row
             RowLayout {
                 spacing: Tokens.spacing.medium
-                visible: storageCard.active || networkCard.active || memoryCard.active
+                visible: storageCard.active || networkCard.active
 
                 WrappedLoader {
                     id: storageCard
 
+                    Layout.fillWidth: !networkCard.active
                     active: Config.dashboard.performance.showStorage
                     sourceComponent: StorageCard {}
                 }
@@ -124,13 +133,6 @@ Item {
 
                     active: Config.dashboard.performance.showNetwork
                     sourceComponent: NetworkCard {}
-                }
-
-                WrappedLoader {
-                    id: memoryCard
-
-                    active: Config.dashboard.performance.showMemory
-                    sourceComponent: MemoryCard {}
                 }
             }
         }

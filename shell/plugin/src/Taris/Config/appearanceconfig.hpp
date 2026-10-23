@@ -241,9 +241,14 @@ class AnimDurations : public settings::ObjectNode {
     Q_PROPERTY(int expressiveFastEffects READ expressiveFastEffects NOTIFY valuesChanged)
     Q_PROPERTY(int expressiveDefaultEffects READ expressiveDefaultEffects NOTIFY valuesChanged)
     Q_PROPERTY(int expressiveSlowEffects READ expressiveSlowEffects NOTIFY valuesChanged)
+    // Every duration 0 while set (Power saver). Read-only to the settings, so it's never saved
+    Q_PROPERTY(bool suspended READ suspended NOTIFY valuesChanged)
 
 public:
     void bindTokens(AnimDurationTokens* tokens);
+
+    [[nodiscard]] bool suspended() const;
+    Q_INVOKABLE void setSuspended(bool suspended);
 
     [[nodiscard]] int small() const;
     [[nodiscard]] int normal() const;
@@ -260,7 +265,10 @@ signals:
     void valuesChanged();
 
 private:
+    [[nodiscard]] int scaled(qreal duration) const;
+
     AnimDurationTokens* m_tokens = nullptr;
+    bool m_suspended = false;
 };
 
 class AppearanceAnim : public settings::ObjectNode {

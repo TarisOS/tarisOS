@@ -35,6 +35,12 @@ Singleton {
     // The light now: the middle of the last three readings, so a flicker doesn't move the panel
     property real lux: NaN
     property list<real> readings: []
+    // Power saver puts the panel down to this if it's brighter, and keeps automatic brightness at or
+    // below it, until the user sets a level of their own; when it goes off, the panel goes back to
+    // where it was (or to automatic brightness's level), unless the user set one meanwhile
+    readonly property real saverLevel: 0.5
+    property bool saverCapped
+    property real levelBeforeSaver: NaN
 
     function getMonitorForScreen(screen: ShellScreen): var {
         return monitors.find(m => m.modelData === screen); // qmllint disable missing-property
@@ -81,7 +87,26 @@ Singleton {
 
     // Never off: the dimmest the Settings slider goes
     function autoLevel(): real {
-        return Math.max(0.01, Math.min(1, levelFor(lux) + adapter.offset));
+        return Math.max(0.01, Math.min(saverCapped ? saverLevel : 1, levelFor(lux) + adapter.offset));
+    }
+
+    function applySaver(): void {
+        if (PowerSaver.active) {
+            saverCapped = true;
+            if (panel && panel.brightness > saverLevel) {
+                levelBeforeSaver = panel.brightness;
+                panel.rampTimer.stop();
+                panel.rampTarget = NaN;
+                panel.setLevel(saverLevel);
+            }
+        } else if (saverCapped) {
+            saverCapped = false;
+            if (autoBrightness && !isNaN(lux))
+                panel.rampTo(autoLevel());
+            else if (panel && !isNaN(levelBeforeSaver))
+                panel.setLevel(levelBeforeSaver);
+            levelBeforeSaver = NaN;
+        }
     }
 
     // The user set the panel to this: kept as the offset from the curve
@@ -125,6 +150,27 @@ Singleton {
     onMonitorsChanged: {
         ddcMonitors = [];
         ddcProc.running = true;
+    }
+
+    // Already on at the start: automatic brightness kept at or below the level, the panel left as it is
+    Component.onCompleted: saverCapped = PowerSaver.active
+
+    Connections {
+        function onActiveChanged(): void {
+            root.applySaver();
+        }
+
+        target: PowerSaver
+    }
+
+    // The user's own level ends Power saver's hold on the panel
+    Connections {
+        function onAdjusted(): void {
+            root.saverCapped = false;
+            root.levelBeforeSaver = NaN;
+        }
+
+        target: root.panel
     }
 
     Variants {

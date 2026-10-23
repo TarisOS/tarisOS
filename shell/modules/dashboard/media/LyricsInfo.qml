@@ -56,7 +56,7 @@ Item {
 
         group: blobGroup
         radius: Tokens.rounding.medium
-        deformScale: 0.00001
+        deformScale: Tokens.anim.durations.suspended ? 0 : 0.00001
 
         states: State {
             name: "open"

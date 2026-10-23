@@ -134,7 +134,7 @@ Item {
 
             anchors.fill: parent
 
-            deformScale: 0.00005
+            deformScale: Tokens.anim.durations.suspended ? 0 : 0.00005
             group: blobGroup
             opacity: blobGroup.color.a
 

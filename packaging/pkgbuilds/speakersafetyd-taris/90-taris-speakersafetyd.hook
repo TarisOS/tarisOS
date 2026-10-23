@@ -1,0 +1,15 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# speakersafetyd with TarisOS's patch built again for the version just installed (asahi-package.sh)
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = speakersafetyd
+Target = speakersafetyd-taris
+
+[Action]
+Description = Building speakersafetyd with TarisOS's patch for the installed version...
+When = PostTransaction
+Exec = /usr/share/taris/asahi-package/speakersafetyd/asahi-package.sh

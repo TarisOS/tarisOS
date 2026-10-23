@@ -485,6 +485,7 @@ StyledWindow {
         implicitWidth: panel.width
         implicitHeight: panel.height
         radius: Tokens.rounding.extraLarge
-        deformScale: (deformAmount * Config.appearance.deformScale) / 10000
+        // No wobble while animations are off (Power saver): the panels jump into place
+        deformScale: Tokens.anim.durations.suspended ? 0 : (deformAmount * Config.appearance.deformScale) / 10000
     }
 }

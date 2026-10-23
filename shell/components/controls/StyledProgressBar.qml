@@ -228,7 +228,7 @@ ProgressBar {
 
         Anim on waveProgress {
             running: true
-            paused: wave.amplitudeMultiplier === 0 || root.wavePaused || !root.visible
+            paused: wave.amplitudeMultiplier === 0 || root.wavePaused || !root.visible || root.Tokens.anim.durations.suspended
             from: 0
             to: 1
             duration: root.waveDuration

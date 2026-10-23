@@ -8,7 +8,7 @@
 
 pkgname=taris-desktop
 pkgver=1.0.0
-pkgrel=19
+pkgrel=20
 pkgdesc='TarisOS: the Hyprland desktop, its defaults and the system name'
 arch=('any')
 url='https://github.com/TarisOS/tarisOS'
@@ -99,6 +99,11 @@ source=(
     'fuse-sleep'
     'taris-fuse-resume.service'
     'agent-setup'
+    'efficiency-cpus'
+    'power-saver-background'
+    'taris-power-saver.service'
+    'taris-power-saver.path'
+    '90-taris-power-saver.rules'
 )
 sha256sums=('9a89963ad0aa6c66b24702f4d3610e3dbef48ae1fa97bea2c725aaec2d0dbe0a'
             '0c6982fcab9703ec3cc44de107f16c9ee37714c98099eb692760162317771196'
@@ -112,7 +117,7 @@ sha256sums=('9a89963ad0aa6c66b24702f4d3610e3dbef48ae1fa97bea2c725aaec2d0dbe0a'
             '5e544b3017a0141369f0ebe8f524a58909482c16d5c47045b1c10660811c9fda'
             'b838524eb391a1e2d39d2f65292f4afc301c24dcbde3ef69ee0e2473eea815c2'
             'c03b77915598b512ee4a05b4f5fdebe5fdecede34fb001bee705aabd51ae03e0'
-            'e2091234f748fae23b2667396ef52257fb6ac52af2e39dead8f1dede05f0862d'
+            'c888724a9f2e17f067a8592c5ce6e23115bd8ddb7778a238fc7779f692eaf657'
             '2336dff308e2ed89556d95289e263039600d4676fdc0141e4d34d67c5c91f852'
             'bf5f4b47666951f19259d91d703538ab0c35e31fbfd9acacb8ad0cade8deb6af'
             '6bfc2b0a390b48b7ece5044e1caabe4476af02b99f3e9ec7bec0c81d4a3d7756'
@@ -143,7 +148,12 @@ sha256sums=('9a89963ad0aa6c66b24702f4d3610e3dbef48ae1fa97bea2c725aaec2d0dbe0a'
             'a819e7b7e13d02682dca89cb1754cf7098ab0be2dfd5360cad9d90b33b125977'
             '888719e5366b8938c937268c40185977b1b0dcc2f4ca1cf7b066641b67089995'
             '558851ddd3b3597a3027bff48818bc46888fd021dbd77ec83a1b59b87e467593'
-            'eb00ffb994ef91d67b30335b78be65c941568c7848c3ee04124d7533cebef079')
+            'eb00ffb994ef91d67b30335b78be65c941568c7848c3ee04124d7533cebef079'
+            'ea4a316e5336c270b0bd4d594434444731e61f2d7781cb80df4e54a51b6c905a'
+            '785ff330d5449d9efc73672387976385a6d8a7f203f343a394a3f886e305c890'
+            '24b567811fb826f8f06a642a128430157dd50ea4ed720a851554ed3d1a07f356'
+            '968d12331f2b08e5828e8fcd1ee133cccfbc69ed70fac2754dad20ee1c79b8e1'
+            'd5e9572e802ebca08069bf07702a52fb8799d77fd566d1c8266b7b058778b0a6')
 
 # This repository's packaging folder (the Hyprland config, defaults, agent skills, title bars)
 _packaging="${TARIS_PACKAGING:-$startdir/../..}"
@@ -209,6 +219,14 @@ package() {
     ln -s ../taris-fuse-resume.service "$pkgdir/usr/lib/systemd/system/suspend.target.wants/taris-fuse-resume.service"
     install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
     ln -s ../taris-hyprbars.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/taris-hyprbars.service"
+    # Power saver keeps background work (timers' services, backups, updates) on the efficiency
+    # cores, and maintenance waits for the charger: set at boot, at each change of the power
+    # profile and when the charger comes or goes
+    install -Dm755 efficiency-cpus power-saver-background -t "$pkgdir/usr/lib/taris"
+    install -Dm644 taris-power-saver.service taris-power-saver.path -t "$pkgdir/usr/lib/systemd/system"
+    ln -s ../taris-power-saver.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/taris-power-saver.service"
+    ln -s ../taris-power-saver.path "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/taris-power-saver.path"
+    install -Dm644 90-taris-power-saver.rules -t "$pkgdir/usr/lib/udev/rules.d"
     install -Dm644 os-release bashrc -t "$share"
     install -Dm644 taris-name.cfg "$pkgdir/etc/default/grub.d/taris-name.cfg"
 

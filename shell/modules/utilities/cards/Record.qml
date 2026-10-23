@@ -213,8 +213,9 @@ StyledRect {
                     Anim {}
                 }
 
+                // Not while animations are off (Power saver): steps of no length would loop every frame
                 SequentialAnimation on opacity {
-                    running: !Recorder.paused
+                    running: !Recorder.paused && Tokens.anim.durations.large > 0
                     alwaysRunToEnd: true
                     loops: Animation.Infinite
 

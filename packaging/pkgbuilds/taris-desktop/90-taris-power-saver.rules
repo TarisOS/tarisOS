@@ -1,0 +1,5 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The charger plugged in or out: Power saver's maintenance hold follows (power-saver-background)
+ACTION=="change", SUBSYSTEM=="power_supply", ATTR{type}=="Mains", RUN+="/usr/bin/systemctl start --no-block taris-power-saver.service"

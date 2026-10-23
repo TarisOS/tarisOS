@@ -9,14 +9,14 @@
 
 pkgname=taris-chromium
 pkgver=1.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc='TarisOS: Chromium settings for every account'
 arch=('any')
 url='https://github.com/TarisOS/tarisOS'
 license=('GPL-3.0-only')
 depends=('chromium' 'gnome-keyring' 'bash' 'sed')
 source=('chromium-flags' 'initial_preferences')
-sha256sums=('e453931128f1a8b4f513dab0499d8e1113251dbfd44d95ce40b1fd030b9b1b8c'
+sha256sums=('f8cf5148e6ecd62970a75aaa6645c6acb6b8f5974ab2b54ce839f1b93166ace3'
             '10a9ed7388fc7dcc727001071692f99e562b20e579f32ef85c6e42206fe0176a')
 
 package() {

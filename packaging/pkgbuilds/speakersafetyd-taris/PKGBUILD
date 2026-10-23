@@ -1,52 +1,40 @@
 # Copyright (C) 2026 George Dobreff ("Witcher") and contributors
 # SPDX-License-Identifier: GPL-3.0-only
 
-# speakersafetyd, the speakers' protection daemon, with TarisOS's patch (taris-*.patch): its sense
-# stream is read with one ALSA period per block, so it wakes about 12 times a second while sound
-# plays instead of 1,000. Based on Asahi ALARM's speakersafetyd PKGBUILD (asahi-alarm/PKGBUILDs),
-# with its patch (0001-*.patch); replaces that package, which a full upgrade swaps for this one.
-# Keep it at Asahi's version: when theirs moves on, move this with it (pkgver, their patches,
-# updpkgsums). A patch that no longer applies stops the build.
+# TarisOS's patch to speakersafetyd, the speakers' protection daemon, for whatever version Asahi's
+# repository has: its sense stream is read with one ALSA period per block, so it wakes about 12
+# times a second while sound plays instead of 1,000 (the model, its limits and the read size are
+# unchanged). Asahi's speakersafetyd stays installed. After it (or this) is installed or upgraded,
+# a pacman hook builds it again from Asahi's own packaging for the installed version with the patch
+# on top (asahi-package.sh, as the kernel driver packages do with asahi-source.sh), and the service
+# runs that build in place of the stock binary (a systemd drop-in). A patch that no longer applies,
+# or no network, leaves the stock binary running.
 
-_pkgname=speakersafetyd
 pkgname=speakersafetyd-taris
-pkgver=2.0.1
+epoch=1
+pkgver=1.0.0
 pkgrel=1
-pkgdesc='Asahi Linux speaker safety daemon, with TarisOS patches'
+pkgdesc="TarisOS: its patch to the speakers' protection daemon, built for the installed speakersafetyd"
 arch=('aarch64')
-url='https://github.com/AsahiLinux/speakersafetyd'
-license=('MIT')
-makedepends=('rust')
-depends=('alsa-lib')
-provides=("$_pkgname=$pkgver")
-conflicts=("$_pkgname")
-replaces=("$_pkgname")
-source=(
-  "$_pkgname-$pkgver.tar.gz::https://github.com/AsahiLinux/speakersafetyd/archive/$pkgver.tar.gz"
-  '0001-j504-Write-the-full-speaker-names-in-conf.patch'
-  'taris-sense-period.patch')
-sha256sums=('0e1cb05a2f5521d80f9a502daa0b75ef5c7f2b9e8913b0f88c2d19a97d4439e5'
-            '9c1060ca170f52ceb2a68fd1d3c67a31edc4171473b65c239de2115ac8c1870f'
-            'e1c2c5150ffbb2856c0ebb337a683cf96446f321c81d3011bc7e0094afe80b94')
-
-prepare() {
-  cd $_pkgname-$pkgver
-  patch -p1 -s --fuzz=0 --no-backup-if-mismatch -f <../0001-j504-Write-the-full-speaker-names-in-conf.patch
-  local p
-  for p in ../taris-*.patch; do
-    patch -p1 -s --fuzz=0 --no-backup-if-mismatch -f <"$p"
-  done
-  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
-}
-
-build() {
-  cd $_pkgname-$pkgver
-  export CARGO_TARGET_DIR=target
-  cargo build --frozen --release
-}
+url='https://github.com/TarisOS/tarisOS'
+license=('GPL-3.0-only' 'MIT')
+depends=('speakersafetyd' 'cargo' 'git' 'patch' 'fakeroot')
+install=speakersafetyd-taris.install
+source=('taris-sense-period.patch'
+        'asahi-package.sh'
+        'asahi-package.conf'
+        '50-taris.conf'
+        '90-taris-speakersafetyd.hook')
+sha256sums=('e1c2c5150ffbb2856c0ebb337a683cf96446f321c81d3011bc7e0094afe80b94'
+            'fbe31153b112e8413f08b279cb91cfa7396dfea2ec61654a349a72f1abf89cd9'
+            '3a789ea77c908381f683a7e5f0061f6604eae25313e7338bbd09831dea6283a9'
+            'b496b4a26814742ff431674e0c3e607d98b93014b5a6f9fbd55c1b0d6b06678d'
+            'a063474d9772a9266c50a07d196d2e1a24813fcbbc3be64e42257fc767bf16c2')
 
 package() {
-  cd $_pkgname-$pkgver
-  make DESTDIR="$pkgdir" UNITDIR=/usr/lib/systemd/system UDEVDIR=/usr/lib/udev/rules.d install
-  install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+    local share="$pkgdir/usr/share/taris/asahi-package/speakersafetyd"
+    install -Dm644 taris-*.patch asahi-package.conf -t "$share"
+    install -Dm755 asahi-package.sh -t "$share"
+    install -Dm644 50-taris.conf -t "$pkgdir/usr/lib/systemd/system/speakersafetyd.service.d"
+    install -Dm644 90-taris-speakersafetyd.hook -t "$pkgdir/usr/share/libalpm/hooks"
 }

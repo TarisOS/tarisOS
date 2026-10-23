@@ -80,7 +80,7 @@ sudo included), and says so. Don't retry a failing password: tell the user.
 | **NetworkManager, BlueZ** | Network, Bluetooth (also in Taris's settings) | |
 | **snapper** | A snapshot of the system before every package change | `/etc/snapper/configs/root` |
 | **nftables** | Firewall: nothing gets in unless it answers this machine | `/etc/taris/firewall.d/` (own rules: network-and-privacy skill) |
-| **tiny-dfr** | Touch Bar (MacBooks that have one; TarisOS's build, `tiny-dfr-taris`) | `~/.config/taris/touchbar.toml` (the owner account's; see the taris skill) |
+| **tiny-dfr** | Touch Bar (MacBooks that have one; with TarisOS's patches, `tiny-dfr-taris`) | `~/.config/taris/touchbar.toml` (the owner account's; see the taris skill) |
 
 Default apps: kitty, Nautilus, Chromium, GNOME Text Editor, Neovim, imv (images), mpv and VLC
 (video), Taris Music (music, the `taris-music` package), Evince (PDFs), swappy (screenshots),

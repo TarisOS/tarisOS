@@ -1,0 +1,11 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# power-profiles-daemon saves the profile the user chooses here at each change (written alongside
+# and renamed into place, which this sees too)
+[Unit]
+Description=Follow the power profile for background work
+
+[Path]
+PathChanged=/var/lib/power-profiles-daemon/state.ini
+Unit=taris-power-saver.service

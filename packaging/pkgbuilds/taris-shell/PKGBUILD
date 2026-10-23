@@ -8,7 +8,7 @@
 
 pkgname=taris-shell
 pkgver=1.0.0
-pkgrel=20
+pkgrel=21
 pkgdesc='The TarisOS desktop shell'
 arch=('aarch64')
 url='https://github.com/TarisOS/tarisOS'

@@ -54,11 +54,11 @@ ColumnLayout {
                 properties: "opacity"
                 from: 0
                 to: 1
-                duration: 140
+                duration: Tokens.anim.durations.suspended ? 0 : 140
             }
             NumberAnimation {
                 properties: "y"
-                duration: 180
+                duration: Tokens.anim.durations.suspended ? 0 : 180
                 easing.type: Easing.OutCubic
             }
         }
@@ -66,20 +66,20 @@ ColumnLayout {
             NumberAnimation {
                 properties: "opacity"
                 to: 0
-                duration: 100
+                duration: Tokens.anim.durations.suspended ? 0 : 100
             }
         }
         move: Transition {
             NumberAnimation {
                 properties: "y"
-                duration: 180
+                duration: Tokens.anim.durations.suspended ? 0 : 180
                 easing.type: Easing.OutCubic
             }
         }
         displaced: Transition {
             NumberAnimation {
                 properties: "y"
-                duration: 180
+                duration: Tokens.anim.durations.suspended ? 0 : 180
                 easing.type: Easing.OutCubic
             }
         }
@@ -183,13 +183,13 @@ ColumnLayout {
                     target: activeRow
                     property: "opacity"
                     to: 0.0
-                    duration: 70
+                    duration: Tokens.anim.durations.suspended ? 0 : 70
                 }
                 NumberAnimation {
                     target: activeRow
                     property: "scale"
                     to: 0.92
-                    duration: 70
+                    duration: Tokens.anim.durations.suspended ? 0 : 70
                 }
             }
 
@@ -198,14 +198,14 @@ ColumnLayout {
                     target: activeRow
                     property: "opacity"
                     to: 1.0
-                    duration: 160
+                    duration: Tokens.anim.durations.suspended ? 0 : 160
                     easing.type: Easing.OutCubic
                 }
                 NumberAnimation {
                     target: activeRow
                     property: "scale"
                     to: 1.0
-                    duration: 220
+                    duration: Tokens.anim.durations.suspended ? 0 : 220
                     easing.type: Easing.OutBack
                 }
             }

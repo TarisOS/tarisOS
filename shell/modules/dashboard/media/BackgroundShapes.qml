@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import M3Shapes
+import Taris.Config
 import qs.components
 import qs.services
 
@@ -41,7 +42,7 @@ Item {
     }
 
     FrameAnimation {
-        running: root.visible && root.width > 0 && root.height > 0 && (Players.active?.isPlaying ?? false)
+        running: root.visible && root.width > 0 && root.height > 0 && (Players.active?.isPlaying ?? false) && !root.Tokens.anim.durations.suspended
         onTriggered: {
             const dt = frameTime;
             for (let i = 0; i < shapes.count; i++) {

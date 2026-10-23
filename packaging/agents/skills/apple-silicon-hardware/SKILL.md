@@ -50,8 +50,9 @@ kernel option that allows setting them; nothing else is needed.
 On MacBooks that have one, `tiny-dfr` draws it from settings the owner account changes without
 sudo, from `~/.config/taris/touchbar.toml` (a link to `/var/lib/taris/touchbar/config.toml`),
 including whether the media keys or F1–F12 show without fn (`MediaLayerDefault`). The taris skill
-has the details. `tiny-dfr` here is TarisOS's own build (`tiny-dfr-taris`): the modifiers held on
-the keyboard go with the Touch Bar's keys, so Ctrl+Alt+F1–F12 on it switch text consoles.
+has the details. `tiny-dfr` here runs with TarisOS's patches (`tiny-dfr-taris` builds Asahi's
+installed version with them): the modifiers held on the keyboard go with the Touch Bar's keys, so
+Ctrl+Alt+F1–F12 on it switch text consoles.
 
 ## Camera
 

@@ -16,8 +16,9 @@ packaging/pkgbuilds/qt6-m3shapes-git/qt6-m3shapes-git/
 packaging/pkgbuilds/ttf-rubik-vf/*.ttf
 packaging/pkgbuilds/ttf-rubik-vf/*.txt
 packaging/pkgbuilds/libva-v4l2-request-avd/libva-v4l2_request/
-packaging/pkgbuilds/taris-tipd-dkms/asahi-*
-packaging/pkgbuilds/taris-appledrm-dkms/asahi-*
-packaging/pkgbuilds/taris-brcmfmac-dkms/asahi-*
+# Kernel source fetched for a driver package by hand (asahi-<version>...), not its asahi-source.*
+packaging/pkgbuilds/taris-tipd-dkms/asahi-[0-9]*
+packaging/pkgbuilds/taris-appledrm-dkms/asahi-[0-9]*
+packaging/pkgbuilds/taris-brcmfmac-dkms/asahi-[0-9]*
 packaging/pkgbuilds/tiny-dfr-taris/*.crate
 distro/out/

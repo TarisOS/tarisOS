@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Wayland
+import Taris.Config
 import qs.services
 
 // Close, minimize and maximize buttons for floating windows (ported from the
@@ -256,7 +257,7 @@ Scope {
       // the pointer sweeping over that spot mustn't open the buttons there.
       property bool shown: false
       property real grow: shown ? 1 : 0
-      Behavior on grow { NumberAnimation { duration: 170; easing.type: Easing.OutBack } }
+      Behavior on grow { NumberAnimation { duration: Tokens.anim.durations.suspended ? 0 : 170; easing.type: Easing.OutBack } }
 
       property double movedAt: 0
       onWxChanged: windowMoved()
@@ -319,7 +320,7 @@ Scope {
               radius: root.buttonSize / 2
               color: Colours.palette.m3onSurface
               scale: press.pressed ? 0.88 : 1
-              Behavior on scale { NumberAnimation { duration: 90 } }
+              Behavior on scale { NumberAnimation { duration: Tokens.anim.durations.suspended ? 0 : 90 } }
               Text {
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: -1

@@ -1,15 +1,18 @@
-TarisOS: the keyboard's backlight goes off after a minute without a key press, and back to its level
-at the next key (/sys/class/leds/kbd_backlight; nothing else turns it off, and it stayed lit the
-whole session). tiny-dfr already reads every keyboard on seat0 and runs as root until it drops
-privileges, so it opens the backlight then, as it does the Touch Bar's. Set off with the brightness
-keys, it stays off; set by the keys while idle-off, the new level is kept. Stopped (SIGTERM, at
-shutdown too) or crashed, it puts the level back first: systemd-backlight saves the keyboard's level
-after tiny-dfr stops, and an idle off saved there would start the next session dark.
+TarisOS: the keyboard's backlight goes off after a minute without a key press (30 s while the
+power profile is Power saver), and back to its level at the next key
+(/sys/class/leds/kbd_backlight; nothing else turns it off, and it stayed lit the whole session).
+tiny-dfr already reads every keyboard on seat0 and runs as root until it drops privileges, so it
+opens the backlight then, as it does the Touch Bar's. The profile comes from power-profiles-daemon's
+saved state (/var/lib/power-profiles-daemon/state.ini, written at each change the user makes),
+watched with inotify: this daemon can't reach the session's bus. Set off with the brightness keys,
+it stays off; set by the keys while idle-off, the new level is kept. Stopped (SIGTERM, at shutdown
+too) or crashed, it puts the level back first: systemd-backlight saves the keyboard's level after
+tiny-dfr stops, and an idle off saved there would start the next session dark.
 
 diff -ruN a/src/kbd_backlight.rs b/src/kbd_backlight.rs
 --- a/src/kbd_backlight.rs	1970-01-01 01:00:00.000000000 +0100
-+++ b/src/kbd_backlight.rs	2026-10-21 18:30:37.703371515 +0100
-@@ -0,0 +1,81 @@
++++ b/src/kbd_backlight.rs	2026-10-23 00:12:30.851973237 +0100
+@@ -0,0 +1,90 @@
 +use std::{
 +    cmp::min,
 +    fs::{self, File, OpenOptions},
@@ -18,10 +21,19 @@ diff -ruN a/src/kbd_backlight.rs b/src/kbd_backlight.rs
 +    time::Instant,
 +};
 +
-+// The keyboard's backlight goes off after a minute without a key press, and back to its level at
-+// the next one
++// The keyboard's backlight goes off after a minute without a key press (30 s in Power saver), and
++// back to its level at the next one
 +const KBD_BACKLIGHT_PATH: &str = "/sys/class/leds/kbd_backlight";
 +const KBD_OFF_TIMEOUT_MS: u64 = 60 * 1000;
++const KBD_OFF_TIMEOUT_SAVER_MS: u64 = 30 * 1000;
++
++fn timeout_ms(power_saver: bool) -> u64 {
++    if power_saver {
++        KBD_OFF_TIMEOUT_SAVER_MS
++    } else {
++        KBD_OFF_TIMEOUT_MS
++    }
++}
 +
 +pub struct KbdBacklight {
 +    path: PathBuf,
@@ -64,7 +76,7 @@ diff -ruN a/src/kbd_backlight.rs b/src/kbd_backlight.rs
 +            }
 +        }
 +    }
-+    pub fn update(&mut self) {
++    pub fn update(&mut self, power_saver: bool) {
 +        if self.saved.is_some() {
 +            // Turned on by something else (the brightness keys' brightnessctl): it counts as a key
 +            if self.level() > 0 {
@@ -73,7 +85,7 @@ diff -ruN a/src/kbd_backlight.rs b/src/kbd_backlight.rs
 +            }
 +            return;
 +        }
-+        if self.last_key.elapsed().as_millis() as u64 >= KBD_OFF_TIMEOUT_MS {
++        if self.last_key.elapsed().as_millis() as u64 >= timeout_ms(power_saver) {
 +            let level = self.level();
 +            // Already off (turned off with the keys): nothing to bring back
 +            if level > 0 {
@@ -83,17 +95,17 @@ diff -ruN a/src/kbd_backlight.rs b/src/kbd_backlight.rs
 +        }
 +    }
 +    // Until it goes off, for the main loop's timeout; none while it's off
-+    pub fn ms_until_off(&self) -> Option<i32> {
++    pub fn ms_until_off(&self, power_saver: bool) -> Option<i32> {
 +        if self.saved.is_some() {
 +            return None;
 +        }
 +        let elapsed = self.last_key.elapsed().as_millis() as u64;
-+        Some(min(KBD_OFF_TIMEOUT_MS.saturating_sub(elapsed), i32::MAX as u64) as i32)
++        Some(min(timeout_ms(power_saver).saturating_sub(elapsed), i32::MAX as u64) as i32)
 +    }
 +}
 diff -ruN a/src/main.rs b/src/main.rs
---- a/src/main.rs	2026-10-21 18:28:31.697515661 +0100
-+++ b/src/main.rs	2026-10-21 18:31:13.622281089 +0100
+--- a/src/main.rs	2026-10-23 00:12:09.326586301 +0100
++++ b/src/main.rs	2026-10-23 00:12:30.851227424 +0100
 @@ -21,6 +21,7 @@
      sys::{
          epoll::{Epoll, EpollCreateFlags, EpollEvent, EpollFlags},
@@ -102,22 +114,23 @@ diff -ruN a/src/main.rs b/src/main.rs
      },
  };
  use privdrop::PrivDrop;
-@@ -41,12 +42,14 @@
+@@ -41,6 +42,7 @@
  mod config;
  mod display;
  mod fonts;
 +mod kbd_backlight;
  mod pixel_shift;
+ mod power_profile;
  
- use crate::config::ConfigManager;
+@@ -48,6 +50,7 @@
  use backlight::BacklightManager;
  use config::{ButtonConfig, Config};
  use display::DrmBackend;
 +use kbd_backlight::KbdBacklight;
  use pixel_shift::{PixelShiftManager, PIXEL_SHIFT_WIDTH_PX};
+ use power_profile::PowerProfile;
  
- const BUTTON_SPACING_PX: i32 = 16;
-@@ -795,7 +798,12 @@
+@@ -797,7 +800,12 @@
  fn main() {
      let mut drm = DrmBackend::open_card().unwrap();
      let (height, width) = drm.mode().size();
@@ -131,7 +144,7 @@ diff -ruN a/src/main.rs b/src/main.rs
      let crash_bitmap = include_bytes!("crash_bitmap.raw");
      let mut map = drm.map().unwrap();
      let data = map.as_mut();
-@@ -818,7 +826,7 @@
+@@ -820,7 +828,7 @@
      sigset.wait().unwrap();
  }
  
@@ -140,7 +153,7 @@ diff -ruN a/src/main.rs b/src/main.rs
      let (height, width) = drm.mode().size();
      let (db_width, db_height) = drm.fb_info().unwrap().size();
      let mut uinput = UInputHandle::new(OpenOptions::new().write(true).open("/dev/uinput").unwrap());
-@@ -864,6 +872,15 @@
+@@ -867,6 +875,15 @@
      epoll
          .add(&udev_monitor, EpollEvent::new(EpollFlags::EPOLLIN, 3))
          .unwrap();
@@ -153,22 +166,22 @@ diff -ruN a/src/main.rs b/src/main.rs
 +    epoll
 +        .add(&signal_fd, EpollEvent::new(EpollFlags::EPOLLIN, 4))
 +        .unwrap();
-     uinput.set_evbit(EventKind::Key).unwrap();
-     for k in MODIFIERS {
-         uinput.set_keybit(k).unwrap();
-@@ -920,6 +937,9 @@
-             }
-             next_timeout_ms = min(next_timeout_ms, pixel_shift_next_timeout_ms);
+     if let Some(fd) = profile.fd() {
+         epoll.add(fd, EpollEvent::new(EpollFlags::EPOLLIN, 5)).unwrap();
+     }
+@@ -929,6 +946,9 @@
+         if let Some(ms) = backlight.ms_until_change(profile.power_saver()) {
+             next_timeout_ms = min(next_timeout_ms, ms);
          }
-+        if let Some(ms) = kbd.as_ref().and_then(|k| k.ms_until_off()) {
++        if let Some(ms) = kbd.as_ref().and_then(|k| k.ms_until_off(profile.power_saver())) {
 +            next_timeout_ms = min(next_timeout_ms, ms);
 +        }
  
          let current_ts = if layers[active_layer].faster_refresh {
              Local::now().second()
-@@ -968,6 +988,13 @@
- 
+@@ -978,6 +998,13 @@
          _ = udev_monitor.iter().last();
+         profile.update();
  
 +        if let Ok(Some(_)) = signal_fd.read_signal() {
 +            if let Some(k) = kbd.as_mut() {
@@ -180,7 +193,7 @@ diff -ruN a/src/main.rs b/src/main.rs
          input_tb.dispatch().unwrap();
          input_main.dispatch().unwrap();
          for event in &mut input_tb.clone().chain(input_main.clone()) {
-@@ -980,6 +1007,11 @@
+@@ -990,6 +1017,11 @@
                      }
                  }
                  Event::Keyboard(KeyboardEvent::Key(key)) => {
@@ -192,12 +205,12 @@ diff -ruN a/src/main.rs b/src/main.rs
                      // This device's own keys come back here too: only the other keyboards count
                      if let Some(m) = MODIFIERS.iter().find(|m| **m as u32 == key.key()) {
                          if key.device().name() != DEVICE_NAME {
-@@ -1046,5 +1078,8 @@
+@@ -1056,5 +1088,8 @@
              }
          }
-         backlight.update_backlight(&cfg);
+         backlight.update_backlight(&cfg, profile.power_saver());
 +        if let Some(k) = kbd.as_mut() {
-+            k.update();
++            k.update(profile.power_saver());
 +        }
      }
  }
