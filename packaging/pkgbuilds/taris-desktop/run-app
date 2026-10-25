@@ -1,0 +1,15 @@
+#!/bin/bash
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Starts an app in a scope of its own, in the account's app.slice. Hyprland's key bindings and the
+# shell open every app through it; otherwise the app would share the login session's scope with
+# Hyprland and the shell, where systemd-oomd (taris-hardware) can't stop it without them and the
+# desktop's memory reservation (session-scope-memory.conf) would cover it too. No limits: the
+# scope only groups the app's processes. It runs the app in this process, so its PID (Hyprland's
+# exec rules), terminal, environment and working folder stay as they are.
+# Usage: run-app <command> [arguments...]
+
+name=${1##*/}
+exec systemd-run --user --scope --quiet --collect --slice=app.slice \
+  --unit="app-taris-${name//[^A-Za-z0-9_.-]/_}-$$" -- "$@"

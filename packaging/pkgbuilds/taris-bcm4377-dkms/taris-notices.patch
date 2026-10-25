@@ -1,0 +1,9 @@
+diff -ruN a/hci_bcm4377.c b/hci_bcm4377.c
+--- a/hci_bcm4377.c
++++ b/hci_bcm4377.c
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: GPL-2.0-only OR MIT
++/* Changed by TarisOS in 2026 (RJ Skerry-Ryan's fix flushing the sleep control writes): https://github.com/TarisOS/tarisOS, packaging/pkgbuilds/taris-bcm4377-dkms */
+ /*
+  * Bluetooth HCI driver for Broadcom 4377/4378/4387/4388 devices attached via PCIe
+  *

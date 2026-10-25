@@ -1,0 +1,44 @@
+# Copyright (C) 2026 George Dobreff ("Witcher") and contributors
+# SPDX-License-Identifier: GPL-3.0-only
+
+# Bluetooth after waking from sleep: the Apple Silicon Macs' Bluetooth driver (hci_bcm4377) with
+# RJ Skerry-Ryan's fix from aurora-silicon/linux. The driver's last write before the sleep
+# (quiesce) and first after the wake (unquiesce) could still be on their way to the controller as
+# the system slept or as the wake's first commands went out: then every command timed out, the
+# wake waited seconds for them, and Bluetooth stayed dead until a restart. The fix reads the
+# register back after both writes. No kernel source in the package: DKMS builds it for every Asahi
+# Linux kernel installed, and before each build asahi-source.sh fetches that kernel's driver source
+# and applies the fix (dkms.conf). A kernel whose source it doesn't apply to keeps its own driver.
+
+pkgname=taris-bcm4377-dkms
+epoch=1
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="TarisOS: the Bluetooth driver that survives sleep, for DKMS"
+arch=('aarch64')
+url='https://github.com/AsahiLinux/linux'
+license=('GPL-2.0-only OR MIT')
+depends=('dkms' 'linux-asahi-headers' 'git' 'patch')
+source=('0001-Bluetooth-hci_bcm4377-Flush-the-sleep-control-writes.patch'
+        'taris-notices.patch'
+        'asahi-source.sh'
+        'asahi-source.conf'
+        'dkms.conf'
+        'NOTICE')
+sha256sums=('d4016d8fcd63840ac29631606c6d36a62a4cea1996c57678da5d60bb1d32d5be'
+            '0ff67a75cc4cced20ba8be030f727789784096297174fa859e14f5a5badeb21a'
+            '333e32aa08b1ddf108ea25486996a249e48373b3c118ffe3bff0c7b07469862c'
+            '2beea1998f0aced882a887bd672d339eee2cf4e878b6a5cc129f4061bfc517a8'
+            'c1bcf571124ba539402e90c25e4d76a9ef1bb4d04799360433de9f03a322ad11'
+            '8b76184cec0fb5cfc52dce327ff3127894241240c50c0de4e4c7c542a93469f5')
+
+package() {
+    local src="$pkgdir/usr/src/taris-bcm4377-$pkgver"
+    grep -qx "PACKAGE_VERSION=\"$pkgver\"" dkms.conf || {
+        error "dkms.conf isn't for $pkgver"
+        return 1
+    }
+    install -Dm644 ./*.patch asahi-source.conf dkms.conf NOTICE -t "$src"
+    install -Dm755 asahi-source.sh -t "$src"
+    install -Dm644 NOTICE -t "$pkgdir/usr/share/licenses/$pkgname"
+}

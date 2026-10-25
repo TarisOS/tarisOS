@@ -37,6 +37,19 @@ function read(): string | null {
   return readLocalJsonSetting<string | null>(STORAGE_KEY, isDeviceId);
 }
 
+/** Hands the choice to Rust; false when it could not take it. */
+async function forward(id: string | null): Promise<boolean> {
+  try {
+    await pushOutputDevice(id);
+    return true;
+  } catch (error) {
+    logInternalWarn("Output device push failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
 /**
  * Pushes the choice down to Rust and, if the engine had a track loaded, reloads it — reopening
  * the stream drops both decks, the same loss `PlayerController.recoverFromPrematureEnd`
@@ -49,14 +62,7 @@ function read(): string | null {
  */
 async function push(id: string | null): Promise<void> {
   const session = playerController.getPlayerSession();
-  try {
-    await pushOutputDevice(id);
-  } catch (error) {
-    logInternalWarn("Output device push failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return;
-  }
+  if (!await forward(id)) return;
 
   if (!session?.currentTrack || session.status === "idle") return;
   const wasPlaying = session.status === "playing";
@@ -83,9 +89,11 @@ export function setOutputDevice(id: string | null): void {
 export async function hydrateOutputDevice(): Promise<void> {
   await hydrateLocalJsonSetting(STORAGE_KEY, isDeviceId);
   // A fresh Rust process always opens the OS default until told otherwise, so the stored choice
-  // has to be pushed down once at startup — nothing is loaded this early, so `push` just forwards
-  // it.
-  void push(read());
+  // has to be pushed down once at startup. Only forwarded: the engine has nothing loaded yet (a
+  // restored session only remembers its track, and `play` loads it at the saved position), and
+  // `push` would load the restored track at every launch, the page's reload after a sleep
+  // included, where the network isn't back yet and the load failed with an error.
+  void forward(read());
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 

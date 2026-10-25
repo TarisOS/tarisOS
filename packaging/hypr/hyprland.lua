@@ -10,6 +10,9 @@ local share = "/usr/share/taris/hypr"
 local terminal = os.getenv("TERMINAL") or "kitty"
 local browser = "chromium"
 local files = "nautilus --new-window"
+-- Apps open in scopes of their own, never in the login session's with Hyprland and the shell, where
+-- systemd-oomd can't stop one alone when the memory runs out
+local run_app = "/usr/lib/taris/run-app "
 
 -- Monitors: everything at its preferred mode, scale 2 suits Apple Silicon panels
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 2 })
@@ -98,9 +101,9 @@ hl.config({
 })
 
 -- Apps
-hl.bind("SUPER + RETURN", hl.dsp.exec_cmd(terminal), { description = "Terminal" })
-hl.bind("SUPER + B", hl.dsp.exec_cmd(browser), { description = "Browser" })
-hl.bind("SUPER + E", hl.dsp.exec_cmd(files), { description = "Files" })
+hl.bind("SUPER + RETURN", hl.dsp.exec_cmd(run_app .. terminal), { description = "Terminal" })
+hl.bind("SUPER + B", hl.dsp.exec_cmd(run_app .. browser), { description = "Browser" })
+hl.bind("SUPER + E", hl.dsp.exec_cmd(run_app .. files), { description = "Files" })
 hl.bind("SUPER + SPACE", hl.dsp.global("taris:launcher"), { description = "App launcher" })
 hl.bind("SUPER + TAB", hl.dsp.global("taris:overview"), { description = "Window overview" })
 hl.bind("SUPER + ESCAPE", hl.dsp.global("taris:session"), { description = "Power panel" })

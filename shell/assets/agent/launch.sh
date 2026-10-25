@@ -57,4 +57,7 @@ if ! command -v "${command[0]}" >/dev/null; then
   command -v "${command[0]}" >/dev/null || wait_and_exit "$agent is not installed. Install it, or pick another agent in Settings → Apps → Agent."
 fi
 
-exec "${command[@]}"
+# In a scope of its own, as an app: what the agent runs (builds, dev servers) is then one of the
+# apps systemd-oomd stops when the memory runs out, instead of sitting in the login session's scope
+# with Hyprland and the shell
+exec /usr/lib/taris/run-app "${command[@]}"

@@ -444,7 +444,10 @@ RowLayout {
                     else if (event.button === Qt.MiddleButton && OnDemand.isPlaceholder(app.modelData))
                         OnDemandInstaller.install(app.modelData);
                     else if (event.button === Qt.MiddleButton)
-                        app.modelData.execute();
+                        Quickshell.execDetached({
+                            command: [Paths.runApp, ...app.modelData.command],
+                            workingDirectory: app.modelData.workingDirectory
+                        });
                     else if (app.modelData.id === Dock.settingsId && app.windows === 0)
                         // Settings opens as the overlay over everything (a Settings window popped
                         // out of it is focused like any app's)

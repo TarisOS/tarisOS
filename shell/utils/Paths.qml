@@ -25,6 +25,9 @@ Singleton {
     readonly property string wallsdir: Quickshell.env("TARIS_WALLPAPERS_DIR") || absolutePath(GlobalConfig.paths.wallpaperDir)
     readonly property string recsdir: Quickshell.env("TARIS_RECORDINGS_DIR") || `${videos}/Recordings`
     readonly property string libdir: Quickshell.env("TARIS_LIB_DIR") || "/usr/lib/taris"
+    // Every app the shell opens goes through it, into a scope of its own: never in the login
+    // session's with Hyprland and the shell, where systemd-oomd can't stop it alone
+    readonly property string runApp: `${libdir}/run-app`
 
     function toLocalFile(path: url): string {
         path = Qt.resolvedUrl(path);

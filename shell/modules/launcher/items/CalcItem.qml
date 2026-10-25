@@ -9,6 +9,7 @@ import Taris.Config
 import Taris.I18n
 import qs.components
 import qs.services
+import qs.utils
 
 Item {
     id: root
@@ -82,7 +83,7 @@ Item {
                 id: stateLayer
 
                 onClicked: {
-                    Quickshell.execDetached([...GlobalConfig.general.apps.terminal, "qalc", "-i", root.math]);
+                    Quickshell.execDetached([Paths.runApp, ...GlobalConfig.general.apps.terminal, "qalc", "-i", root.math]);
                     root.list.screenState.launcher = false;
                 }
 

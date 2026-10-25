@@ -130,7 +130,10 @@ Singleton {
             for (const id of root.toOpen) {
                 const entry = OnDemand.installedFor(id);
                 if (entry)
-                    entry.execute();
+                    Quickshell.execDetached({
+                        command: [Paths.runApp, ...entry.command],
+                        workingDirectory: entry.workingDirectory
+                    });
                 else
                     waiting.push(id);
             }

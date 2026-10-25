@@ -104,6 +104,9 @@ source=(
     'taris-power-saver.service'
     'taris-power-saver.path'
     '90-taris-power-saver.rules'
+    'run-app'
+    'user-slice-memory.conf'
+    'session-scope-memory.conf'
 )
 sha256sums=('9a89963ad0aa6c66b24702f4d3610e3dbef48ae1fa97bea2c725aaec2d0dbe0a'
             '0c6982fcab9703ec3cc44de107f16c9ee37714c98099eb692760162317771196'
@@ -153,7 +156,10 @@ sha256sums=('9a89963ad0aa6c66b24702f4d3610e3dbef48ae1fa97bea2c725aaec2d0dbe0a'
             '785ff330d5449d9efc73672387976385a6d8a7f203f343a394a3f886e305c890'
             '24b567811fb826f8f06a642a128430157dd50ea4ed720a851554ed3d1a07f356'
             '968d12331f2b08e5828e8fcd1ee133cccfbc69ed70fac2754dad20ee1c79b8e1'
-            'd5e9572e802ebca08069bf07702a52fb8799d77fd566d1c8266b7b058778b0a6')
+            'd5e9572e802ebca08069bf07702a52fb8799d77fd566d1c8266b7b058778b0a6'
+            'd592707458605bfc345bde6084fec300fa5b6201209ee2b970f97fb7174ee25f'
+            '015b1bd813d16930cd537ebac9b61fcfc17f13e0e4630dda3694f2eccd61b103'
+            '09df3923aa2e4c37dbd80f17e3858ec8e4785067ee86cdc3a5c3bd4b23edf297')
 
 # This repository's packaging folder (the Hyprland config, defaults, agent skills, title bars)
 _packaging="${TARIS_PACKAGING:-$startdir/../..}"
@@ -167,6 +173,14 @@ package() {
     install -Dm644 "$_packaging/defaults/logo/face.png" "$pkgdir/etc/skel/.face"
 
     install -Dm755 user-defaults name-system update install-on-demand input-method mirrors nordvpn-setup agent-setup -t "$pkgdir/usr/lib/taris"
+    # The desktop stays responsive when the memory runs out: every app opens in a scope of its own
+    # (run-app, from Hyprland's key bindings and the shell), and the login session's scope, left
+    # with Hyprland, Xwayland and the shell, keeps 1 GB the kernel takes from everything else
+    # first (its parents carry the same, or it would be capped at theirs)
+    install -Dm755 run-app -t "$pkgdir/usr/lib/taris"
+    install -Dm644 session-scope-memory.conf "$pkgdir/usr/lib/systemd/system/session-.scope.d/50-taris-memory.conf"
+    install -Dm644 user-slice-memory.conf "$pkgdir/usr/lib/systemd/system/user.slice.d/50-taris-memory.conf"
+    install -Dm644 user-slice-memory.conf "$pkgdir/usr/lib/systemd/system/user-.slice.d/50-taris-memory.conf"
     # Apps installed the first time they're opened: VSCodium, Steam, OBS Studio, LibreOffice,
     # Firefox and NordVPN (whose service and group are set up when it's installed)
     install -Dm644 taris-install-*.desktop -t "$pkgdir/usr/share/applications"

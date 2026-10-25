@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 pragma Singleton
+pragma ComponentBehavior: Bound
 
 import QtQml
 import Quickshell
@@ -16,8 +17,18 @@ Singleton {
     id: root
 
     readonly property list<MprisPlayer> list: Mpris.players.values
-    readonly property MprisPlayer active: props.manualActive ?? list.find(p => getIdentity(p) === GlobalConfig.services.defaultPlayer) ?? list[0] ?? null
+    /*
+     * The player the media keys, the Touch Bar and the dashboard act on. It follows playback
+     * (`follow`): the one that has been playing longest keeps it while others start, and once it
+     * pauses or stops it goes to what is still playing. While nothing plays it stays on the last
+     * one, so play resumes what was just paused. Before anything has played: the default player,
+     * else the first.
+     */
+    readonly property MprisPlayer active: (list.includes(props.manualActive) ? props.manualActive : null) ?? list.find(p => p.isPlaying) ?? list.find(p => isDefault(p)) ?? list[0] ?? null
+    // Moved by `follow`, and by hand from the dashboard's player menu and the mediaSwitch shortcut
     property alias manualActive: props.manualActive
+    // When each playing player started, by D-Bus name: the one playing longest keeps the controls
+    property var playingSince: ({})
 
     // Dedup key for progressive metadata (e.g. mpv-mpris/yt-dlp player fills title then artist later).
     property string lastNowPlayingKey: ""
@@ -27,6 +38,29 @@ Singleton {
             return "";
         const alias = GlobalConfig.services.playerAliases.values.find(a => a.from === player.identity);
         return alias?.to ?? player.identity;
+    }
+
+    // The default player, set either as its own name (`Music`) or as shown (`Taris Music`)
+    function isDefault(player: MprisPlayer): bool {
+        const preferred = GlobalConfig.services.defaultPlayer;
+        return !!player && !!preferred && (player.identity === preferred || getIdentity(player) === preferred);
+    }
+
+    // Moves the controls along with playback; see `active`
+    function follow(): void {
+        const now = Date.now();
+        const since = {};
+        for (const player of list) {
+            if (player.isPlaying)
+                since[player.dbusName] = playingSince[player.dbusName] ?? now;
+        }
+        playingSince = since;
+
+        if (active?.isPlaying)
+            return;
+        const playing = list.filter(p => p.isPlaying).sort((a, b) => since[a.dbusName] - since[b.dbusName]);
+        if (playing.length > 0)
+            props.manualActive = playing[0];
     }
 
     function getArtUrl(player: MprisPlayer): string {
@@ -69,6 +103,23 @@ Singleton {
     }
 
     onActiveChanged: lastNowPlayingKey = ""
+    onListChanged: follow()
+    Component.onCompleted: follow()
+
+    // Every player's playback, for `follow`
+    Variants {
+        model: root.list
+
+        Connections {
+            required property MprisPlayer modelData
+
+            function onIsPlayingChanged(): void {
+                root.follow();
+            }
+
+            target: modelData
+        }
+    }
 
     Connections {
         function onPostTrackChanged(): void {

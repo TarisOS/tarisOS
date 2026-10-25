@@ -141,7 +141,7 @@ Singleton {
         command: [`${root.scriptDir}/install.sh`, "--check", agent]
         onExited: exitCode => {
             if (exitCode !== 0)
-                Quickshell.execDetached([...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, `${root.scriptDir}/install.sh`, agent, root.nameOf(agent)]);
+                Quickshell.execDetached([Paths.runApp, ...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, `${root.scriptDir}/install.sh`, agent, root.nameOf(agent)]);
         }
     }
 

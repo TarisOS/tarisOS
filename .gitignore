@@ -20,5 +20,6 @@ packaging/pkgbuilds/libva-v4l2-request-avd/libva-v4l2_request/
 packaging/pkgbuilds/taris-tipd-dkms/asahi-[0-9]*
 packaging/pkgbuilds/taris-appledrm-dkms/asahi-[0-9]*
 packaging/pkgbuilds/taris-brcmfmac-dkms/asahi-[0-9]*
+packaging/pkgbuilds/taris-bcm4377-dkms/asahi-[0-9]*
 packaging/pkgbuilds/tiny-dfr-taris/*.crate
 distro/out/

@@ -207,7 +207,7 @@ Singleton {
     function openTrash(): void {
         // trash:/// has no handler of its own (xdg-open hands it to the browser), so it goes to
         // whatever opens folders
-        Quickshell.execDetached(["sh", "-c", 'app=$(xdg-mime query default inode/directory 2>/dev/null); if [ -n "$app" ] && command -v gtk-launch >/dev/null; then exec gtk-launch "${app%.desktop}" trash:///; fi; for fm in nautilus thunar nemo dolphin; do command -v "$fm" >/dev/null && exec "$fm" trash:///; done; exec gio open trash:///']);
+        Quickshell.execDetached([Paths.runApp, "sh", "-c", 'app=$(xdg-mime query default inode/directory 2>/dev/null); if [ -n "$app" ] && command -v gtk-launch >/dev/null; then exec gtk-launch "${app%.desktop}" trash:///; fi; for fm in nautilus thunar nemo dolphin; do command -v "$fm" >/dev/null && exec "$fm" trash:///; done; exec gio open trash:///']);
     }
 
     function emptyTrash(): void {
@@ -238,7 +238,7 @@ Singleton {
     // Steam's own launcher in its VM, where Asahi's steam package keeps it (/usr/bin/steam, the
     // package's, puts up a splash each time): it hands the argument to the Steam running there
     function steamCommand(arg: string): void {
-        Quickshell.execDetached(["sh", "-c", 'exec muvm -- FEXBash -c "$HOME/.local/share/fex-steam/steam-launcher/bin_steam.sh $1"', "_", arg]);
+        Quickshell.execDetached([Paths.runApp, "sh", "-c", 'exec muvm -- FEXBash -c "$HOME/.local/share/fex-steam/steam-launcher/bin_steam.sh $1"', "_", arg]);
     }
 
     function windowsFor(entry: DesktopEntry): list<var> {

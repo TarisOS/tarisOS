@@ -1,0 +1,18 @@
+taris-bcm4377-dkms
+
+The Bluetooth driver for Broadcom 4377/4378/4387/4388 devices attached via PCIe
+(drivers/bluetooth/hci_bcm4377.c) from Asahi Linux's kernel source
+(https://github.com/AsahiLinux/linux), by Sven Peter, its other authors and the Asahi Linux
+contributors. Licensed under the GNU General Public License version 2 or the MIT licence, as its
+SPDX line says. The package holds no kernel source: asahi-source.sh fetches the driver's source for
+each kernel it's built for.
+
+Changed by TarisOS (https://github.com/TarisOS/tarisOS) in 2026, by applying RJ Skerry-Ryan's
+commit from aurora-silicon/linux (https://github.com/aurora-silicon/linux/pull/167), so the
+controller sees the driver's quiesce before the system sleeps and its unquiesce before the wake's
+first commands:
+
+- 0001-Bluetooth-hci_bcm4377-Flush-the-sleep-control-writes.patch
+
+hci_bcm4377.c, the file it changes, says so near its top (taris-notices.patch). The patches are in
+TarisOS's source, packaging/pkgbuilds/taris-bcm4377-dkms.

@@ -30,9 +30,9 @@ Item {
         } else if (action === "store") {
             StoreWindow.open();
         } else if (action === "terminal") {
-            Quickshell.execDetached(GlobalConfig.general.apps.terminal);
+            Quickshell.execDetached([Paths.runApp, ...GlobalConfig.general.apps.terminal]);
         } else if (action === "files") {
-            Quickshell.execDetached(GlobalConfig.general.apps.explorer);
+            Quickshell.execDetached([Paths.runApp, ...GlobalConfig.general.apps.explorer]);
         } else if (action === "overview") {
             Dock.showAllWindows();
         } else if (action.startsWith("app:")) {

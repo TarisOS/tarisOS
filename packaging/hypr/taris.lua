@@ -177,7 +177,8 @@ local function toggle_space(s, start)
 end
 function _G.taris_music()
   local ok, err = pcall(toggle_space, spaces[1], function()
-    hl.dispatch(hl.dsp.exec_cmd("taris-music"))
+    -- In a scope of its own, as every app (run-app)
+    hl.dispatch(hl.dsp.exec_cmd("/usr/lib/taris/run-app taris-music"))
   end)
   if not ok then log_error("taris_music", err) end
 end

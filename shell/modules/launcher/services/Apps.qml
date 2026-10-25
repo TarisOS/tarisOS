@@ -20,11 +20,14 @@ Searcher {
             OnDemandInstaller.install(entry);
         else if (entry.runInTerminal)
             Quickshell.execDetached({
-                command: [...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...entry.command],
+                command: [Paths.runApp, ...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...entry.command],
                 workingDirectory: entry.workingDirectory
             });
         else
-            entry.execute();
+            Quickshell.execDetached({
+                command: [Paths.runApp, ...entry.command],
+                workingDirectory: entry.workingDirectory
+            });
     }
 
     function search(search: string): var {

@@ -13,6 +13,7 @@ import Taris.Services
 import qs.components
 import qs.components.containers
 import qs.services
+import qs.utils
 import qs.modules.kdeconnect
 import qs.modules.nexus.common
 
@@ -32,7 +33,7 @@ Item {
     Connections {
         // Its files, mounted: opened in the file manager
         function onMounted(path: string): void {
-            Quickshell.execDetached([...GlobalConfig.general.apps.explorer, path]);
+            Quickshell.execDetached([Paths.runApp, ...GlobalConfig.general.apps.explorer, path]);
         }
 
         function onBrowseFailed(error: string): void {

@@ -1029,7 +1029,13 @@ export function SettingsPage({
                 and description push the sign-out button off the right edge on long channel
                 names instead of truncating. */}
             <div className="flex items-center justify-between gap-3">
-              <AccountAvatar artworkUrl={account?.artworkUrl} className="size-11" iconSize={26} />
+              {/* The library outlives a lost session, account and all: its picture beside "Not
+                  signed in" looked like a sign-in that half worked. */}
+              <AccountAvatar
+                artworkUrl={isSignedIn ? account?.artworkUrl : undefined}
+                className="size-11"
+                iconSize={26}
+              />
 
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-base font-medium text-foreground">

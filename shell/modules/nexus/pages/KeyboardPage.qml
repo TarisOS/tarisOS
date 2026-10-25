@@ -11,6 +11,7 @@ import Taris.I18n
 import qs.components
 import qs.components.controls
 import qs.services
+import qs.utils
 import qs.modules.nexus.common
 
 // Keyboard, pointer and trackpad, changed the way the Witcher's Tweaks settings change them:
@@ -337,7 +338,7 @@ PageBase {
                 checked: modelData.installed
                 enabled: !root._imSet.running
                 onToggled: {
-                    root._imSet.command = ["sh", "-c", `exec ${GlobalConfig.general.apps.terminal.join(" ")} -e sh -c '/usr/lib/taris/input-method ${imRow.checked ? "add" : "remove"} ${imRow.modelData.id}; echo; read -p "Press Enter to close" _'`];
+                    root._imSet.command = [Paths.runApp, "sh", "-c", `exec ${GlobalConfig.general.apps.terminal.join(" ")} -e sh -c '/usr/lib/taris/input-method ${imRow.checked ? "add" : "remove"} ${imRow.modelData.id}; echo; read -p "Press Enter to close" _'`];
                     root._imSet.running = true;
                 }
             }

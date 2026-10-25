@@ -9,6 +9,7 @@ import Quickshell.Io
 import Taris
 import Taris.I18n
 import qs.services
+import qs.utils
 
 // The Store's data (modules/store). assets/store.py runs while a Store is open (users > 0) and
 // answers requests over stdin/stdout; installs, removals and updates of Flatpak and repo apps are
@@ -177,7 +178,10 @@ Singleton {
         const id = (app.desktop ?? "").replace(/\.desktop$/, "");
         const entry = id ? DesktopEntries.byId(id) : null;
         if (entry)
-            entry.execute();
+            Quickshell.execDetached({
+                command: [Paths.runApp, ...entry.command],
+                workingDirectory: entry.workingDirectory
+            });
         else if (app.source === "flathub")
             Quickshell.execDetached(["flatpak", "run", app.pkg]);
     }

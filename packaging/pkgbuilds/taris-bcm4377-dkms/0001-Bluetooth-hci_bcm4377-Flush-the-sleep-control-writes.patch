@@ -1,0 +1,45 @@
+From a30d9034bacda4d7e583aa0daa832a7a15ca8f32 Mon Sep 17 00:00:00 2001
+From: RJ Skerry-Ryan <rryan@alum.mit.edu>
+Date: Sat, 3 Oct 2026 12:33:18 -0700
+Subject: [PATCH 2/3] Bluetooth: hci_bcm4377: Flush the sleep control writes
+
+bcm4377_suspend() and bcm4377_resume() write SLEEP_CONTROL and return
+without reading anything back, so the PCIe write can still be posted
+when the system enters suspend-to-idle, or when hci_resume_dev() starts
+sending commands. On a BCM4388 (MacBook Pro 16" M2 Max) about a quarter
+to half of all resumes then left the controller unresponsive: every
+resume command timed out, stalling resume by about 20 s.
+
+Read the register back after both writes. With a read-back in place, 8
+of 8 resumes succeeded, including 10 and 20 minute sleeps.
+
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: RJ Skerry-Ryan <rryan@alum.mit.edu>
+(cherry picked from commit 4d662f924baeab3f5080f6e21bdddabeaaa1c691)
+---
+ drivers/bluetooth/hci_bcm4377.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/bluetooth/hci_bcm4377.c b/drivers/bluetooth/hci_bcm4377.c
+index dace2f0a6adcd7..57250d2060b034 100644
+--- a/drivers/bluetooth/hci_bcm4377.c
++++ b/drivers/bluetooth/hci_bcm4377.c
+@@ -2485,6 +2485,8 @@ static int bcm4377_suspend(struct device *dev)
+ 
+ 	iowrite32(BCM4377_BAR0_SLEEP_CONTROL_QUIESCE,
+ 		  bcm4377->bar0 + BCM4377_BAR0_SLEEP_CONTROL);
++	/* Flush the posted write before the system goes to sleep. */
++	ioread32(bcm4377->bar0 + BCM4377_BAR0_SLEEP_CONTROL);
+ 
+ 	return 0;
+ }
+@@ -2496,6 +2498,8 @@ static int bcm4377_resume(struct device *dev)
+ 
+ 	iowrite32(BCM4377_BAR0_SLEEP_CONTROL_UNQUIESCE,
+ 		  bcm4377->bar0 + BCM4377_BAR0_SLEEP_CONTROL);
++	/* The firmware must see UNQUIESCE before the resume commands. */
++	ioread32(bcm4377->bar0 + BCM4377_BAR0_SLEEP_CONTROL);
+ 
+ 	return hci_resume_dev(bcm4377->hdev);
+ }
+

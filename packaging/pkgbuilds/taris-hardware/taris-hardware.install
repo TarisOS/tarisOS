@@ -9,6 +9,17 @@ post_install() {
     /usr/bin/update-m1n1
     touchbar_default
     wifi_power
+    oomd_on
+}
+
+# systemd-oomd now rather than from the next boot (its links start it at every boot). systemd's own
+# reload hook comes after the install scripts, so reload first: oomd reads which cgroups to watch
+# (user@.service's 50-taris-oomd.conf) when it starts. Not in a chroot, where nothing runs.
+oomd_on() {
+    if ! systemd-detect-virt -q --chroot; then
+        systemctl daemon-reload
+        systemctl start systemd-oomd.socket systemd-oomd.service || true
+    fi
 }
 
 # The Touch Bar's settings: /var/lib/taris/touchbar/config.toml, made from TarisOS's

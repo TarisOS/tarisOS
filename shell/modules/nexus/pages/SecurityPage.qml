@@ -10,6 +10,7 @@ import Quickshell.Io
 import Taris.Config
 import Taris.I18n
 import qs.components
+import qs.utils
 import qs.modules.nexus.common
 
 // Security: lock screen behaviour, remote login, disk encryption and password
@@ -17,7 +18,7 @@ PageBase {
     id: root
 
     function inTerminal(cmd: string): void {
-        Quickshell.execDetached(["sh", "-c", `exec ${GlobalConfig.general.apps.terminal.join(" ")} -e sh -c '${cmd}; echo; read -p "Press Enter to close" _'`]);
+        Quickshell.execDetached([Paths.runApp, "sh", "-c", `exec ${GlobalConfig.general.apps.terminal.join(" ")} -e sh -c '${cmd}; echo; read -p "Press Enter to close" _'`]);
     }
 
     title: Tr.tr("Security")

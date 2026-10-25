@@ -19,6 +19,7 @@
 
 use std::io::{self, Read, Seek, SeekFrom};
 use std::num::NonZero;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -82,13 +83,15 @@ struct EndedEvent {
  * A `Read + Seek` view over a body that is still downloading.
  *
  * This is what lets the first sample play before the last byte arrives: the decoder reads the
- * container header out of the head chunk while the rest is still in flight. `MediaBuffer` only
- * reports its contiguous prefix, so a read never sees a hole — it waits for one to fill.
+ * container header out of the head while the rest is still in flight. A read at bytes that
+ * have not arrived — a jump, a resume, playback catching up — tells the fetcher where it is
+ * waiting (`Waiting`) and waits for them, never seeing a hole. Every read also moves
+ * `read_pos`, which the fetcher keeps a few minutes ahead of.
  *
  * ponytail: the wait happens on rodio's mixing thread, so a connection that falls behind
  * playback is an audible stall rather than a dropped track. Move decoding onto its own thread
- * behind a bounded channel if that ever shows up in practice; with a 128 KiB head chunk and a
- * ~160 kbps stream there is a large margin.
+ * behind a bounded channel if that ever shows up in practice; with minutes fetched ahead there
+ * is a large margin.
  */
 pub(crate) struct BufferReader {
     buffer: Arc<Mutex<MediaBuffer>>,
@@ -100,13 +103,44 @@ impl BufferReader {
         Self { buffer, position: 0 }
     }
 
-    /// `(contiguous_len, total, failed)` — read under one lock so the three cannot disagree.
-    fn state(&self) -> io::Result<(usize, usize, bool)> {
+    fn total(&self) -> io::Result<usize> {
         let guard = self
             .buffer
             .lock()
             .map_err(|_| io::Error::other("audio buffer lock poisoned"))?;
-        Ok((guard.contiguous_len(), guard.total, guard.failed))
+        Ok(guard.total)
+    }
+}
+
+/**
+ * A reader waiting on bytes that have not arrived: counted in `PLAYBACK_READERS_WAITING`, so
+ * other tracks' read-ahead steps aside, and named in `wanted`, so this track's fetcher gets them
+ * first. Both are taken back however the wait ends.
+ */
+struct Waiting {
+    buffer: Arc<Mutex<MediaBuffer>>,
+}
+
+impl Waiting {
+    fn start(buffer: &Arc<Mutex<MediaBuffer>>, position: usize) -> Self {
+        let wake = buffer.lock().ok().map(|mut guard| {
+            guard.wanted = Some(position);
+            Arc::clone(&guard.wake)
+        });
+        crate::PLAYBACK_READERS_WAITING.fetch_add(1, Ordering::SeqCst);
+        if let Some(wake) = wake {
+            wake.notify_one();
+        }
+        Self { buffer: Arc::clone(buffer) }
+    }
+}
+
+impl Drop for Waiting {
+    fn drop(&mut self) {
+        crate::PLAYBACK_READERS_WAITING.fetch_sub(1, Ordering::SeqCst);
+        if let Ok(mut guard) = self.buffer.lock() {
+            guard.wanted = None;
+        }
     }
 }
 
@@ -117,35 +151,45 @@ impl Read for BufferReader {
         }
 
         let deadline = Instant::now() + READ_TIMEOUT;
+        // Declared before the lock is taken below, so it is dropped (and locks) after it
+        let mut waiting: Option<Waiting> = None;
         loop {
-            let (available, total, failed) = self.state()?;
-
-            if self.position >= total {
-                return Ok(0);
-            }
-            if available > self.position {
-                let end = (self.position + out.len()).min(available).min(total) - 1;
-                let bytes = {
-                    let guard = self
-                        .buffer
-                        .lock()
-                        .map_err(|_| io::Error::other("audio buffer lock poisoned"))?;
-                    guard.read(self.position, end)
-                };
-                if bytes.is_empty() {
-                    return Ok(0);
+            let (bytes, ended) = {
+                let mut guard = self
+                    .buffer
+                    .lock()
+                    .map_err(|_| io::Error::other("audio buffer lock poisoned"))?;
+                if self.position >= guard.total {
+                    (Vec::new(), true)
+                } else {
+                    let available = guard.available_from(self.position);
+                    if available > 0 {
+                        let end = self.position + out.len().min(available) - 1;
+                        let bytes = guard.read(self.position, end);
+                        guard.read_pos = self.position + bytes.len();
+                        (bytes, false)
+                    } else {
+                        /*
+                         * A failed download reports EOF rather than an error. The decoder then
+                         * finishes the frames it already has and the track ends early, which is
+                         * a truncated song instead of a dead sink that never reports `ended`
+                         * and hangs the queue.
+                         */
+                        (Vec::new(), guard.failed)
+                    }
                 }
+            };
+
+            if !bytes.is_empty() {
                 out[..bytes.len()].copy_from_slice(&bytes);
                 self.position += bytes.len();
                 return Ok(bytes.len());
             }
-            /*
-             * A failed download reports EOF rather than an error. The decoder then finishes the
-             * frames it already has and the track ends early, which is a truncated song instead
-             * of a dead sink that never reports `ended` and hangs the queue.
-             */
-            if failed {
+            if ended {
                 return Ok(0);
+            }
+            if waiting.is_none() {
+                waiting = Some(Waiting::start(&self.buffer, self.position));
             }
             if Instant::now() >= deadline {
                 return Err(io::Error::new(
@@ -171,13 +215,13 @@ impl MediaSource for BufferReader {
     }
 
     fn byte_len(&self) -> Option<u64> {
-        self.state().ok().map(|(_, total, _)| total as u64)
+        self.total().ok().map(|total| total as u64)
     }
 }
 
 impl Seek for BufferReader {
     fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
-        let (_, total, _) = self.state()?;
+        let total = self.total()?;
         let target = match from {
             SeekFrom::Start(offset) => offset as i64,
             SeekFrom::Current(delta) => self.position as i64 + delta,

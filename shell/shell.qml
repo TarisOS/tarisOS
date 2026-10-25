@@ -14,6 +14,7 @@ import "modules/areapicker"
 import "modules/lock"
 import "modules/overview"
 import "modules/polkit"
+import "modules/bluetooth"
 import "modules/windowcontrols"
 import QtQuick
 import Quickshell
@@ -46,6 +47,7 @@ ShellRoot {
     FloatingControls {}
     BatteryMonitor {}
     Polkit {}
+    BluetoothPrompt {}
     StashNotice {}
     Keybinds {}
     EmojiPicker {}

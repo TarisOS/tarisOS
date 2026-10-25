@@ -18,6 +18,9 @@ ColumnLayout {
     id: root
 
     required property PopoutState popouts
+    // Devices that say what they are (nearby phones and gadgets often only show an address), and
+    // any paired or connected one
+    readonly property list<BluetoothDevice> devices: Bluetooth.devices.values.filter(d => d.deviceName !== "" || d.bonded || d.connected) // qmllint disable unresolved-type
 
     // Bluetooth discovers devices only while this panel is open (or Settings' pairing page)
     function setDiscovering(on: bool): void {
@@ -71,7 +74,7 @@ ColumnLayout {
         Layout.topMargin: Tokens.spacing.small
         Layout.rightMargin: Tokens.padding.extraSmall
         text: {
-            const devices = Bluetooth.devices.values; // qmllint disable unresolved-type
+            const devices = root.devices;
             const connected = devices.filter(d => d.connected).length;
             if (connected > 0)
                 // TRANSLATORS: %n = total paired devices, %1 = how many of them are connected
@@ -84,14 +87,25 @@ ColumnLayout {
 
     Repeater {
         model: ScriptModel {
-            values: [...Bluetooth.devices.values].sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name)).slice(0, 5) // qmllint disable unresolved-type
+            values: [...root.devices].sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name)).slice(0, 5) // qmllint disable unresolved-type
         }
 
         RowLayout {
             id: device
 
             required property BluetoothDevice modelData
-            readonly property bool loading: modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting // qmllint disable unresolved-type
+            // Paired from here: trusted and connected once it is
+            property bool connectWhenPaired
+            readonly property bool loading: modelData.pairing || modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting // qmllint disable unresolved-type
+
+            function toggle(): void {
+                if (modelData.paired) {
+                    modelData.connected = !modelData.connected;
+                } else {
+                    connectWhenPaired = true;
+                    modelData.pair();
+                }
+            }
 
             Layout.fillWidth: true
             Layout.rightMargin: Tokens.padding.extraSmall
@@ -103,6 +117,26 @@ ColumnLayout {
             Component.onCompleted: {
                 opacity = 1;
                 scale = 1;
+            }
+
+            Connections {
+                // Trusted, so it reconnects later without a question; headphones usually connect
+                // by themselves right after pairing
+                function onPairedChanged(): void {
+                    if (!device.connectWhenPaired || !device.modelData.paired)
+                        return;
+                    device.connectWhenPaired = false;
+                    device.modelData.trusted = true;
+                    if (!device.modelData.connected && device.modelData.state !== BluetoothDeviceState.Connecting) // qmllint disable unresolved-type
+                        device.modelData.connect();
+                }
+
+                function onPairingChanged(): void {
+                    if (!device.modelData.pairing && !device.modelData.paired)
+                        device.connectWhenPaired = false;
+                }
+
+                target: device.modelData
             }
 
             Behavior on opacity {
@@ -125,6 +159,13 @@ ColumnLayout {
                 Layout.fillWidth: true
                 text: device.modelData.name
                 elide: Text.ElideRight
+
+                // The name connects (or disconnects) too, as the link button does
+                StateLayer {
+                    radius: Tokens.rounding.small
+                    disabled: device.loading
+                    onClicked: device.toggle()
+                }
             }
 
             MaterialIcon {
@@ -150,7 +191,7 @@ ColumnLayout {
                 StateLayer {
                     color: device.modelData.state === BluetoothDeviceState.Connected ? Colours.palette.m3onPrimary : Colours.palette.m3onSurface // qmllint disable unresolved-type
                     disabled: device.loading
-                    onClicked: device.modelData.connected = !device.modelData.connected
+                    onClicked: device.toggle()
                 }
 
                 MaterialIcon {

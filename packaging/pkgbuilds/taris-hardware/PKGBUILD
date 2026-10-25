@@ -7,7 +7,7 @@
 
 pkgname=taris-hardware
 pkgver=1.0.0
-pkgrel=8
+pkgrel=9
 pkgdesc='TarisOS: Apple Silicon hardware support and fixes'
 arch=('aarch64')
 url='https://github.com/TarisOS/tarisOS'
@@ -55,6 +55,9 @@ depends=(
     # firmware runs
     'taris-brcmfmac-dkms'
 
+    # The Bluetooth driver that still answers after waking from sleep
+    'taris-bcm4377-dkms'
+
     # Wi-Fi (NetworkManager alone; its regulatory domain) and Bluetooth
     'networkmanager'
     'wireless-regdb'
@@ -62,7 +65,7 @@ depends=(
     'bluez'
     'bluez-utils'
 
-    # Compressed swap in RAM
+    # Compressed swap in RAM; systemd-oomd (part of systemd) stops the app that fills it
     'zram-generator'
 
     # A readable console font on Retina screens (the decrypt prompt, TTYs)
@@ -83,6 +86,7 @@ backup=(
 )
 source=(
     'zram.conf'
+    '50-taris-oomd.conf'
     'taris-hid.conf'
     'taris-grub.cfg'
     'grub-background.png'
@@ -118,6 +122,7 @@ source=(
     '80-taris.preset'
 )
 sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
+            '587f5fa3128fc83ce52c1944ab2e80f37ab98d2f275e063db18d9dbc21929d12'
             '73fdc58084b4892dcd508aa35ee60222220d035b2e87f511fbd93d90cf723534'
             '8abd3b39e59425ab051020bd222f807e540b81b941de429e6e9d7421b3bea000'
             '228598905776948cb49db87193277a372bbc0a549110f79165b4db5dbdb16d39'
@@ -154,6 +159,12 @@ sha256sums=('21191ad009c51717dee5051b38faf2fcbab116be6b36783a84e449530e3af64a'
 
 package() {
     install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/50-taris.conf"
+    # The app that fills the memory stopped before the desktop freezes: systemd-oomd watching the
+    # accounts' apps, on whenever installed (the install script starts it at once)
+    install -Dm644 50-taris-oomd.conf -t "$pkgdir/usr/lib/systemd/system/user@.service.d"
+    install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants" "$pkgdir/usr/lib/systemd/system/sockets.target.wants"
+    ln -s ../systemd-oomd.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/systemd-oomd.service"
+    ln -s ../systemd-oomd.socket "$pkgdir/usr/lib/systemd/system/sockets.target.wants/systemd-oomd.socket"
     install -Dm644 taris-hid.conf "$pkgdir/etc/mkinitcpio.conf.d/taris-hid.conf"
     install -Dm644 taris-grub.cfg "$pkgdir/etc/default/grub.d/taris.cfg"
     install -Dm644 grub-background.png "$pkgdir/usr/share/taris/grub-background.png"

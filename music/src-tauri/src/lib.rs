@@ -10,7 +10,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -69,7 +69,8 @@ const YOUTUBE_LOGIN_URL: &str = "https://accounts.google.com/ServiceLogin?servic
 /// lost manifest made the next launch delete every downloaded file as an orphan.
 const YOUTUBE_LOGIN_DATA_DIR: &str = "youtube-login-webview";
 const YOUTUBE_COOKIE_CHUNK_SIZE: usize = 900;
-/// Bytes: `YOUTUBE_COOKIE_CHUNK_SIZE * YOUTUBE_COOKIE_MAX_CHUNKS` ~= 57.6 KB.
+/// Bytes: `YOUTUBE_COOKIE_CHUNK_SIZE * YOUTUBE_COOKIE_MAX_CHUNKS` ~= 57.6 KB. Saves write one
+/// entry now; the chunks are what older saves left, read and removed by count.
 ///
 /// One account's cookie header used to be the whole stored blob; it is now one entry in a JSON
 /// array of them, so the ceiling went up from a single session (~14.4 KB of headroom) to
@@ -78,8 +79,8 @@ const YOUTUBE_COOKIE_CHUNK_SIZE: usize = 900;
 const YOUTUBE_COOKIE_MAX_CHUNKS: usize = 64;
 /// How often a rotation of `YOUTUBE_SLOW_PERSIST_COOKIES` is written back to secure storage.
 ///
-/// Not on every response: Google rotates SIDCC on almost all of them, and a save rewrites every
-/// chunk of the keyring entry. Every *other* rotation is written at once —
+/// Not on every response: Google rotates SIDCC on almost all of them, and a save rewrites the
+/// whole keyring entry. Every *other* rotation is written at once —
 /// see `YOUTUBE_SLOW_PERSIST_COOKIES` for why that distinction is the whole game.
 const YOUTUBE_COOKIE_PERSIST_INTERVAL: Duration = Duration::from_secs(300);
 /// Cookies whose rotation may be persisted late, because nothing authenticates with them.
@@ -260,7 +261,7 @@ struct StoredYoutubeAccount {
 /// Every Google account with a stored session, and which one is active.
 ///
 /// This is the one blob persisted through the existing `save_youtube_music_cookie` /
-/// `load_youtube_music_cookie_entries` transport — the chunked keyring entries — unchanged
+/// `load_youtube_music_cookie_entries` transport — the keyring entry — unchanged
 /// underneath. Only what gets stored changed, from a bare cookie header to this struct's JSON.
 #[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
@@ -1531,37 +1532,69 @@ fn youtube_cookie_chunk_entry(index: usize) -> Result<keyring::Entry, CommandErr
     })
 }
 
-fn save_youtube_music_cookie_entries(cookie: &str) -> Result<(), CommandError> {
-    let chunks = cookie
-        .as_bytes()
-        .chunks(YOUTUBE_COOKIE_CHUNK_SIZE)
-        .map(|chunk| std::str::from_utf8(chunk).expect("YouTube cookie header must be UTF-8"))
-        .collect::<Vec<_>>();
+/// One save at a time: two cookie rotations persisting at once interleaved their keyring calls.
+static YOUTUBE_COOKIE_STORE_LOCK: Mutex<()> = Mutex::new(());
 
-    if chunks.len() > YOUTUBE_COOKIE_MAX_CHUNKS {
+/// How many chunks an older save left behind its `chunks:N` manifest; `0` for a single entry or
+/// for none at all.
+fn stored_youtube_cookie_chunk_count() -> Result<usize, CommandError> {
+    match youtube_cookie_keyring_entry()?.get_password() {
+        Ok(manifest) if manifest.starts_with("chunks:") => Ok(manifest
+            .trim_start_matches("chunks:")
+            .parse::<usize>()
+            .unwrap_or(YOUTUBE_COOKIE_MAX_CHUNKS)
+            .min(YOUTUBE_COOKIE_MAX_CHUNKS)),
+        Ok(_) | Err(keyring::Error::NoEntry) => Ok(0),
+        Err(error) => Err(CommandError {
+            message: format!("YouTube Music session load failed: {error}"),
+        }),
+    }
+}
+
+/**
+ * The whole blob in one keyring entry, written in one call.
+ *
+ * It used to be split into 900-byte chunks, a limit of other platforms' credential stores and not
+ * of the Secret Service, and every save deleted all 64 chunk slots before writing each chunk
+ * again: 70 to 130 Secret Service sessions in a burst, on nearly every cookie rotation.
+ * gnome-keyring aborted in the middle of one, and the session being saved never reached the
+ * disk, so the next launch was signed out. `load_youtube_music_cookie_entries` has always read a
+ * single entry; the chunks an older save left are removed once, after the entry is written.
+ */
+fn save_youtube_music_cookie_entries(cookie: &str) -> Result<(), CommandError> {
+    if cookie.len() > YOUTUBE_COOKIE_CHUNK_SIZE * YOUTUBE_COOKIE_MAX_CHUNKS {
         return Err(CommandError {
             message: "YouTube Music session is too large for secure storage.".to_string(),
         });
     }
 
+    let _storing = YOUTUBE_COOKIE_STORE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let old_chunks = stored_youtube_cookie_chunk_count()?;
     eprintln!(
-        "[internal][tauri][info] save_youtube_music_cookie chunks={} bytes={}",
-        chunks.len(),
-        cookie.len()
+        "[internal][tauri][info] save_youtube_music_cookie bytes={} old_chunks={}",
+        cookie.len(),
+        old_chunks
     );
-    delete_youtube_music_cookie_entries()?;
-    for (index, chunk) in chunks.iter().enumerate() {
-        youtube_cookie_chunk_entry(index)?
-            .set_password(chunk)
-            .map_err(|error| CommandError {
-                message: format!("YouTube Music session chunk {index} save failed: {error}"),
-            })?;
-    }
     youtube_cookie_keyring_entry()?
-        .set_password(&format!("chunks:{}", chunks.len()))
+        .set_password(cookie)
         .map_err(|error| CommandError {
-            message: format!("YouTube Music session manifest save failed: {error}"),
+            message: format!("YouTube Music session save failed: {error}"),
         })?;
+    // The session is saved by now; a chunk that won't go only takes up room
+    for index in 0..old_chunks {
+        match youtube_cookie_chunk_entry(index).map(|entry| entry.delete_credential()) {
+            Ok(Ok(())) | Ok(Err(keyring::Error::NoEntry)) => {}
+            Ok(Err(error)) => eprintln!(
+                "[internal][tauri][warn] save_youtube_music_cookie old chunk {index} delete failed: {error}"
+            ),
+            Err(error) => eprintln!(
+                "[internal][tauri][warn] save_youtube_music_cookie old chunk {index} delete failed: {}",
+                error.message
+            ),
+        }
+    }
     Ok(())
 }
 
@@ -1571,29 +1604,6 @@ fn save_youtube_music_cookie_entries(cookie: &str) -> Result<(), CommandError> {
 
 fn save_youtube_music_cookie(_app: &tauri::AppHandle, cookie: &str) -> Result<(), CommandError> {
     save_youtube_music_cookie_entries(cookie)
-}
-
-fn delete_youtube_music_cookie_entries() -> Result<(), CommandError> {
-    match youtube_cookie_keyring_entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => {}
-        Err(error) => {
-            return Err(CommandError {
-                message: format!("YouTube Music session manifest delete failed: {error}"),
-            });
-        }
-    }
-
-    for index in 0..YOUTUBE_COOKIE_MAX_CHUNKS {
-        match youtube_cookie_chunk_entry(index)?.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => {}
-            Err(error) => {
-                return Err(CommandError {
-                    message: format!("YouTube Music session chunk {index} delete failed: {error}"),
-                });
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Clears the OAuth credential left behind by the version of the app that used one.
@@ -1647,9 +1657,10 @@ fn load_youtube_music_cookie_entries() -> Result<Option<String>, CommandError> {
             );
             Ok(Some(cookie))
         }
+        // One entry: how every save writes it now (and how the oldest versions did)
         Ok(cookie) => {
             eprintln!(
-                "[internal][tauri][info] load_youtube_music_cookie found legacy credential bytes={}",
+                "[internal][tauri][info] load_youtube_music_cookie found credential bytes={}",
                 cookie.len()
             );
             Ok(Some(cookie))
@@ -2244,72 +2255,124 @@ struct ProxyHttpResponse {
     cookie: Option<String>,
 }
 
-#[derive(Clone)]
 /**
- * A media body, which may still be arriving.
+ * A media body, fetched in pieces wherever it is being read.
  *
- * Ranges are fetched in parallel and therefore land out of order, so "how much can be served"
- * is the leading run of present chunks — not how many bytes have arrived in total. A request
- * for a range past that prefix waits for it rather than being answered short, which is what
- * lets an `<audio>` element start on the first chunk while the rest is still downloading.
+ * Holds what has arrived as separate extents at their own offsets, the way a browser's media
+ * cache does, so a resume at 18 minutes into a 35-minute mix needs the bytes *there* — which
+ * the WebM cues, read from the head, point the demuxer straight at — and not everything before
+ * them. A reader that reaches bytes not yet here says so (`wanted`) and waits;
+ * `fetch_playback_pieces` fetches from that point first, and otherwise keeps a few minutes
+ * ahead of `read_pos`.
  */
 pub(crate) struct MediaBuffer {
-    /// Sized on creation; each slot's length is its own chunk size, so no stride is stored.
-    chunks: Vec<Option<Vec<u8>>>,
+    /// Arrived bytes by start offset. Never overlapping; adjacent extents are merged.
+    extents: std::collections::BTreeMap<usize, Vec<u8>>,
     pub(crate) total: usize,
-    /// Set when the download gave up. The server answers 503 rather than waiting out the clock.
+    /// Set when the download gave up: a reader waiting on it gets EOF instead of the timeout.
     pub(crate) failed: bool,
+    /// Where a reader is waiting for bytes that are not here yet.
+    pub(crate) wanted: Option<usize>,
+    /// How far the reader has read, which read-ahead keeps ahead of.
+    pub(crate) read_pos: usize,
+    /// Wakes the fetcher when `wanted` or `read_pos` moves.
+    pub(crate) wake: Arc<tokio::sync::Notify>,
 }
 
 impl MediaBuffer {
-    fn pending(total: usize, chunk_count: usize) -> Self {
-        Self { chunks: vec![None; chunk_count], total, failed: false }
+    fn pending(total: usize) -> Self {
+        Self {
+            extents: std::collections::BTreeMap::new(),
+            total,
+            failed: false,
+            wanted: None,
+            read_pos: 0,
+            wake: Arc::new(tokio::sync::Notify::new()),
+        }
     }
 
-    /// Bytes servable from offset 0 without a hole.
-    pub(crate) fn contiguous_len(&self) -> usize {
-        let mut len = 0;
-        for chunk in &self.chunks {
-            match chunk {
-                Some(bytes) => len += bytes.len(),
-                None => break,
-            }
+    /// Bytes servable from `pos` without a hole; `0` when `pos` itself has not arrived.
+    pub(crate) fn available_from(&self, pos: usize) -> usize {
+        match self.extents.range(..=pos).next_back() {
+            Some((start, bytes)) if start + bytes.len() > pos => start + bytes.len() - pos,
+            _ => 0,
         }
-        len
+    }
+
+    /// Whether every byte of the body has arrived.
+    fn is_complete(&self) -> bool {
+        self.total > 0 && self.available_from(0) >= self.total
+    }
+
+    /**
+     * The first missing stretch at or after `from`, as `(start, end)` inclusive, cut at `limit`
+     * and at the next extent so a fetch never asks for bytes already here. `None` when
+     * everything from `from` to `limit` has arrived.
+     */
+    fn next_gap(&self, from: usize, limit: usize) -> Option<(usize, usize)> {
+        let limit = limit.min(self.total.saturating_sub(1));
+        let start = from + self.available_from(from);
+        if start > limit || start >= self.total {
+            return None;
+        }
+        let end = match self.extents.range(start..).next() {
+            Some((next, _)) => (next - 1).min(limit),
+            None => limit,
+        };
+        Some((start, end))
     }
 
     /// Replaces everything with one finished body, for the whole-file fallback.
     fn adopt_complete(&mut self, bytes: Vec<u8>) {
         self.total = bytes.len();
-        self.chunks = vec![Some(bytes)];
+        self.extents = std::collections::BTreeMap::from([(0, bytes)]);
     }
 
-    fn put(&mut self, index: usize, bytes: Vec<u8>) {
-        if index < self.chunks.len() {
-            self.chunks[index] = Some(bytes);
+    /**
+     * Writes bytes that arrived at `offset`, extending the extent that ends there or starting
+     * one, and joining the next extent once they meet. Bytes that would overlap one already
+     * here are dropped: the fetcher only asks for gaps, so that is a server sending past the
+     * range it was asked for.
+     */
+    fn write(&mut self, offset: usize, bytes: &[u8]) {
+        // Whatever of these bytes is already here stays as it is
+        let present = self.available_from(offset).min(bytes.len());
+        let (offset, bytes) = (offset + present, &bytes[present..]);
+        if bytes.is_empty() {
+            return;
+        }
+        let next = self.extents.range(offset + 1..).next().map(|(start, _)| *start);
+        let room = next.map_or(bytes.len(), |next| bytes.len().min(next.saturating_sub(offset)));
+        let bytes = &bytes[..room.min(self.total.saturating_sub(offset))];
+        if bytes.is_empty() {
+            return;
+        }
+        let joined = match self.extents.range_mut(..=offset).next_back() {
+            Some((start, extent)) if start + extent.len() == offset => {
+                extent.extend_from_slice(bytes);
+                *start
+            }
+            _ => {
+                self.extents.insert(offset, bytes.to_vec());
+                offset
+            }
+        };
+        let end = joined + self.extents[&joined].len();
+        if let Some(following) = self.extents.remove(&end) {
+            self.extents.get_mut(&joined).expect("extent just written").extend(following);
         }
     }
 
-    /// Copies `start..=end` out of the chunk list, which may straddle several chunks.
+    /// Copies `start..=end`, as far as it has arrived without a hole.
     pub(crate) fn read(&self, start: usize, end: usize) -> Vec<u8> {
-        let mut out = Vec::with_capacity(end.saturating_sub(start) + 1);
-        let mut offset = 0;
-        for chunk in &self.chunks {
-            let Some(bytes) = chunk else { break };
-            let chunk_end = offset + bytes.len();
-            if chunk_end > start && offset <= end {
-                let from = start.saturating_sub(offset);
-                let to = (end - offset + 1).min(bytes.len());
-                if from < to {
-                    out.extend_from_slice(&bytes[from..to]);
-                }
+        match self.extents.range(..=start).next_back() {
+            Some((extent_start, bytes)) if extent_start + bytes.len() > start => {
+                let from = start - extent_start;
+                let to = (end + 1 - extent_start).min(bytes.len());
+                bytes[from..to.max(from)].to_vec()
             }
-            offset = chunk_end;
-            if offset > end {
-                break;
-            }
+            _ => Vec::new(),
         }
-        out
     }
 }
 
@@ -2393,45 +2456,40 @@ const OFFLINE_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
 const OFFLINE_CHUNK_CONCURRENCY: usize = 6;
 
 /**
- * One playback fill at a time, process-wide.
+ * One playback request at a time, process-wide.
  *
  * Not a rate limit — a correctness guard. googlevideo answers 403 on the later of two range
- * requests that overlap on one session, so two tracks filling at once means the one being
- * listened to loses its tail. See `fill_media_buffer`, which holds this for its whole run.
+ * requests that overlap on one session, so two tracks fetching at once means the one being
+ * listened to loses its tail. Held for one piece (`AUDIO_PIECE_BYTES`), never for a whole
+ * file: held for a whole file, a preloaded 38-minute mix kept the track just clicked waiting
+ * 20 seconds for its first byte, and every such play fell back to the YouTube player.
  *
  * Downloads (`fetch_audio_ranged`) deliberately stay outside it: they fan out six ways on
  * purpose, they are a user-initiated bulk action rather than something a listener is waiting
  * on, and that path has not shown this failure.
  */
-static PLAYBACK_FILL_LOCK: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
-
-/** Attempts per playback range before falling back. A 403 here is usually transient. */
-const PLAYBACK_RANGE_ATTEMPTS: usize = 3;
-/** Delay before retrying a refused range; doubled on each further attempt. */
-const PLAYBACK_RETRY_BACKOFF: Duration = Duration::from_millis(250);
+static PLAYBACK_REQUEST_LOCK: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
 
 /**
- * One counter per native-audio load slot — foreground (`0`) and standby (`1`) — bumped every
- * time a new load targets that slot.
+ * Readers waiting on bytes that have not arrived, across every playing and preloaded track.
  *
- * A fill still running under a stale generation has been superseded: nobody is waiting on it
- * any more, so it abandons instead of running its retries and whole-file fallback to
- * completion. Without this, a track that died left its fill orphaned but still holding
- * `PLAYBACK_FILL_LOCK` — a single global permit — for as long as its own retries took to
- * exhaust. That is exactly what the one reload `recoverFromPrematureEnd` sends right behind it
- * needs to not queue up behind, and a starved retry there is what turned one stalled download
- * into a skipped track.
+ * Read-ahead yields to them: it waits while one is waiting, and stops a piece it is part way
+ * through, so a jump or a click waits at most for the request already on the wire.
  */
-static LOAD_GENERATION: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+pub(crate) static PLAYBACK_READERS_WAITING: AtomicUsize = AtomicUsize::new(0);
 
-/// True once a fill's slot has moved on to a newer load. `None` opts out, for the media-server
-/// (`<audio>`) path, which has no load slots to be superseded in.
-fn load_superseded(slot: Option<(usize, u64)>) -> bool {
-    match slot {
-        Some((index, generation)) => LOAD_GENERATION[index].load(Ordering::SeqCst) != generation,
-        None => false,
-    }
-}
+/** Attempts per playback piece before falling back. A 403 here is usually transient. */
+const PLAYBACK_RANGE_ATTEMPTS: usize = 3;
+/** Delay before retrying a refused piece; doubled on each further attempt. */
+const PLAYBACK_RETRY_BACKOFF: Duration = Duration::from_millis(250);
+
+/// Bytes per playback request after the head: about a minute of ~150 kbps audio, a fraction of
+/// a second to fetch.
+const AUDIO_PIECE_BYTES: usize = 1024 * 1024;
+
+/// How far past the reader playback is kept: about four minutes of ~150 kbps audio. A song is
+/// all of it; a long mix is never pulled in whole.
+const AUDIO_READ_AHEAD_BYTES: usize = 4 * 1024 * 1024;
 
 /**
  * Smallest total worth splitting, and the floor on a range.
@@ -2460,31 +2518,6 @@ const AUDIO_MIN_CHUNK_BYTES: u64 = 512 * 1024;
  * like the others meant ~700 KB before the first note; this is enough to decode a header.
  */
 const AUDIO_HEAD_CHUNK_BYTES: usize = 128 * 1024;
-
-/**
- * The two ranges a *playback* body is fetched in: a small head, then all the rest.
- *
- * Playback does not fan out. googlevideo refuses ranges when several are in flight on one
- * session — always the later ones, never the first — and with a track playing and another
- * warming behind it there are always two fills competing. Lowering the fan-out did not stop
- * it; removing it does, and this is how a browser streams the same file anyway.
- *
- * The speed argument for fanning out does not apply here. It exists so a *download* finishes
- * quickly; playback only has to outrun the listener, and a ~130 kbps track needs about 16 KB/s
- * against a single stream that delivers far more. Latency is already handled by the head being
- * small — that is the only part a click waits for.
- */
-fn playback_ranges(total: usize) -> Vec<(usize, usize)> {
-    if total == 0 {
-        return Vec::new();
-    }
-    let head = AUDIO_HEAD_CHUNK_BYTES.min(total);
-    let mut ranges = vec![(0, head - 1)];
-    if head < total {
-        ranges.push((head, total - 1));
-    }
-    ranges
-}
 
 fn audio_chunk_size(total: u64) -> u64 {
     (total / OFFLINE_CHUNK_CONCURRENCY as u64)
@@ -2997,60 +3030,35 @@ fn bytes_preview(bytes: &[u8]) -> String {
 }
 
 /**
- * Fills a published buffer with parallel range requests.
+ * Fetches a playing or preloaded track in pieces, where it is being read.
  *
- * Chunks land out of order, which is why the buffer tracks them by index and serves only its
- * contiguous prefix. A failure marks the buffer so waiting requests get a 503 instead of
- * sitting out the timeout — the media element then reports an error and playback fails loudly
- * rather than hanging.
+ * What comes next, in order: the head (header and the WebM cues the demuxer seeks with); the
+ * bytes a reader is waiting on (a jump, a resume, playback catching up); then read-ahead,
+ * `AUDIO_READ_AHEAD_BYTES` past where the reader is. Each piece goes into the buffer as it
+ * arrives. One request at a time across the app (`PLAYBACK_REQUEST_LOCK`), and read-ahead
+ * steps aside whenever another track's reader is waiting.
  *
- * `slot` is the native-audio load slot this fill belongs to (see `LOAD_GENERATION`), `None` for
- * the media-server path. Checked at every point that would otherwise spend time on a track
- * nobody wants any more, so a superseded fill gives up `PLAYBACK_FILL_LOCK` promptly instead of
- * running its retries and fallback to completion first.
+ * Runs while a deck holds the track: `buffer` is weak, so once the reader and the deck's
+ * health probe are gone — skipped, replaced, finished — the next look finds nothing and the
+ * fetch stops. A failure marks the buffer so a waiting reader gets EOF instead of the timeout.
  */
-async fn fill_media_buffer(
+async fn fetch_playback_pieces(
     url: String,
     track_id: String,
     cookie: Option<String>,
     mime_type: String,
-    buffer: Arc<Mutex<MediaBuffer>>,
-    ranges: Vec<(usize, usize)>,
-    slot: Option<(usize, u64)>,
+    buffer: std::sync::Weak<Mutex<MediaBuffer>>,
+    wake: Arc<tokio::sync::Notify>,
 ) {
     use futures_util::stream::StreamExt;
 
-    let fail = |buffer: &Arc<Mutex<MediaBuffer>>| {
-        if let Ok(mut guard) = buffer.lock() {
-            guard.failed = true;
+    let fail = |buffer: &std::sync::Weak<Mutex<MediaBuffer>>| {
+        if let Some(buffer) = buffer.upgrade() {
+            if let Ok(mut guard) = buffer.lock() {
+                guard.failed = true;
+            }
         }
     };
-
-    /*
-     * Held for the whole fill, both ranges and the fallback.
-     *
-     * `playback_ranges` removed the fan-out *within* a track after googlevideo was found to
-     * refuse ranges whenever several are in flight on one session — always the later ones,
-     * never the first. What it could not fix from where it sat is the fan-out *across* tracks:
-     * `warmNextTrack` starts the next track's fill the moment the current one loads, so two
-     * fills raced roughly 15 ms apart and the playing track's tail range came back 403. The
-     * whole-file fallback, issued while the other fill was still going, was refused in turn,
-     * and the track died.
-     *
-     * The warmed track waits, which is the right way round: it is an optimisation, and the one
-     * making sound is not.
-     */
-    let _fill_permit = PLAYBACK_FILL_LOCK.acquire().await;
-
-    // The wait for the permit above is where a superseded fill most likely spent its time —
-    // recheck now, before spending a request on a track that moved on while this was queued.
-    if load_superseded(slot) {
-        eprintln!(
-            "[internal][tauri][info] fill_media_buffer superseded before start track_id={}",
-            track_id
-        );
-        return;
-    }
 
     let Ok(request_url) = url::Url::parse(&url) else {
         fail(&buffer);
@@ -3064,135 +3072,164 @@ async fn fill_media_buffer(
         }
     };
 
-    let mut stream = futures_util::stream::iter(ranges.into_iter().enumerate().map(
-        |(index, (start, end))| {
-            let client = client.clone();
-            let url = url.clone();
-            let cookie = cookie.clone();
-            let abandoned = Arc::clone(&buffer);
-            async move {
-                /*
-                 * Checked here rather than between chunks because `buffered(1)` starts the next
-                 * request as soon as it is polled — by the time the outer loop could look, the
-                 * range is already in flight. `failed` is set by whoever gave up on the body:
-                 * the fill itself, or a decode that could not use it. `load_superseded` catches
-                 * the third way a range stops mattering: a newer load took this slot, and this
-                 * one is still going only because nothing had told it to stop.
-                 */
-                if abandoned.lock().map(|guard| guard.failed).unwrap_or(true)
-                    || load_superseded(slot)
-                {
-                    return Err((index, cache_error("fill abandoned")));
-                }
-                /*
-                 * Retried before it is given up on. A 403 on a range is usually transient —
-                 * googlevideo throttling rather than a URL that has gone bad — and abandoning
-                 * the assembly on the first one sent every such track down the whole-file
-                 * path, which can be refused in turn and then the play simply fails.
-                 */
-                let ranged = audio_url_with_range(&url, start as u64, end as u64);
-                let mut backoff = PLAYBACK_RETRY_BACKOFF;
-                let mut last: CommandError = cache_error("range never attempted");
+    let mut head_verified = false;
+    let mut failures = 0usize;
+    let mut backoff = PLAYBACK_RETRY_BACKOFF;
 
-                for attempt in 0..PLAYBACK_RANGE_ATTEMPTS {
-                    // Re-checked every attempt: a supersede mid-backoff must not spend the next
-                    // request anyway, and this is what stops it doing that.
-                    if load_superseded(slot) {
-                        return Err((index, cache_error("fill abandoned")));
-                    }
-                    if attempt > 0 {
-                        tokio::time::sleep(backoff).await;
-                        backoff *= 2;
-                    }
-                    match googlevideo_audio_request(&client, &ranged, cookie.as_deref())
-                        .send()
-                        .await
-                    {
-                        Ok(response) if response.status().is_success() => {
-                            match response.bytes().await {
-                                Ok(body) => return Ok((index, body.to_vec())),
-                                Err(error) => {
-                                    last = cache_error(format!("audio range read failed: {error}"));
-                                }
-                            }
-                        }
-                        Ok(response) => {
-                            last = cache_error(format!("range returned {}", response.status()));
-                        }
-                        Err(error) => {
-                            last = cache_error(format!("audio range request failed: {error}"));
-                        }
-                    }
-                }
-                Err::<(usize, Vec<u8>), (usize, CommandError)>((index, last))
+    loop {
+        /*
+         * What to fetch next, decided under the lock and acted on outside it. `demand` is the
+         * head or a reader of this track waiting; only read-ahead yields to other tracks.
+         */
+        let (job, own_waiting, head) = {
+            let Some(strong) = buffer.upgrade() else { return };
+            let Ok(guard) = strong.lock() else { return };
+            if guard.failed {
+                return;
             }
-        },
-    ))
-    .buffered(1);
-
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok((index, body)) => {
-                // The first chunk is the only one that can prove the container.
-                if index == 0 {
-                    if let Err(error) = verify_audio_container(&body, &mime_type) {
-                        eprintln!(
-                            "[internal][tauri][warn] fill_media_buffer bad container track_id={} error={}",
-                            track_id, error.message
-                        );
-                        fail(&buffer);
-                        return;
-                    }
-                }
-                match buffer.lock() {
-                    Ok(mut guard) => guard.put(index, body),
-                    Err(_) => return,
-                }
-            }
-            Err((index, error)) => {
-                /*
-                 * An abandoned fill must not fall back — the fallback downloads the *whole*
-                 * body, which is precisely the work being called off. Only a genuine refusal
-                 * gets the retry below.
-                 */
-                if buffer.lock().map(|guard| guard.failed).unwrap_or(true) {
-                    eprintln!(
-                        "[internal][tauri][info] fill_media_buffer abandoned track_id={}",
-                        track_id
-                    );
-                    return;
-                }
-                // Same reasoning, for the one case above cannot see: superseded rather than
-                // failed. The whole-file fallback below is the expensive part of this function —
-                // not worth starting for a track nobody is playing or preloading any more.
-                if load_superseded(slot) {
-                    eprintln!(
-                        "[internal][tauri][info] fill_media_buffer superseded, skipping fallback track_id={}",
-                        track_id
-                    );
-                    return;
-                }
-                /*
-                 * One refused range is not a dead track.
-                 *
-                 * googlevideo answers 403 on individual ranges often enough that the ranged
-                 * fetcher has always fallen back to a single whole-file request — this task
-                 * lost that when it was split out, so a transient refusal became a failed
-                 * play. Slower, but it is the path that has always worked.
-                 */
+            if head_verified && guard.is_complete() {
                 eprintln!(
-                    "[internal][tauri][warn] fill_media_buffer chunk {} failed ({}) falling back track_id={}",
-                    index, error.message, track_id
+                    "[internal][tauri][info] fetch_playback_pieces complete track_id={}",
+                    track_id
                 );
-                drop(stream);
-                match fetch_audio_bytes(url.clone(), track_id.clone(), cookie.clone()).await {
-                    Ok(whole) if !whole.is_empty() => {
-                        if verify_audio_container(&whole, &mime_type).is_err() {
-                            fail(&buffer);
-                            return;
+                return;
+            }
+            let own_waiting = guard.wanted.is_some();
+            if !head_verified {
+                match guard.next_gap(0, AUDIO_HEAD_CHUNK_BYTES - 1) {
+                    Some(gap) => (Some((gap, true)), own_waiting, None),
+                    // The head is here: checked before anything else is fetched
+                    None => (None, own_waiting, Some(guard.read(0, AUDIO_HEAD_CHUNK_BYTES - 1))),
+                }
+            } else if let Some(gap) =
+                guard.wanted.and_then(|at| guard.next_gap(at, at + AUDIO_PIECE_BYTES - 1))
+            {
+                (Some((gap, true)), own_waiting, None)
+            } else {
+                let from = guard.read_pos;
+                let gap = guard
+                    .next_gap(from, from + AUDIO_READ_AHEAD_BYTES - 1)
+                    .map(|(start, end)| ((start, end.min(start + AUDIO_PIECE_BYTES - 1)), false));
+                (gap, own_waiting, None)
+            }
+        };
+
+        // The head is the only piece that can prove the container
+        if let Some(head) = head {
+            if let Err(error) = verify_audio_container(&head, &mime_type) {
+                eprintln!(
+                    "[internal][tauri][warn] fetch_playback_pieces bad container track_id={} error={}",
+                    track_id, error.message
+                );
+                fail(&buffer);
+                return;
+            }
+            head_verified = true;
+            continue;
+        }
+
+        let Some(((start, end), demand)) = job else {
+            // Nothing missing near the reader: wait for it to move on, or to jump
+            let _ = tokio::time::timeout(Duration::from_millis(500), wake.notified()).await;
+            continue;
+        };
+
+        let others_waiting =
+            || PLAYBACK_READERS_WAITING.load(Ordering::SeqCst) > usize::from(own_waiting);
+        if !demand && others_waiting() {
+            let _ = tokio::time::timeout(Duration::from_millis(50), wake.notified()).await;
+            continue;
+        }
+        let permit = PLAYBACK_REQUEST_LOCK.acquire().await;
+        if !demand && others_waiting() {
+            continue;
+        }
+
+        let started_at = Instant::now();
+        let ranged = audio_url_with_range(&url, start as u64, end as u64);
+        let mut received = 0usize;
+        let mut preempted = false;
+        let outcome: Result<(), String> =
+            match googlevideo_audio_request(&client, &ranged, cookie.as_deref()).send().await {
+                Ok(response) if response.status().is_success() => {
+                    let mut pieces = response.bytes_stream();
+                    let mut outcome = Ok(());
+                    while let Some(piece) = pieces.next().await {
+                        let bytes = match piece {
+                            Ok(bytes) => bytes,
+                            Err(error) => {
+                                outcome = Err(format!(
+                                    "audio piece read failed after {received} bytes: {error}"
+                                ));
+                                break;
+                            }
+                        };
+                        let Some(strong) = buffer.upgrade() else { return };
+                        match strong.lock() {
+                            Ok(mut guard) if !guard.failed => guard.write(start + received, &bytes),
+                            _ => return,
                         }
-                        if let Ok(mut guard) = buffer.lock() {
-                            guard.adopt_complete(whole);
+                        received += bytes.len();
+                        // Another track's reader is waiting: the rest of this piece can wait
+                        if !demand && others_waiting() {
+                            preempted = true;
+                            break;
+                        }
+                    }
+                    if outcome.is_ok() && !preempted && start + received <= end {
+                        outcome = Err(format!("audio piece ended short after {received} bytes"));
+                    }
+                    outcome
+                }
+                Ok(response) => Err(format!("piece returned {}", response.status())),
+                Err(error) => Err(format!("audio piece request failed: {error}")),
+            };
+        drop(permit);
+
+        match outcome {
+            Ok(()) => {
+                failures = 0;
+                backoff = PLAYBACK_RETRY_BACKOFF;
+                eprintln!(
+                    "[internal][tauri][info] fetch_playback_pieces piece track_id={} start={} bytes={} ms={} demand={} preempted={}",
+                    track_id,
+                    start,
+                    received,
+                    started_at.elapsed().as_millis(),
+                    demand,
+                    preempted
+                );
+            }
+            Err(message) => {
+                failures += 1;
+                eprintln!(
+                    "[internal][tauri][warn] fetch_playback_pieces piece failed track_id={} start={} attempt={} error={}",
+                    track_id, start, failures, message
+                );
+                if failures < PLAYBACK_RANGE_ATTEMPTS {
+                    tokio::time::sleep(backoff).await;
+                    backoff *= 2;
+                    continue;
+                }
+                /*
+                 * One refused piece is not a dead track. googlevideo refuses ranges often enough
+                 * that playback has always fallen back to one whole-file request, which is
+                 * slower but the path that has always worked. Not worth starting for a track no
+                 * deck holds any more.
+                 */
+                if buffer.upgrade().is_none() {
+                    return;
+                }
+                let _permit = PLAYBACK_REQUEST_LOCK.acquire().await;
+                match fetch_audio_bytes(url.clone(), track_id.clone(), cookie.clone()).await {
+                    Ok(whole)
+                        if !whole.is_empty()
+                            && verify_audio_container(&whole, &mime_type).is_ok() =>
+                    {
+                        if let Some(strong) = buffer.upgrade() {
+                            if let Ok(mut guard) = strong.lock() {
+                                guard.adopt_complete(whole);
+                            }
                         }
                     }
                     _ => fail(&buffer),
@@ -3244,21 +3281,15 @@ enum NativeAudioSource {
  * Opens a source as a blocking reader.
  *
  * The streaming case is the interesting one: it publishes an empty buffer sized from the URL's
- * own `clen`, starts the same ranged fill the media server uses, and returns a reader over it
- * straight away. The decoder then reads the container header out of the head chunk while the
- * rest is still arriving — which is the whole difference from the `<audio>` path, where the
- * body had to be published before an element could be pointed at it.
- *
- * `standby` picks the load slot for `LOAD_GENERATION`: this load's fill becomes the one worth
- * waiting for in its slot, and whatever fill was previously running there — a track that has
- * since died, been skipped, or already played out — is now free to abandon instead of running
- * its retries and fallback to completion.
+ * own `clen`, starts fetching it in pieces (`fetch_playback_pieces`), and returns a reader over
+ * it straight away. The decoder then reads the container header out of the head while the rest
+ * is still arriving. The fetch holds the buffer weakly, so it runs exactly as long as the deck
+ * that gets this reader holds the track.
  */
 fn open_native_audio_reader(
     app: &tauri::AppHandle,
     track_id: &str,
     source: NativeAudioSource,
-    standby: bool,
 ) -> Result<NativeAudioReader, CommandError> {
     match source {
         NativeAudioSource::Stream {
@@ -3273,18 +3304,18 @@ fn open_native_audio_reader(
                 return Err(cache_error("audio URL declared no length"));
             }
 
-            let ranges = playback_ranges(total);
-            let buffer = Arc::new(Mutex::new(MediaBuffer::pending(total, ranges.len())));
-            let slot_index = standby as usize;
-            let generation = LOAD_GENERATION[slot_index].fetch_add(1, Ordering::SeqCst) + 1;
-            tauri::async_runtime::spawn(fill_media_buffer(
+            let buffer = Arc::new(Mutex::new(MediaBuffer::pending(total)));
+            let wake = buffer
+                .lock()
+                .map(|guard| Arc::clone(&guard.wake))
+                .map_err(|_| cache_error("audio buffer lock poisoned"))?;
+            tauri::async_runtime::spawn(fetch_playback_pieces(
                 url,
                 track_id.to_string(),
                 cookie,
                 mime_type.clone(),
-                Arc::clone(&buffer),
-                ranges,
-                Some((slot_index, generation)),
+                Arc::downgrade(&buffer),
+                wake,
             ));
             Ok(NativeAudioReader {
                 reader: Box::new(audio::BufferReader::new(Arc::clone(&buffer))),
@@ -3354,8 +3385,8 @@ fn sniffed_mime(
  * A reader, plus the buffer behind it when one is still filling.
  *
  * The buffer comes back so a *failed* decode can abandon the download. Without it a track whose
- * codec symphonia cannot handle still pulled its whole body over the network — and, worse, held
- * `PLAYBACK_FILL_LOCK` while doing it, so every refusal delayed the next real load.
+ * codec symphonia cannot handle still pulled its whole body over the network — and, worse, took
+ * turns on `PLAYBACK_REQUEST_LOCK` while doing it, so every refusal delayed the next real load.
  */
 struct NativeAudioReader {
     /// `MediaSource` is `Read + Seek + Send + Sync` plus a length — exactly what symphonia's
@@ -3389,7 +3420,7 @@ async fn native_audio_load(
     standby: Option<bool>,
 ) -> Result<f64, CommandError> {
     let NativeAudioReader { reader, mime_type, buffer } =
-        open_native_audio_reader(&app, &track_id, source, standby.unwrap_or(false))?;
+        open_native_audio_reader(&app, &track_id, source)?;
     let started_at = Instant::now();
 
     let decoded = tauri::async_runtime::spawn_blocking(move || {
@@ -3413,9 +3444,9 @@ async fn native_audio_load(
 
     /*
      * A decode that failed has no reader left, so the fill behind it is downloading a body
-     * nobody will ever read. Marking the buffer stops it at its next range and, more to the
-     * point, gives up the fill permit — otherwise a run of undecodable tracks queues a run of
-     * pointless downloads in front of the next one that would have played.
+     * nobody will ever read. Marking the buffer stops it at its next piece and, more to the
+     * point, ends its turns on the request lock — otherwise a run of undecodable tracks queues
+     * a run of pointless downloads in front of the next one that would have played.
      */
     let (decoded, decoded_duration) = match decoded {
         Ok(decoded) => decoded,
@@ -3424,7 +3455,7 @@ async fn native_audio_load(
             // the flag first would not change these bytes, only make the intent read backwards.
             let preview = buffer.as_ref().and_then(|buffer| {
                 let guard = buffer.lock().ok()?;
-                let available = guard.contiguous_len();
+                let available = guard.available_from(0);
                 Some(bytes_preview(&guard.read(0, available.saturating_sub(1))))
             });
             if let Some(buffer) = &buffer {
@@ -4127,8 +4158,8 @@ mod tests {
     use super::{
         apply_set_cookie, audio_url_with_range, cookie_account_identity,
         error_cause_chain, is_slow_persist_cookie, is_youtube_cookie_host, parse_cookie_header, sanitize_log_url,
-        audio_chunk_size, playback_ranges, serialize_cookie_pairs, MediaBuffer, AUDIO_HEAD_CHUNK_BYTES, signed_content_length, AUDIO_MIN_CHUNK_BYTES, OFFLINE_CHUNK_BYTES,
-        load_superseded, LOAD_GENERATION, bytes_preview,
+        audio_chunk_size, serialize_cookie_pairs, MediaBuffer, signed_content_length, AUDIO_MIN_CHUNK_BYTES, OFFLINE_CHUNK_BYTES,
+        PLAYBACK_READERS_WAITING, bytes_preview,
         YoutubeAccountStore, generate_slot_id, login_partition_directory_name,
         LEGACY_ACCOUNT_SLOT_ID,
     };
@@ -4228,132 +4259,103 @@ mod tests {
     /**
      * The streaming reader the Rust decoder pulls through.
      *
-     * This is the one place a mistake is inaudible until it is a corrupted song: ranges land
-     * out of order, so a reader that measured "how much has arrived" rather than "how much has
-     * arrived *from the start*" would happily hand the decoder chunk 1 as though it were chunk
-     * 0 and splice the file together wrong.
+     * Bytes arrive wherever they are being read, so a reader must only ever hand the decoder
+     * bytes from where it is — never the next extent that happens to be here — and a read at a
+     * hole must say where it waits and wait, not answer short: 0 would look like the end of the
+     * track.
      */
     #[test]
-    fn buffer_reader_serves_only_the_contiguous_prefix() {
-        let buffer = Arc::new(Mutex::new(MediaBuffer::pending(6, 3)));
+    fn buffer_reader_waits_where_it_reads_and_says_so() {
+        let buffer = Arc::new(Mutex::new(MediaBuffer::pending(8)));
         let mut reader = BufferReader::new(Arc::clone(&buffer));
 
-        // The second range wins the race. Nothing is servable yet regardless: byte 0 is missing.
-        buffer.lock().unwrap().put(1, vec![3, 4]);
-
-        let filling = Arc::clone(&buffer);
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(30));
-            filling.lock().unwrap().put(0, vec![1, 2]);
-        });
-
-        let started_at = std::time::Instant::now();
-        let mut head = [0u8; 2];
-        let read = reader.read(&mut head).unwrap();
-        /*
-         * Two things at once: the bytes are the head, not the chunk that happened to land
-         * first, and getting them took the wait. A reader that returned 0 here would look like
-         * the end of the stream to the decoder, and one that returned `[3, 4]` would play the
-         * middle of the song as its beginning.
-         */
-        assert_eq!(&head[..read], &[1, 2]);
-        assert!(started_at.elapsed() >= Duration::from_millis(25));
-
-        // The prefix is served as one run rather than one chunk at a time — the chunk layout is
-        // the downloader's business, not something the decoder should feel.
+        buffer.lock().unwrap().write(0, &[1, 2]);
         let mut out = [0u8; 8];
         let read = reader.read(&mut out).unwrap();
-        assert_eq!(&out[..read], &[3, 4]);
+        assert_eq!(&out[..read], &[1, 2]);
+        assert_eq!(buffer.lock().unwrap().read_pos, 2, "read-ahead follows the reader");
+
+        // A jump past what has arrived: the reader waits there, and says so
+        reader.seek(SeekFrom::Start(5)).unwrap();
+        let filling = Arc::clone(&buffer);
+        let filler = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            let wanted = filling.lock().unwrap().wanted;
+            let waiting = PLAYBACK_READERS_WAITING.load(Ordering::SeqCst);
+            filling.lock().unwrap().write(5, &[6, 7, 8]);
+            (wanted, waiting)
+        });
+        let started_at = std::time::Instant::now();
+        let read = reader.read(&mut out).unwrap();
+        assert_eq!(&out[..read], &[6, 7, 8], "the bytes at the jump, not the head");
+        assert!(started_at.elapsed() >= Duration::from_millis(25));
+        let (wanted, waiting) = filler.join().unwrap();
+        assert_eq!(wanted, Some(5), "the fetcher is told where the reader waits");
+        assert!(waiting >= 1, "other tracks' read-ahead is told a reader waits");
+        assert_eq!(buffer.lock().unwrap().wanted, None, "taken back once the bytes are here");
 
         /*
-         * The tail never arrives and the download gives up. EOF, not an error and not a hang:
-         * the decoder finishes the frames it has and the track reports its end, so the queue
-         * advances instead of stalling on a deck that will never empty.
+         * The hole at 2 never fills and the download gives up. EOF, not an error and not a
+         * hang: the decoder finishes the frames it has and the track reports its end, so the
+         * queue advances instead of stalling on a deck that will never empty.
          */
+        reader.seek(SeekFrom::Start(2)).unwrap();
         buffer.lock().unwrap().failed = true;
         assert_eq!(reader.read(&mut out).unwrap(), 0);
 
         // Symphonia probes containers by seeking around; past the end must clamp rather than
         // fail, or a probe of a body still downloading kills the load.
-        assert_eq!(reader.seek(SeekFrom::End(0)).unwrap(), 6);
-        assert_eq!(reader.seek(SeekFrom::Start(999)).unwrap(), 6);
+        assert_eq!(reader.seek(SeekFrom::End(0)).unwrap(), 8);
+        assert_eq!(reader.seek(SeekFrom::Start(999)).unwrap(), 8);
         assert_eq!(reader.seek(SeekFrom::Start(2)).unwrap(), 2);
     }
 
-    /// The head decides how long a click waits for sound, and the two ranges must tile the
-    /// body exactly — a gap here is a hole in the audio.
+    /// Pieces land anywhere, and the buffer tells the fetcher exactly which bytes are still
+    /// missing — a gap asked for twice is a wasted request, and one never asked for is a hole.
     #[test]
-    fn playback_ranges_lead_with_a_small_head_and_cover_everything() {
-        let total = 4_000_000;
-        let ranges = playback_ranges(total);
+    fn media_buffer_holds_pieces_anywhere_and_finds_the_gaps() {
+        let mut buffer = MediaBuffer::pending(10);
+        assert_eq!(buffer.next_gap(0, 9), Some((0, 9)));
 
-        assert_eq!(ranges.len(), 2, "playback fetches a head and then the rest, nothing more");
-        assert_eq!(ranges[0], (0, AUDIO_HEAD_CHUNK_BYTES - 1));
-        assert_eq!(ranges[1], (AUDIO_HEAD_CHUNK_BYTES, total - 1));
+        // A resume: bytes far in arrive before the start
+        buffer.write(6, &[7, 8]);
+        assert_eq!(buffer.available_from(0), 0);
+        assert_eq!(buffer.available_from(6), 2);
+        assert_eq!(buffer.available_from(7), 1);
+        assert_eq!(buffer.read(6, 7), vec![7, 8]);
+        assert_eq!(buffer.next_gap(0, 9), Some((0, 5)), "stops at what is already here");
 
-        let mut next = 0;
-        for (start, end) in &ranges {
-            assert_eq!(*start, next, "ranges must tile without a gap");
-            next = end + 1;
-        }
-        assert_eq!(next, total, "ranges must cover the whole body");
+        buffer.write(0, &[1, 2, 3]);
+        assert_eq!(buffer.next_gap(0, 9), Some((3, 5)));
+        assert_eq!(buffer.next_gap(6, 9), Some((8, 9)), "skips what is here");
+        assert_eq!(buffer.next_gap(6, 7), None, "nothing missing up to the limit");
 
-        // Smaller than one head is a single range, and nothing at all is no ranges.
-        assert_eq!(playback_ranges(1000), vec![(0, 999)]);
-        assert!(playback_ranges(0).is_empty());
+        // The hole closes: the extents join and read as one run
+        buffer.write(3, &[4, 5, 6]);
+        assert_eq!(buffer.available_from(0), 8);
+        assert_eq!(buffer.read(2, 7), vec![3, 4, 5, 6, 7, 8]);
+
+        // A server sending past the end is cut at the end
+        buffer.write(8, &[9, 10, 11]);
+        assert!(buffer.is_complete());
+        assert_eq!(buffer.read(0, 9), (1..=10).collect::<Vec<u8>>());
+        assert_eq!(buffer.next_gap(0, 9), None);
     }
 
-    /**
-     * A fill knows when a newer load has taken its slot.
-     *
-     * This is what lets an orphaned fill — one whose track died, was skipped, or already
-     * finished — give up `PLAYBACK_FILL_LOCK` instead of running its retries and whole-file
-     * fallback to completion first, which is what starved the one retry
-     * `recoverFromPrematureEnd` sends right behind it.
-     */
+    /// A piece arriving over bytes already here keeps what is there and adds only what is new.
     #[test]
-    fn a_fill_notices_its_slot_was_taken_by_a_newer_load() {
-        let slot_index = 1; // Standby — kept off slot 0 so a parallel test on the other slot can't race this one.
-        let first = LOAD_GENERATION[slot_index].fetch_add(1, Ordering::SeqCst) + 1;
-        assert!(
-            !load_superseded(Some((slot_index, first))),
-            "the load that just claimed the slot is not superseded by itself",
-        );
+    fn media_buffer_write_never_overwrites() {
+        let mut buffer = MediaBuffer::pending(6);
+        buffer.write(0, &[1, 2, 3]);
+        buffer.write(2, &[9, 4, 5]);
+        assert_eq!(buffer.read(0, 4), vec![1, 2, 3, 4, 5]);
 
-        // A second load for the same slot — the track that died gets reloaded, or the queue
-        // just moved on — bumps past it.
-        let second = LOAD_GENERATION[slot_index].fetch_add(1, Ordering::SeqCst) + 1;
-        assert!(
-            load_superseded(Some((slot_index, first))),
-            "the first load must see itself superseded once a second one claims the slot",
-        );
-        assert!(!load_superseded(Some((slot_index, second))), "the newest load is never stale");
-
-        // No slot at all — the media-server path — is never superseded.
-        assert!(!load_superseded(None));
-    }
-
-    /// Ranges land out of order, so what can be served is the leading run of chunks — not the
-    /// byte count. Serving past a hole would hand the media element a corrupt body.
-    #[test]
-    fn media_buffer_serves_only_its_contiguous_prefix() {
-        let mut buffer = MediaBuffer::pending(10, 4);
-        assert_eq!(buffer.contiguous_len(), 0);
-
-        // The tail arrives first: still nothing servable, because byte 0 is missing.
-        buffer.put(2, vec![9, 9]);
-        assert_eq!(buffer.contiguous_len(), 0);
-
-        buffer.put(0, vec![1, 2, 3, 4]);
-        assert_eq!(buffer.contiguous_len(), 4, "only the head is contiguous");
-
-        // The hole closes and the whole file becomes readable in one step.
-        buffer.put(1, vec![5, 6, 7, 8]);
-        assert_eq!(buffer.contiguous_len(), 10);
-
-        // A read spanning three chunks is reassembled in order.
-        assert_eq!(buffer.read(2, 8), vec![3, 4, 5, 6, 7, 8, 9]);
-        assert_eq!(buffer.read(0, 0), vec![1]);
+        // Bytes that would run into a later extent stop where it starts
+        let mut buffer = MediaBuffer::pending(6);
+        buffer.write(4, &[5, 6]);
+        buffer.write(0, &[1, 2, 3, 4, 9, 9]);
+        assert_eq!(buffer.read(0, 5), vec![1, 2, 3, 4, 5, 6]);
+        assert!(buffer.is_complete());
     }
 
     /// A typical song is 2-4 MB. A fixed 4 MiB range size meant exactly those never split at

@@ -24,6 +24,7 @@ qml_module(taris-services
         hyprdevices.cpp
         hyprextras.cpp
         kdeconnect.cpp
+        bluetoothagent.cpp
     LIBRARIES
         Qt::Concurrent
         Qt::DBus

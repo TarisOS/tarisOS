@@ -23,9 +23,13 @@ Singleton {
     property bool keybinds
     // The emoji picker is up (modules/EmojiPicker.qml): the focus grabs let go meanwhile too
     property bool emojis
+    // A Bluetooth question is up (modules/bluetooth): the focus grabs let go meanwhile too, so the
+    // prompt gets every click and key
+    property bool bluetoothPrompt
     // The shell's focus grabs (modules/drawers, the bar's popouts) are off: while a password is
-    // asked for, an area is picked, or the keyboard shortcuts or the emoji picker are shown
-    readonly property bool grabsReleased: authenticating || picking || keybinds || emojis
+    // asked for, an area is picked, the keyboard shortcuts or the emoji picker are shown, or
+    // Bluetooth asks something
+    readonly property bool grabsReleased: authenticating || picking || keybinds || emojis || bluetoothPrompt
 
     // A disabled sidebar never counts as open (it would silence notification popups for nothing)
     function anySidebarOpen(): bool {

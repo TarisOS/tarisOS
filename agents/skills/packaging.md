@@ -79,16 +79,17 @@ as it is.
 
 ## Drivers patched for every kernel
 
-`taris-tipd-dkms`, `taris-appledrm-dkms` and `taris-brcmfmac-dkms` patch drivers of Asahi's kernel
-without carrying its source: each holds only TarisOS's patches, `asahi-source.sh` (the same script
-in all three) and `asahi-source.conf` (which source folders, which patches). DKMS builds them for
-every kernel installed (its pacman hook), and before each build `asahi-source.sh` takes Asahi's tag
-from the kernel release (`7.2.12-1-1-ARCH`: `asahi-7.2.12-1`), fetches just those folders (a
-shallow, sparse clone, cached in `/var/cache/taris-dkms`), and applies the patches. A patch the
-source already has is skipped. One that no longer applies stops that build, and the kernel's own
-driver loads instead: the M1's USB-C display stays dark, a USB-C display unplugged while on breaks
-modesetting until a restart, or the Wi-Fi link stays in L1 (about 0.2 W more). Nothing needs doing
-per Asahi release, except when a patch stops applying:
+`taris-tipd-dkms`, `taris-appledrm-dkms`, `taris-brcmfmac-dkms` and `taris-bcm4377-dkms` patch
+drivers of Asahi's kernel without carrying its source: each holds only TarisOS's patches,
+`asahi-source.sh` (the same script in all four) and `asahi-source.conf` (which source folders, which
+patches). DKMS builds them for every kernel installed (its pacman hook), and before each build
+`asahi-source.sh` takes Asahi's tag from the kernel release (`7.2.12-1-1-ARCH`: `asahi-7.2.12-1`),
+fetches just those folders (a shallow, sparse clone, cached in `/var/cache/taris-dkms`), and applies
+the patches. A patch the source already has is skipped. One that no longer applies stops that build,
+and the kernel's own driver loads instead: the M1's USB-C display stays dark, a USB-C display
+unplugged while on breaks modesetting until a restart, the Wi-Fi link stays in L1 (about 0.2 W
+more), or Bluetooth can die on waking from sleep until a restart. Nothing needs doing per Asahi
+release, except when a patch stops applying:
 
 - bring the patch up to date against the new source (DKMS's `make.log` for that kernel says which
   one stopped), and test it as the build does: `asahi-source.sh <kernel release>` in a copy of the

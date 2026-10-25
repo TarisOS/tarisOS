@@ -78,7 +78,8 @@ PageBase {
             list.anchors.top: scanIndicator.bottom
 
             model: ScriptModel {
-                values: Bluetooth.devices.values.filter(d => !d.bonded).sort((a, b) => (b.pairing - a.pairing) || a.name.localeCompare(b.name)) // qmllint disable unresolved-type
+                // Devices that say what they are: nearby phones and gadgets often only show an address
+                values: Bluetooth.devices.values.filter(d => !d.bonded && d.deviceName !== "").sort((a, b) => (b.pairing - a.pairing) || a.name.localeCompare(b.name)) // qmllint disable unresolved-type
             }
 
             delegate: Item {
@@ -100,9 +101,16 @@ PageBase {
                 }
 
                 Connections {
+                    // Trusted, so it reconnects later without a question, and connected (headphones
+                    // usually connect by themselves right after pairing)
                     function onPairedChanged(): void {
-                        if (newDevice.wasPairing && newDevice.modelData?.paired)
-                            root.nState.closeSubPage();
+                        const device = newDevice.modelData;
+                        if (!newDevice.wasPairing || !device?.paired)
+                            return;
+                        device.trusted = true;
+                        if (!device.connected && device.state !== BluetoothDeviceState.Connecting) // qmllint disable unresolved-type
+                            device.connect();
+                        root.nState.closeSubPage();
                     }
 
                     target: newDevice.modelData

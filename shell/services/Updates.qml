@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Io
 import Taris.Config
 import Taris.I18n
+import qs.utils
 
 // Pending updates for the Updates settings (the page in General and its full list share them):
 // packages (checkupdates: Arch Linux ARM, Asahi, the TarisOS repository; yay's AUR ones) and
@@ -69,7 +70,7 @@ Singleton {
     Process {
         id: terminalWindow
 
-        command: [...GlobalConfig.general.apps.terminal, "-e", "bash", "-c", "/usr/lib/taris/update; echo; read -p 'Done. Press Enter to close' _"]
+        command: [Paths.runApp, ...GlobalConfig.general.apps.terminal, "-e", "bash", "-c", "/usr/lib/taris/update; echo; read -p 'Done. Press Enter to close' _"]
         onExited: root.updateFinished()
     }
 
