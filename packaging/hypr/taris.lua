@@ -272,6 +272,11 @@ if style.columns == "1" then
 end
 if style.floatnew == "1" then
   hl.window_rule({ match = { class = ".*" }, float = true })
+  -- Except the music player and the agent, tiled on their workspaces (spaces, above): this rule
+  -- comes later, so it won over theirs
+  for _, s in ipairs(spaces) do
+    hl.window_rule({ match = s.match, tile = true })
+  end
   -- A floating window opens at the size it asks for: a viewer at its picture's or video's full
   -- size, a dialog at its saved one, often most of the screen. Larger than 65% x 70% of the
   -- screen, it opens at that size, centred, as SUPER + T does; it can still be made larger by hand

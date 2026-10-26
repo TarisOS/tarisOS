@@ -165,8 +165,22 @@ Singleton {
         previousSourceNode = source.name;
     }
 
+    // The built-in microphone is two sources: Asahi's DSP microphone and taris_mic, the mono copy of
+    // it that apps get by default (sameMicrophone). An app can pick the DSP one itself, and muting
+    // only the default left that app's microphone on: muting either mutes both
+    function syncMicMute(): void {
+        if (!source?.ready)
+            return;
+
+        for (const node of sources)
+            if (node !== source && node.ready && node.audio && sameMicrophone(source.name, node.name) && node.audio.muted !== sourceMuted)
+                node.audio.muted = sourceMuted;
+    }
+
     onSinkChanged: sinkUpdated()
     onSourceChanged: sourceUpdated()
+    onSourceMutedChanged: syncMicMute()
+    onSourcesChanged: syncMicMute()
 
     // Populate immediately: Pipewire.nodes may already be filled by the time this
     // lazily-loaded singleton is created, so onValuesChanged would never fire.

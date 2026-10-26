@@ -37,7 +37,10 @@ MouseArea {
     signal itemSelected(item: MenuItem)
 
     parent: {
-        const win = QsWindow.window;
+        // The window of the item it opens from first: a menu made with its window (the dock's
+        // Trash) finds none of its own yet, is taken out to nothing, and so never gets one: it
+        // stayed invisible, and holding the dock up, never closed
+        const win = root.attachTo?.QsWindow.window ?? QsWindow.window;
         const contentWin = win as ContentWindow; // If inside the drawer content window, put it inside the interaction wrapper so hover works
         // No window while being torn down (e.g. on a config reload)
         return contentWin ? contentWin.interactionWrapper : (win as QsWindow)?.contentItem ?? null;

@@ -205,9 +205,7 @@ Singleton {
     }
 
     function openTrash(): void {
-        // trash:/// has no handler of its own (xdg-open hands it to the browser), so it goes to
-        // whatever opens folders
-        Quickshell.execDetached([Paths.runApp, "sh", "-c", 'app=$(xdg-mime query default inode/directory 2>/dev/null); if [ -n "$app" ] && command -v gtk-launch >/dev/null; then exec gtk-launch "${app%.desktop}" trash:///; fi; for fm in nautilus thunar nemo dolphin; do command -v "$fm" >/dev/null && exec "$fm" trash:///; done; exec gio open trash:///']);
+        trashOpener.running = true;
     }
 
     function emptyTrash(): void {
@@ -365,6 +363,21 @@ Singleton {
         command: ["sh", "-c", 'ls "${XDG_CONFIG_HOME:-$HOME/.config}/autostart" 2>/dev/null']
         stdout: StdioCollector {
             onStreamFinished: root.autostart = text.split("\n").filter(f => f.endsWith(".desktop")).map(f => f.slice(0, -8))
+        }
+    }
+
+    // trash:/// has no handler of its own (xdg-open hands it to the browser), so it goes to whatever
+    // opens folders, started from its launcher's command as every app is (Launcher.Apps.launch).
+    // gtk-launch asked Nautilus over D-Bus instead, and the Trash never opened
+    Process {
+        id: trashOpener
+
+        command: ["xdg-mime", "query", "default", "inode/directory"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const entry = DesktopEntries.byId(text.trim().replace(/\.desktop$/, ""));
+                Quickshell.execDetached([Paths.runApp, ...(entry?.command ?? ["nautilus"]), "trash:///"]);
+            }
         }
     }
 

@@ -255,11 +255,22 @@ RowLayout {
                                 action: () => Dock.openTrash()
                             }
                         ];
+                        // Emptying it is asked again, as the Store's Remove is: the menu opens once
+                        // more with Confirm in its place (once the click has closed it)
                         if (root.trashFull)
                             rows.push({
                                 label: Tr.tr("Empty Trash"),
                                 icon: "delete_forever",
-                                action: () => Dock.emptyTrash()
+                                action: () => Qt.callLater(() => {
+                                    trashItem.menuRows = [rows[0],
+                                        {
+                                            label: Tr.tr("Confirm"),
+                                            icon: "delete_forever",
+                                            action: () => Dock.emptyTrash()
+                                        }
+                                    ];
+                                    trashMenu.expanded = true;
+                                })
                             });
                         trashItem.menuRows = rows;
                         trashMenu.expanded = true;
