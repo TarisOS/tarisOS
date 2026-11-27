@@ -19,6 +19,12 @@ A minimal, fast, low-power desktop for Apple Silicon Macs.
 
 ---
 
+
+
+https://github.com/user-attachments/assets/614bc088-618d-4fd8-a2dd-5f6aca37c02a
+
+
+
 TarisOS is a Linux desktop for M1 and M2 Macs. It's built on [Asahi Linux](https://asahilinux.org/)
 and Arch Linux ARM, uses [Hyprland](https://hypr.land) for windows, and comes with its own desktop
 shell, Taris.
